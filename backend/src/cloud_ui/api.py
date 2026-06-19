@@ -1,10 +1,30 @@
 from uuid import uuid4
 
-from fastapi import FastAPI, Request, Response
+from fastapi import APIRouter, FastAPI, Request, Response
 from starlette.middleware.base import RequestResponseEndpoint
 
 from cloud_ui.config import get_settings
 from cloud_ui.health import HealthReport, ReadinessCheck, build_readiness_check
+
+
+def build_health_router(check: ReadinessCheck) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/health/live")
+    def health_live() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @router.get(
+        "/health/ready",
+        response_model=HealthReport,
+        responses={503: {"model": HealthReport}},
+    )
+    def health_ready(response: Response) -> HealthReport:
+        report = check()
+        response.status_code = 200 if report.status == "ok" else 503
+        return report
+
+    return router
 
 
 def create_app(readiness_check: ReadinessCheck | None = None) -> FastAPI:
@@ -22,18 +42,7 @@ def create_app(readiness_check: ReadinessCheck | None = None) -> FastAPI:
         response.headers["x-request-id"] = request_id
         return response
 
-    @app.get("/health/live")
-    def health_live() -> dict[str, str]:
-        return {"status": "ok"}
-
-    @app.get(
-        "/health/ready",
-        response_model=HealthReport,
-        responses={503: {"model": HealthReport}},
-    )
-    def health_ready(response: Response) -> HealthReport:
-        report = check()
-        response.status_code = 200 if report.status == "ok" else 503
-        return report
+    app.include_router(build_health_router(check))
+    app.include_router(build_health_router(check), prefix="/api/v1")
 
     return app

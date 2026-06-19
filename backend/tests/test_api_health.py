@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 from cloud_ui.api import create_app
 from cloud_ui.health import DependencyState, HealthReport
 from fastapi.testclient import TestClient
@@ -14,6 +15,19 @@ def test_liveness_returns_ok() -> None:
 
     assert response.status_code == 200
     assert response.headers["x-request-id"] == "request-123"
+    assert response.json()["status"] == "ok"
+
+
+def test_api_v1_liveness_returns_ok() -> None:
+    def check() -> HealthReport:
+        return HealthReport(status="ok", dependencies={})
+
+    app = create_app(readiness_check=check)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/health/live")
+
+    assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
 
@@ -55,6 +69,31 @@ def test_readiness_returns_ok_status() -> None:
     }
 
 
+def test_api_v1_readiness_returns_ok_status() -> None:
+    def check() -> HealthReport:
+        return HealthReport(
+            status="ok",
+            dependencies={
+                "database": DependencyState(status="ok", detail="reachable"),
+                "rabbitmq": DependencyState(status="ok", detail="reachable"),
+            },
+        )
+
+    app = create_app(readiness_check=check)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/health/ready")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "dependencies": {
+            "database": {"status": "ok", "detail": "reachable"},
+            "rabbitmq": {"status": "ok", "detail": "reachable"},
+        },
+    }
+
+
 def test_readiness_openapi_documents_health_report() -> None:
     def check() -> HealthReport:
         return HealthReport(status="ok", dependencies={})
@@ -70,6 +109,17 @@ def test_readiness_openapi_documents_health_report() -> None:
         "$ref": "#/components/schemas/HealthReport"
     }
     assert responses["503"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/HealthReport"
+    }
+
+    prefixed_responses = client.get("/openapi.json").json()["paths"][
+        "/api/v1/health/ready"
+    ]["get"]["responses"]
+
+    assert prefixed_responses["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/HealthReport"
+    }
+    assert prefixed_responses["503"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/HealthReport"
     }
 

@@ -1,0 +1,87 @@
+services:
+  db:
+    image: mariadb:11.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-cloud_ui}
+      MYSQL_USER: ${MYSQL_USER:-cloud_ui}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-cloud_ui_dev}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-cloud_ui_root_dev}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-cloud_ui}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-cloud_ui_dev}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/cloud-ui}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: ./backend
+    command: ["cloud-ui", "api"]
+    environment:
+      CLOUD_UI_DATABASE_URL: ${CLOUD_UI_DATABASE_URL:-mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui}
+      CLOUD_UI_RABBITMQ_URL: ${CLOUD_UI_RABBITMQ_URL:-amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui}
+      CLOUD_UI_API_BIND_HOST: ${CLOUD_UI_API_BIND_HOST:-0.0.0.0}
+      CLOUD_UI_API_PORT: ${CLOUD_UI_API_PORT:-8080}
+      CLOUD_UI_LOG_LEVEL: ${CLOUD_UI_LOG_LEVEL:-INFO}
+      CLOUD_UI_CONFIG_VERSION: ${CLOUD_UI_CONFIG_VERSION:-dev}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  worker:
+    build:
+      context: ./backend
+    command: ["cloud-ui", "worker"]
+    environment:
+      CLOUD_UI_DATABASE_URL: ${CLOUD_UI_DATABASE_URL:-mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui}
+      CLOUD_UI_RABBITMQ_URL: ${CLOUD_UI_RABBITMQ_URL:-amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui}
+      CLOUD_UI_API_BIND_HOST: ${CLOUD_UI_API_BIND_HOST:-0.0.0.0}
+      CLOUD_UI_API_PORT: ${CLOUD_UI_API_PORT:-8080}
+      CLOUD_UI_LOG_LEVEL: ${CLOUD_UI_LOG_LEVEL:-INFO}
+      CLOUD_UI_CONFIG_VERSION: ${CLOUD_UI_CONFIG_VERSION:-dev}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  events:
+    build:
+      context: ./backend
+    command: ["cloud-ui", "events"]
+    environment:
+      CLOUD_UI_DATABASE_URL: ${CLOUD_UI_DATABASE_URL:-mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui}
+      CLOUD_UI_RABBITMQ_URL: ${CLOUD_UI_RABBITMQ_URL:-amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui}
+      CLOUD_UI_API_BIND_HOST: ${CLOUD_UI_API_BIND_HOST:-0.0.0.0}
+      CLOUD_UI_API_PORT: ${CLOUD_UI_API_PORT:-8080}
+      CLOUD_UI_LOG_LEVEL: ${CLOUD_UI_LOG_LEVEL:-INFO}
+      CLOUD_UI_CONFIG_VERSION: ${CLOUD_UI_CONFIG_VERSION:-dev}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "3000:8080"
