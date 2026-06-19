@@ -8,6 +8,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+.serena/
 node_modules/
 dist/
 build/
