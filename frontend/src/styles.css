@@ -1,0 +1,66 @@
+body {
+  margin: 0;
+}
+
+.cloud-ui-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.cloud-ui-layout {
+  width: min(100%, 760px);
+}
+
+.cloud-ui-status-card {
+  margin-top: 1rem;
+  max-width: 760px;
+}
+
+.cloud-ui-loading {
+  min-height: 8rem;
+}
+
+.cloud-ui-status-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.cloud-ui-dependencies {
+  margin: 0;
+}
+
+.cloud-ui-dependency-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #d2d2d2;
+}
+
+.cloud-ui-dependency-row:first-child {
+  padding-top: 0;
+}
+
+.cloud-ui-dependency-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.cloud-ui-dependency-row dt {
+  color: #151515;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.cloud-ui-dependency-row dd {
+  margin: 0;
+  color: #4f5255;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .cloud-ui-dependency-row {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+}
