@@ -25,6 +25,7 @@ services:
       retries: 12
 
   api:
+    image: cloud-ui-backend:dev
     build:
       context: ./backend
     command: ["cloud-ui", "api"]
@@ -40,12 +41,16 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     ports:
       - "8080:8080"
 
   worker:
-    build:
-      context: ./backend
+    image: cloud-ui-backend:dev
     command: ["cloud-ui", "worker"]
     environment:
       CLOUD_UI_DATABASE_URL: ${CLOUD_UI_DATABASE_URL:-mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui}
@@ -61,8 +66,7 @@ services:
         condition: service_healthy
 
   events:
-    build:
-      context: ./backend
+    image: cloud-ui-backend:dev
     command: ["cloud-ui", "events"]
     environment:
       CLOUD_UI_DATABASE_URL: ${CLOUD_UI_DATABASE_URL:-mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui}
@@ -78,6 +82,7 @@ services:
         condition: service_healthy
 
   frontend:
+    image: cloud-ui-frontend:dev
     build:
       context: ./frontend
     depends_on:
