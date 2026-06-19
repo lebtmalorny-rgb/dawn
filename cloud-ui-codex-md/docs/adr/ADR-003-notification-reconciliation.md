@@ -19,7 +19,7 @@ Use reconciliation as correctness authority and notifications as acceleration. E
 - Payload versions unknown.
 - Permissions model unknown.
 - Freshness target unknown.
-- Current catalog does not include Mistral, Watcher or Masakari; event/workflow assumptions for those services are blocked.
+- Mistral, Watcher and Masakari are now present in the test service catalog; notification transport and payload assumptions remain blocked until verified.
 
 ## Consequences
 
