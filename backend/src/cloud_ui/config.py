@@ -9,7 +9,8 @@ class Settings(BaseSettings):
 
     database_url: AnyUrl
     rabbitmq_url: AnyUrl
-    api_bind_host: str = Field(default="0.0.0.0")
+    # Container API binds all interfaces intentionally.
+    api_bind_host: str = Field(default="0.0.0.0")  # noqa: S104
     api_port: int = Field(default=8080, ge=1, le=65535)
     log_level: str = Field(default="INFO")
     config_version: str = Field(default="dev")

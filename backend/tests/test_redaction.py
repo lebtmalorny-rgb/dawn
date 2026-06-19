@@ -13,5 +13,5 @@ def test_redact_mapping_hides_secret_like_values() -> None:
 
     assert redacted["database_url"] == "***"
     assert redacted["rabbitmq_url"] == "***"
-    assert redacted["token"] == "***"
+    assert redacted["token"] == redacted["database_url"]
     assert redacted["normal"] == "visible"

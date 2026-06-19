@@ -1,7 +1,8 @@
 from typing import Any
 
-import cloud_ui.db as db
 from pytest import MonkeyPatch
+
+import cloud_ui.db as db
 
 
 def test_mysql_engine_uses_bounded_probe_timeouts(monkeypatch: MonkeyPatch) -> None:
