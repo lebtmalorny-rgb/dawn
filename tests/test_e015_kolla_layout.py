@@ -38,6 +38,8 @@ def test_kolla_build_config_defines_two_custom_images() -> None:
         "[cloud-ui-backend]",
         "[cloud-ui-frontend]",
         "[cloudui-user]",
+        "uid = 42580",
+        "gid = 42580",
     ]:
         assert expected in config
 
@@ -61,6 +63,8 @@ def test_kolla_build_config_defines_two_custom_images() -> None:
     }
 
     assert "latest" not in config.lower()
+    assert "uid = 42480" not in config
+    assert "gid = 42480" not in config
 
 
 def test_backend_template_keeps_one_backend_image_for_all_commands() -> None:
