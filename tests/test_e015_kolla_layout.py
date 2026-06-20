@@ -143,3 +143,13 @@ def test_lab_playbooks_are_reversible_and_use_no_committed_secrets() -> None:
     for relative_path, content in lab_file_contents.items():
         for forbidden_value in forbidden_values:
             assert forbidden_value not in content, relative_path
+
+
+def test_build_script_prepares_kolla_work_directories() -> None:
+    script = read_text("deploy/kolla/scripts/build-images.sh")
+
+    assert 'KOLLA_LOGS_DIR="${KOLLA_LOGS_DIR:-/tmp/dawn-kolla-build/logs}"' in script
+    assert 'KOLLA_WORK_DIR="${KOLLA_WORK_DIR:-/tmp/dawn-kolla-build/work}"' in script
+    assert 'mkdir -p "${KOLLA_LOGS_DIR}" "${KOLLA_WORK_DIR}"' in script
+    assert '--logs-dir "${KOLLA_LOGS_DIR}"' in script
+    assert '--work-dir "${KOLLA_WORK_DIR}"' in script
