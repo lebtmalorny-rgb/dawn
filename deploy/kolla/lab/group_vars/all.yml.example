@@ -1,0 +1,17 @@
+cloud_ui_registry_host: "192.168.10.15:5000"
+cloud_ui_image_tag: "2025.1-rocky-9"
+cloud_ui_backend_image: "{{ cloud_ui_registry_host }}/kolla/cloud-ui-backend:{{ cloud_ui_image_tag }}"
+cloud_ui_frontend_image: "{{ cloud_ui_registry_host }}/kolla/cloud-ui-frontend:{{ cloud_ui_image_tag }}"
+
+cloud_ui_network_name: "cloud-ui"
+cloud_ui_api_port: 18080
+cloud_ui_frontend_port: 13080
+cloud_ui_config_dir: "/etc/cloud-ui"
+cloud_ui_env_file: "{{ cloud_ui_config_dir }}/cloud-ui.env"
+
+cloud_ui_registry_engine: "podman"
+cloud_ui_aio_engine: "docker"
+
+# Supply these through an untracked vars file or environment-specific secret store.
+cloud_ui_database_url: "{{ lookup('env', 'CLOUD_UI_DATABASE_URL') }}"
+cloud_ui_rabbitmq_url: "{{ lookup('env', 'CLOUD_UI_RABBITMQ_URL') }}"

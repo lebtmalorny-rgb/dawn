@@ -1,0 +1,57 @@
+---
+- name: Bootstrap Dawn lab registry
+  hosts: registry
+  gather_facts: false
+  vars:
+    registry_container_name: dawn_registry
+    registry_bind: "0.0.0.0:5000"
+    registry_image: "registry:2"
+  tasks:
+    - name: Check registry container exists
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_registry_engine }}"
+          - ps
+          - -a
+          - --filter
+          - "name={{ registry_container_name }}"
+          - --format
+          - "{{ '{{' }}.Names{{ '}}' }}"
+      register: registry_container_exists
+      changed_when: false
+
+    - name: Check registry container is running
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_registry_engine }}"
+          - ps
+          - --filter
+          - "name={{ registry_container_name }}"
+          - --format
+          - "{{ '{{' }}.Names{{ '}}' }}"
+      register: registry_container_running
+      changed_when: false
+
+    - name: Start existing registry container
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_registry_engine }}"
+          - start
+          - "{{ registry_container_name }}"
+      when:
+        - registry_container_name in registry_container_exists.stdout_lines
+        - registry_container_name not in registry_container_running.stdout_lines
+
+    - name: Run registry container
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_registry_engine }}"
+          - run
+          - -d
+          - --restart=always
+          - -p
+          - "{{ registry_bind }}:5000"
+          - --name
+          - "{{ registry_container_name }}"
+          - "{{ registry_image }}"
+      when: registry_container_name not in registry_container_exists.stdout_lines
