@@ -96,6 +96,17 @@
 | [docs/generated/dkb-implementation-plan.md](docs/generated/dkb-implementation-plan.md) | План evidence по всем 73 требованиям ДКБ. |
 | [docs/adr/](docs/adr/) | ADR-001..ADR-010 по обязательным решениям E00. |
 
+## Артефакты E01
+
+| Файл | Назначение |
+|---|---|
+| [docs/execplans/E01-bootstrap.md](docs/execplans/E01-bootstrap.md) | Фактический результат E01 bootstrap и verification evidence. |
+| [Makefile](Makefile) | Unified E01 developer and verification commands. |
+| [compose.yaml](compose.yaml) | Local E01 MariaDB/RabbitMQ/frontend/backend stack. |
+| [backend/](backend/) | Python backend package and backend runtime image. |
+| [frontend/](frontend/) | React frontend shell and frontend runtime image. |
+| [tests/smoke.py](tests/smoke.py) | Compose smoke verification. |
+
 ## Минимальный контекст на сессию
 
 Для E00: `AGENTS.md`, `PLANS.md`, `tasks/E00_DISCOVERY.md` и перечисленные там документы.

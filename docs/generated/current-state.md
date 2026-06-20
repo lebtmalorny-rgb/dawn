@@ -1,59 +1,92 @@
 # Current state baseline
 
-- Date: 2026-06-19
+- Date: 2026-06-20
 - Workspace: `/Users/dmitry/Desktop/dawn`
-- Stage: E00 discovery
-- Evidence status: local-only, sanitized
+- Stage: E01 bootstrap implemented
+- Evidence status: local and lab evidence, sanitized
 
 ## Repository state
 
-Fact: current workspace is not a Git repository.
+Fact: current workspace is a Git repository.
 
-Command:
+Current branch and pushed state:
 
-```bash
-git rev-parse --show-toplevel
-```
-
-Result:
-
-```text
-fatal: not a git repository (or any of the parent directories): .git
-```
-
-Implication:
-
-- branch/worktree isolation is not available yet;
-- no commit hash can be used as evidence for E00;
-- before E01 code work, initialize/migrate into a Git repository.
+| Item | Observed value |
+|---|---|
+| repository root | `/Users/dmitry/Desktop/dawn` |
+| branch | `feature/e01-bootstrap` |
+| remote | `https://github.com/lebtmalorny-rgb/dawn.git` |
+| local HEAD | current `feature/e01-bootstrap` branch tip |
+| origin branch | `origin/feature/e01-bootstrap` exists; push after this docs commit updates it |
 
 ## Files observed
 
 Top-level files:
 
-- `skyline:horizon arch.md`
-- `cloud-ui-codex-md/README.md`
-- `cloud-ui-codex-md/AGENTS.md`
-- `cloud-ui-codex-md/CODEX_START.md`
-- `cloud-ui-codex-md/FILE_INDEX.md`
-- `cloud-ui-codex-md/PLANS.md`
+- `README.md`
+- `AGENTS.md`
+- `CODEX_START.md`
+- `FILE_INDEX.md`
+- `PLANS.md`
+- `Makefile`
+- `compose.yaml`
 
 Document directories:
 
-- `cloud-ui-codex-md/docs/`
-- `cloud-ui-codex-md/tasks/`
-- `cloud-ui-codex-md/templates/`
-- `cloud-ui-codex-md/backend/`
-- `cloud-ui-codex-md/frontend/`
-- `cloud-ui-codex-md/deploy/`
-- `cloud-ui-codex-md/security/`
+- `docs/`
+- `tasks/`
+- `templates/`
+- `backend/`
+- `frontend/`
+- `deploy/`
+- `security/`
 
-Generated E00 directories:
+Generated directories:
 
-- `cloud-ui-codex-md/docs/generated/`
-- `cloud-ui-codex-md/docs/execplans/`
-- `cloud-ui-codex-md/docs/adr/`
-- `cloud-ui-codex-md/artifacts/`
+- `docs/generated/`
+- `docs/execplans/`
+- `docs/adr/`
+- `artifacts/`
+
+## E01 bootstrap implementation state
+
+E01 implemented the first runnable application slice:
+
+- backend Python package under `backend/`;
+- backend API, worker, events and migration CLI commands;
+- FastAPI health endpoints and request-id middleware;
+- Alembic scaffold and initial `schema_info` migration;
+- React/Vite/PatternFly frontend status shell under `frontend/`;
+- local compose stack with MariaDB, RabbitMQ, backend API, backend worker, backend events and frontend;
+- backend and frontend runtime images;
+- `Makefile` quality/runtime commands;
+- `scripts/secret-scan.sh` with exact dummy allowlist and fallback scanning when `rg` is absent;
+- `tests/smoke.py` for compose smoke verification.
+
+Final E01 verification on 2026-06-20:
+
+| Command | Result |
+|---|---|
+| `make lint` | passed: backend ruff, frontend eslint, secret scan |
+| `make typecheck` | passed: backend mypy for 11 source files, frontend `tsc -b` |
+| `make test` | passed: backend 14 tests, frontend 4 tests |
+| `make build` | passed: `cloud-ui-backend:dev` and `cloud-ui-frontend:dev` built |
+| `make up` | passed: compose started db, rabbitmq, api, worker, events, frontend |
+| `make smoke` | passed: `smoke ok` |
+| `docker compose images --format json` | confirmed api/worker/events use `cloud-ui-backend:dev`; frontend uses `cloud-ui-frontend:dev` |
+| `./scripts/secret-scan.sh` | passed: no matches |
+| `make down` | passed: compose containers and network removed |
+
+Codex sandbox note:
+
+- direct loopback access to published compose ports is blocked inside the sandbox with `Operation not permitted`;
+- `make smoke` was run outside the sandbox for final evidence;
+- container healthchecks and logs confirmed the API itself was healthy.
+
+Kolla status:
+
+- E01 is a source application bootstrap, not the Kolla Build integration step;
+- Kolla-compatible image template/build integration remains a later deployment stage.
 
 ## Local host
 
@@ -69,7 +102,7 @@ Impact:
 
 - local tool availability is useful for authoring only;
 - target Rocky/Kolla facts must come from the test hosts, not from local macOS tools;
-- E01 runtime/package choices must be accepted in ADR-006 before code.
+- E01 uses Python backend tooling, npm frontend tooling and Docker Compose for local verification.
 
 ## Available local tools
 
@@ -79,11 +112,11 @@ Impact:
 | `python3` | 3.14.0 | verified locally; not target runtime |
 | `node` | v25.9.0 | verified locally; not target runtime |
 | `npm` | 11.12.1 | verified locally |
-| `pnpm` | command not found | blocker for frontend bootstrap until installed or ADR changes package manager |
+| `pnpm` | command not found | not used by E01; frontend bootstrap uses npm |
 | `uv` | 0.11.7 | verified locally |
 | `make` | GNU Make 3.81 | verified locally |
 | `docker` CLI | 29.0.1 | client verified |
-| Docker daemon | permission denied to user socket | unavailable in current sandbox |
+| Docker daemon | available through approved Docker commands | used for E01 compose verification |
 | `podman` | command not found | unavailable locally |
 | `ansible` | core 2.18.6 with `/tmp` local temp override | verified locally |
 | `kolla-build` | command not found | unavailable locally |
