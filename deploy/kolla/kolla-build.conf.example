@@ -1,0 +1,28 @@
+[DEFAULT]
+engine = podman
+base = rocky
+base_tag = 9
+openstack_release = 2025.1
+namespace = kolla
+tag = 2025.1-rocky-9
+registry = 192.168.10.15:5000
+push = False
+template_only = False
+logs_dir = /tmp/dawn-kolla-build/logs
+work_dir = /tmp/dawn-kolla-build/work
+
+[profiles]
+cloud-ui-backend = cloud-ui-backend
+cloud-ui-frontend = cloud-ui-frontend
+
+[cloud-ui-backend]
+type = local
+location = /opt/dawn/source
+
+[cloud-ui-frontend]
+type = local
+location = /opt/dawn/source
+
+[cloudui-user]
+uid = 42480
+gid = 42480

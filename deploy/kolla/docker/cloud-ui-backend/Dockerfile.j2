@@ -1,0 +1,39 @@
+FROM {{ namespace }}/{{ image_prefix }}openstack-base:{{ tag }}
+
+{% block labels %}
+LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build_date }}"
+LABEL org.opencontainers.image.title="Dawn cloud UI backend"
+LABEL org.opencontainers.image.description="Dawn API, worker, events, migration and smoke runtime"
+{% endblock %}
+
+{% block cloud_ui_backend_header %}{% endblock %}
+
+{% import "macros.j2" as macros with context %}
+
+{{ macros.configure_user(name='cloudui') }}
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY cloud-ui-backend-source /tmp/cloud-ui-source
+
+RUN {{ macros.install_pip(['/tmp/cloud-ui-source/backend'] | customizable("pip_packages")) }} \
+    && mkdir -p /etc/cloud-ui /var/lib/cloud-ui /var/log/cloud-ui \
+    && chown -R cloudui: /etc/cloud-ui /var/lib/cloud-ui /var/log/cloud-ui \
+    && rm -rf /tmp/cloud-ui-source
+
+USER cloudui
+WORKDIR /var/lib/cloud-ui
+EXPOSE 8080
+
+# Supported commands from the single backend image:
+# - cloud-ui api
+# - cloud-ui worker
+# - cloud-ui events
+# - cloud-ui db-upgrade
+# - cloud-ui smoke
+
+CMD ["cloud-ui", "api"]
+
+{% block cloud_ui_backend_footer %}{% endblock %}
+{% block footer %}{% endblock %}
