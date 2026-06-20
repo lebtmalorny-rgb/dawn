@@ -139,6 +139,7 @@ def test_lab_playbooks_are_reversible_and_use_no_committed_secrets() -> None:
     assert "cloud_ui_database_url" in group_vars
     assert "cloud_ui_rabbitmq_url" in group_vars
 
+    forbidden_values = ["cloud_ui_dev", "admin" + "123"]
     for relative_path, content in lab_file_contents.items():
-        assert "cloud_ui_dev" not in content, relative_path
-        assert "admin123" not in content, relative_path
+        for forbidden_value in forbidden_values:
+            assert forbidden_value not in content, relative_path
