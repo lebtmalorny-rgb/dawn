@@ -1,0 +1,193 @@
+---
+- name: Deploy Dawn lab containers on single-node AIO
+  hosts: cloud_ui_aio
+  gather_facts: false
+  tasks:
+    - name: Assert Dawn database URL is supplied outside Git
+      ansible.builtin.assert:
+        that:
+          - (cloud_ui_database_url | default('') | string | length) > 0
+          - "'://' in (cloud_ui_database_url | default('') | string)"
+        fail_msg: "cloud_ui_database_url must be supplied outside Git."
+      no_log: true
+
+    - name: Assert Dawn RabbitMQ URL is supplied outside Git
+      ansible.builtin.assert:
+        that:
+          - (cloud_ui_rabbitmq_url | default('') | string | length) > 0
+          - "'://' in (cloud_ui_rabbitmq_url | default('') | string)"
+        fail_msg: "cloud_ui_rabbitmq_url must be supplied outside Git."
+      no_log: true
+
+    - name: Create Dawn config directory
+      ansible.builtin.file:
+        path: "{{ cloud_ui_config_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0750"
+
+    - name: Write Dawn runtime environment file
+      ansible.builtin.copy:
+        dest: "{{ cloud_ui_env_file }}"
+        owner: root
+        group: root
+        mode: "0640"
+        content: |
+          CLOUD_UI_DATABASE_URL={{ cloud_ui_database_url }}
+          CLOUD_UI_RABBITMQ_URL={{ cloud_ui_rabbitmq_url }}
+          CLOUD_UI_API_BIND_HOST=0.0.0.0
+          CLOUD_UI_API_PORT=8080
+          CLOUD_UI_LOG_LEVEL=INFO
+          CLOUD_UI_CONFIG_VERSION=e015-lab
+      no_log: true
+
+    - name: Check Dawn Docker network
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - network
+          - inspect
+          - "{{ cloud_ui_network_name }}"
+      register: cloud_ui_network_check
+      changed_when: false
+      failed_when:
+        - cloud_ui_network_check.rc != 0
+        - "'no such network' not in (cloud_ui_network_check.stderr | lower)"
+        - "'not found' not in (cloud_ui_network_check.stderr | lower)"
+
+    - name: Create Dawn Docker network
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - network
+          - create
+          - "{{ cloud_ui_network_name }}"
+      when: cloud_ui_network_check.rc != 0
+
+    - name: Pull Dawn cloud-ui-backend image
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - pull
+          - "{{ cloud_ui_backend_image }}"
+
+    - name: Pull Dawn cloud-ui-frontend image
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - pull
+          - "{{ cloud_ui_frontend_image }}"
+
+    - name: Remove previous Dawn lab containers
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - rm
+          - -f
+          - "{{ item }}"
+      loop:
+        - cloud_ui_frontend
+        - cloud_ui_api
+        - cloud_ui_worker
+        - cloud_ui_events
+      register: cloud_ui_container_remove
+      changed_when: cloud_ui_container_remove.rc == 0
+      failed_when:
+        - cloud_ui_container_remove.rc != 0
+        - "'no such container' not in (cloud_ui_container_remove.stderr | lower)"
+        - "'no container with name or id' not in (cloud_ui_container_remove.stderr | lower)"
+
+    - name: Run Dawn database migration
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - run
+          - --rm
+          - --name
+          - cloud_ui_db_migrate
+          - --env-file
+          - "{{ cloud_ui_env_file }}"
+          - --network
+          - "{{ cloud_ui_network_name }}"
+          - "{{ cloud_ui_backend_image }}"
+          - cloud-ui
+          - db-upgrade
+      no_log: true
+
+    - name: Start Dawn API container
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - run
+          - -d
+          - --restart
+          - unless-stopped
+          - --name
+          - cloud_ui_api
+          - --env-file
+          - "{{ cloud_ui_env_file }}"
+          - --network
+          - "{{ cloud_ui_network_name }}"
+          - --network-alias
+          - api
+          - -p
+          - "{{ cloud_ui_api_port }}:8080"
+          - "{{ cloud_ui_backend_image }}"
+          - cloud-ui
+          - api
+      no_log: true
+
+    - name: Start Dawn worker container
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - run
+          - -d
+          - --restart
+          - unless-stopped
+          - --name
+          - cloud_ui_worker
+          - --env-file
+          - "{{ cloud_ui_env_file }}"
+          - --network
+          - "{{ cloud_ui_network_name }}"
+          - "{{ cloud_ui_backend_image }}"
+          - cloud-ui
+          - worker
+      no_log: true
+
+    - name: Start Dawn events container
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - run
+          - -d
+          - --restart
+          - unless-stopped
+          - --name
+          - cloud_ui_events
+          - --env-file
+          - "{{ cloud_ui_env_file }}"
+          - --network
+          - "{{ cloud_ui_network_name }}"
+          - "{{ cloud_ui_backend_image }}"
+          - cloud-ui
+          - events
+      no_log: true
+
+    - name: Start Dawn frontend container
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - run
+          - -d
+          - --restart
+          - unless-stopped
+          - --name
+          - cloud_ui_frontend
+          - --network
+          - "{{ cloud_ui_network_name }}"
+          - -p
+          - "{{ cloud_ui_frontend_port }}:8080"
+          - "{{ cloud_ui_frontend_image }}"

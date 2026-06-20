@@ -1,0 +1,84 @@
+---
+- name: Roll back Dawn lab containers
+  hosts: cloud_ui_aio
+  gather_facts: false
+  tasks:
+    - name: Require Dawn-specific rollback targets
+      ansible.builtin.assert:
+        that:
+          - cloud_ui_config_dir is defined
+          - cloud_ui_config_dir is string
+          - cloud_ui_config_dir is match('^/etc/cloud-ui(/.*)?$')
+          - cloud_ui_network_name is defined
+          - cloud_ui_network_name is string
+          - cloud_ui_network_name is match('^cloud-ui($|[-_])')
+        fail_msg: >-
+          Rollback targets must be Dawn-specific:
+          cloud_ui_config_dir must be under /etc/cloud-ui and
+          cloud_ui_network_name must start with cloud-ui.
+
+    - name: Remove Dawn lab containers
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - rm
+          - -f
+          - "{{ item }}"
+      loop:
+        - cloud_ui_frontend
+        - cloud_ui_api
+        - cloud_ui_worker
+        - cloud_ui_events
+        - cloud_ui_db_migrate
+      register: cloud_ui_container_remove
+      changed_when: cloud_ui_container_remove.rc == 0
+      failed_when:
+        - cloud_ui_container_remove.rc != 0
+        - "'no such container' not in (cloud_ui_container_remove.stderr | lower)"
+        - "'no container with name or id' not in (cloud_ui_container_remove.stderr | lower)"
+
+    - name: Remove Dawn config directory
+      ansible.builtin.file:
+        path: "{{ cloud_ui_config_dir }}"
+        state: absent
+
+    - name: Check Dawn Docker network
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - network
+          - inspect
+          - "{{ cloud_ui_network_name }}"
+      register: cloud_ui_network_check
+      changed_when: false
+      failed_when:
+        - cloud_ui_network_check.rc != 0
+        - "'no such network' not in (cloud_ui_network_check.stderr | lower)"
+        - "'not found' not in (cloud_ui_network_check.stderr | lower)"
+
+    - name: Remove Dawn Docker network
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - network
+          - rm
+          - "{{ cloud_ui_network_name }}"
+      when: cloud_ui_network_check.rc == 0
+
+    - name: List remaining Dawn containers
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - ps
+          - -a
+          - --filter
+          - name=cloud_ui_
+          - --format
+          - "{{ '{{' }}.Names{{ '}}' }}"
+      register: remaining_containers
+      changed_when: false
+
+    - name: Assert no Dawn lab containers remain
+      ansible.builtin.assert:
+        that:
+          - remaining_containers.stdout | trim == ""

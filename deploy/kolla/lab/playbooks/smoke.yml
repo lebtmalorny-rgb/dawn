@@ -1,0 +1,69 @@
+---
+- name: Smoke Dawn lab containers
+  hosts: cloud_ui_aio
+  gather_facts: false
+  tasks:
+    - name: Wait for Dawn API liveness
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ cloud_ui_api_port }}/health/live"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: api_live
+      retries: 30
+      delay: 2
+      until: api_live.status == 200 and (api_live.json.status | default('')) == "ok"
+
+    - name: Wait for Dawn API readiness
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ cloud_ui_api_port }}/api/v1/health/ready"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: api_ready
+      retries: 30
+      delay: 2
+      until: api_ready.status == 200 and (api_ready.json.status | default('')) == "ok"
+
+    - name: Wait for Dawn frontend response
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ cloud_ui_frontend_port }}/"
+        method: GET
+        status_code: 200
+      register: frontend_response
+      retries: 30
+      delay: 2
+      until: frontend_response.status == 200
+
+    - name: List Dawn lab containers
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - ps
+          - --filter
+          - name=cloud_ui_
+          - --format
+          - "{{ '{{' }}.Names{{ '}}' }} {{ '{{' }}.Image{{ '}}' }} {{ '{{' }}.Status{{ '}}' }}"
+      register: cloud_ui_ps
+      changed_when: false
+
+    - name: Assert Dawn lab containers are running expected images
+      ansible.builtin.assert:
+        that:
+          - >-
+            (cloud_ui_ps.stdout_lines
+            | select('match', '^' ~ item.name ~ '\\s+' ~ (item.image | regex_escape) ~ '\\s+')
+            | list
+            | length) == 1
+        fail_msg: >-
+          Missing running Dawn lab container image pair:
+          {{ item.name }} {{ item.image }}
+      loop:
+        - name: cloud_ui_api
+          image: "{{ cloud_ui_backend_image }}"
+        - name: cloud_ui_worker
+          image: "{{ cloud_ui_backend_image }}"
+        - name: cloud_ui_events
+          image: "{{ cloud_ui_backend_image }}"
+        - name: cloud_ui_frontend
+          image: "{{ cloud_ui_frontend_image }}"
