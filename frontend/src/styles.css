@@ -8,12 +8,20 @@ body {
 }
 
 .cloud-ui-layout {
-  width: min(100%, 760px);
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 1200px);
+}
+
+.cloud-ui-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
 }
 
 .cloud-ui-status-card {
-  margin-top: 1rem;
-  max-width: 760px;
+  min-width: 0;
 }
 
 .cloud-ui-login-form {
@@ -42,16 +50,33 @@ body {
 .cloud-ui-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
-.cloud-ui-nav span {
+.cloud-ui-nav-item {
+  appearance: none;
+  background: #ffffff;
   border: 1px solid #d2d2d2;
+  color: #151515;
+  font: inherit;
+  line-height: 1.2;
   padding: 0.375rem 0.625rem;
+  text-decoration: none;
+}
+
+.cloud-ui-nav a:hover,
+.cloud-ui-nav a[aria-current="page"] {
+  border-color: #0066cc;
+  color: #004080;
 }
 
 .cloud-ui-loading {
   min-height: 8rem;
+}
+
+.cloud-ui-compact-loading {
+  justify-content: start;
+  min-height: 2.25rem;
 }
 
 .cloud-ui-status-content {
@@ -90,6 +115,102 @@ body {
   margin: 0;
   color: #4f5255;
   overflow-wrap: anywhere;
+}
+
+.cloud-ui-workarea {
+  display: grid;
+  gap: 0.875rem;
+  min-width: 0;
+  padding: 1rem 0 0;
+}
+
+.cloud-ui-workarea-header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.cloud-ui-muted,
+.cloud-ui-empty {
+  color: #4f5255;
+  margin: 0;
+}
+
+.cloud-ui-inventory-page {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.cloud-ui-inventory-notices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  min-height: 1.75rem;
+}
+
+.cloud-ui-badge,
+.cloud-ui-warning-text {
+  border: 1px solid #d2d2d2;
+  background: #ffffff;
+  color: #151515;
+  display: inline-flex;
+  max-width: 100%;
+  padding: 0.25rem 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.cloud-ui-badge-warning {
+  border-color: #f0ab00;
+  background: #fff7db;
+}
+
+.cloud-ui-badge-stale {
+  border-color: #c9190b;
+  background: #faeae8;
+}
+
+.cloud-ui-warning-text {
+  color: #7d1007;
+}
+
+.cloud-ui-table-wrapper {
+  border-top: 1px solid #d2d2d2;
+  overflow-x: auto;
+  width: 100%;
+}
+
+.cloud-ui-table {
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  min-width: 760px;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.cloud-ui-table th,
+.cloud-ui-table td {
+  border-bottom: 1px solid #d2d2d2;
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.cloud-ui-table thead th {
+  background: #ffffff;
+  color: #151515;
+  font-weight: 700;
+}
+
+.cloud-ui-table tbody th {
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .cloud-ui-status-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 480px) {
