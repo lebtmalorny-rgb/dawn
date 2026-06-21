@@ -133,7 +133,16 @@ frontend inventory pages.
   `npm test -- --run src/App.test.tsx` -> `22 passed`; `npm run typecheck`,
   `npm run lint`, `git diff --check 50f3a0d..HEAD`, browser-storage/direct-URL scans passed;
   final spec and quality reviews approved with no blocking issues.
-- [ ] Scale evidence and documentation.
+- [x] 2026-06-21: Synthetic scale evidence generated and documented. Evidence: commits
+  `72a9da0 feat: add E04 synthetic scale report`,
+  `1dec331 docs: refresh E04 scale evidence`,
+  `551f38c fix: explain measured inventory queries`,
+  `764fa97 docs: refresh measured E04 scale report`; `make test-load` generated
+  `docs/generated/e04-scale-report.md` for 10 000 instances / 1 000 hypervisors with
+  `success=True`, SQL max `5`, p95 below 2 s in all scenarios, SQLite `EXPLAIN QUERY PLAN`
+  from captured measured repository SQL, and peak Python memory `3.622 MiB`; targeted tests
+  `tests/inventory/test_scale_report.py tests/inventory/test_reconciliation.py tests/inventory/test_repository.py`
+  -> `28 passed`; scoped Ruff, scoped mypy, secret scan and final spec/quality reviews approved.
 - [ ] Final verification, review and integration.
 
 ## Неожиданные открытия
@@ -162,6 +171,10 @@ frontend inventory pages.
   authorization/audit remains covered by API tests.
 - No Playwright/e2e command exists yet in this worktree, so E04.5 browser-level evidence is limited
   to Vitest/RTL component coverage and static checks.
+- E04.6 synthetic scale report is local SQLite evidence only, not production MariaDB/HA evidence.
+  The measured default instance and hypervisor scenarios include SQLite `USE TEMP B-TREE FOR ORDER BY`
+  because repository null-bucket ordering is part of the real list SQL; this is documented rather
+  than hidden.
 
 ## Журнал решений
 
