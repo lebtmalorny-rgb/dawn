@@ -44,6 +44,46 @@ kolla-build --config-file deploy/kolla/kolla-build.conf.example \
 
 Use the later `deploy/kolla/scripts/build-images.sh` script for the lab build and push flow.
 
+Example from the build/control host:
+
+```bash
+KOLLA_BUILD=/root/venvs/kolla-epoxy/bin/kolla-build \
+  CLOUD_UI_REGISTRY=192.168.10.15:5000 \
+  CLOUD_UI_TAG=2025.1-rocky-9 \
+  deploy/kolla/scripts/build-images.sh
+```
+
+## Lab deploy and smoke
+
+Create an untracked vars file on the build/control host, for example
+`/root/dawn-cloud-ui-lab-secrets.yml`, containing:
+
+```yaml
+cloud_ui_database_url: "mysql+pymysql://..."
+cloud_ui_rabbitmq_url: "amqp://..."
+```
+
+Then run:
+
+```bash
+/root/venvs/kolla-epoxy/bin/ansible-playbook \
+  -i deploy/kolla/lab/inventory.ini.example \
+  -e @deploy/kolla/lab/group_vars/all.yml.example \
+  -e @/root/dawn-cloud-ui-lab-secrets.yml \
+  deploy/kolla/lab/playbooks/deploy.yml
+
+/root/venvs/kolla-epoxy/bin/ansible-playbook \
+  -i deploy/kolla/lab/inventory.ini.example \
+  -e @deploy/kolla/lab/group_vars/all.yml.example \
+  -e @/root/dawn-cloud-ui-lab-secrets.yml \
+  deploy/kolla/lab/playbooks/smoke.yml
+```
+
+Default lab endpoints after deploy:
+
+- API: `http://192.168.10.14:18081`
+- frontend: `http://192.168.10.14:13080`
+
 ## Safety
 
 - no production inventory;
