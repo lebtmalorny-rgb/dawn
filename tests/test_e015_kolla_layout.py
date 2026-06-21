@@ -72,6 +72,8 @@ def test_backend_template_keeps_one_backend_image_for_all_commands() -> None:
 
     for expected in [
         "FROM {{ namespace }}/{{ image_prefix }}openstack-base:{{ tag }}",
+        "python3.11",
+        "python3.11 -m pip",
         "ADD cloud-ui-backend-archive /cloud-ui-backend-source",
         "/cloud-ui-backend-source/source/backend",
         "cloud-ui api",
