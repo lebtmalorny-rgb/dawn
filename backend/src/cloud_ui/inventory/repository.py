@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -424,6 +424,21 @@ def _instance_conditions(filters: InstanceFilters) -> list[sa.ColumnElement[bool
     for column_name, value in optional_filters.items():
         if value is not None:
             conditions.append(schema.instances.c[column_name] == value)
+    query = _normalized_query(filters.q)
+    if query is not None:
+        conditions.append(
+            _search_condition(
+                (
+                    schema.instances.c.instance_id,
+                    schema.instances.c.name,
+                    schema.instances.c.project_id,
+                    schema.instances.c.status,
+                    schema.instances.c.host_name,
+                    schema.instances.c.availability_zone,
+                ),
+                query,
+            )
+        )
     return conditions
 
 
@@ -443,7 +458,50 @@ def _hypervisor_conditions(filters: HypervisorFilters) -> list[sa.ColumnElement[
     for column_name, value in optional_filters.items():
         if value is not None:
             conditions.append(schema.hypervisors.c[column_name] == value)
+    query = _normalized_query(filters.q)
+    if query is not None:
+        conditions.append(
+            _search_condition(
+                (
+                    schema.hypervisors.c.hypervisor_id,
+                    schema.hypervisors.c.host_name,
+                    schema.hypervisors.c.service_status,
+                    schema.hypervisors.c.service_state,
+                    schema.hypervisors.c.availability_zone,
+                ),
+                query,
+            )
+        )
     return conditions
+
+
+def _normalized_query(value: str | None) -> str | None:
+    if value is None:
+        return None
+    query = value.strip().lower()
+    return query or None
+
+
+def _search_condition(
+    columns: Iterable[sa.Column[Any]],
+    query: str,
+) -> sa.ColumnElement[bool]:
+    pattern = _contains_pattern(query)
+    return sa.or_(
+        *(
+            sa.func.lower(sa.func.coalesce(column, "")).like(pattern, escape="\\")
+            for column in columns
+        )
+    )
+
+
+def _contains_pattern(query: str) -> str:
+    escaped = (
+        query.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+    return f"%{escaped}%"
 
 
 def _instance_sort_column(field: str) -> sa.Column[Any]:

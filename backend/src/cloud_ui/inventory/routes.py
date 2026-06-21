@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
+import json
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 from uuid import uuid4
@@ -10,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.engine import Engine
 from starlette.responses import JSONResponse
 
-from cloud_ui.config import Settings
+from cloud_ui.config import DEV_INVENTORY_CURSOR_SIGNING_KEY, Settings
 from cloud_ui.db import create_db_engine
 from cloud_ui.inventory.cursor import CursorCodec, CursorTampered
 from cloud_ui.inventory.models import (
@@ -89,6 +91,9 @@ SortDirection = Literal["asc", "desc"]
 class InventoryServices:
     repository: InventoryRepository | None
     engine: Engine | None = None
+    default_limit: int = DEFAULT_LIST_LIMIT
+    max_limit: int = MAX_LIST_LIMIT
+    operation_signing_key: str = DEV_INVENTORY_CURSOR_SIGNING_KEY
 
     @property
     def available(self) -> bool:
@@ -162,7 +167,13 @@ def build_inventory_services(settings: Settings) -> InventoryServices:
         max_limit=settings.inventory_max_limit,
         stale_after_seconds=settings.inventory_stale_after_seconds,
     )
-    return InventoryServices(repository=repository, engine=engine)
+    return InventoryServices(
+        repository=repository,
+        engine=engine,
+        default_limit=settings.inventory_default_limit,
+        max_limit=settings.inventory_max_limit,
+        operation_signing_key=settings.inventory_cursor_signing_key,
+    )
 
 
 def unavailable_inventory_services() -> InventoryServices:
@@ -210,7 +221,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         )
         if query_error is not None:
             return query_error
-        effective_limit = _effective_limit(limit)
+        effective_limit = _effective_limit(_query_limit(limit, request), services)
         parsed_sort = _parse_sort(sort, allowed_fields=INSTANCE_SORT_FIELDS, request=request)
         if isinstance(parsed_sort, JSONResponse):
             return parsed_sort
@@ -220,6 +231,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
                 filters=InstanceFilters(
                     cloud_id=cloud_id,
                     region_id=region_id,
+                    q=q,
                     project_id=project_id,
                     status=status,
                     host_name=host_name,
@@ -322,6 +334,8 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
             region_id=region_id,
             instance_id=instance_id,
             idempotency_key=idempotency_key,
+            actor_subject_id=session.subject.subject_id,
+            operation_signing_key=services.operation_signing_key,
         )
         _record_audit(
             security,
@@ -383,7 +397,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         )
         if query_error is not None:
             return query_error
-        effective_limit = _effective_limit(limit)
+        effective_limit = _effective_limit(_query_limit(limit, request), services)
         parsed_sort = _parse_sort(sort, allowed_fields=HYPERVISOR_SORT_FIELDS, request=request)
         if isinstance(parsed_sort, JSONResponse):
             return parsed_sort
@@ -393,6 +407,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
                 filters=HypervisorFilters(
                     cloud_id=cloud_id,
                     region_id=region_id,
+                    q=q,
                     service_status=service_status,
                     service_state=service_state,
                     host_name=host_name,
@@ -520,8 +535,15 @@ def _reject_unsupported_query(request: Request, *, allowed: frozenset[str]) -> J
     )
 
 
-def _effective_limit(raw_limit: int) -> int:
-    return max(1, min(raw_limit, MAX_LIST_LIMIT))
+def _effective_limit(raw_limit: int | None, services: InventoryServices) -> int:
+    requested_limit = services.default_limit if raw_limit is None else raw_limit
+    return max(1, min(requested_limit, services.max_limit))
+
+
+def _query_limit(parsed_limit: int, request: Request) -> int | None:
+    if "limit" in request.query_params:
+        return parsed_limit
+    return None
 
 
 def _parse_sort(
@@ -781,7 +803,24 @@ def _refresh_operation_id(
     region_id: str,
     instance_id: str,
     idempotency_key: str,
+    actor_subject_id: str,
+    operation_signing_key: str,
 ) -> str:
-    payload = "\x1f".join((cloud_id, region_id, instance_id, idempotency_key))
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    payload = json.dumps(
+        {
+            "actor_subject_id": actor_subject_id,
+            "cloud_id": cloud_id,
+            "idempotency_key": idempotency_key,
+            "instance_id": instance_id,
+            "region_id": region_id,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    digest = hmac.new(
+        operation_signing_key.encode("utf-8"),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
     return f"inventory-refresh-{digest[:32]}"

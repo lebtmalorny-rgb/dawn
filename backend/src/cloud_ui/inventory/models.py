@@ -107,6 +107,7 @@ class InstanceFilters(BaseModel):
 
     cloud_id: str
     region_id: str
+    q: str | None = None
     project_id: str | None = None
     status: str | None = None
     host_name: str | None = None
@@ -119,6 +120,7 @@ class HypervisorFilters(BaseModel):
 
     cloud_id: str
     region_id: str
+    q: str | None = None
     service_status: str | None = None
     service_state: str | None = None
     host_name: str | None = None

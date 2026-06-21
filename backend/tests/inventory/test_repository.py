@@ -75,6 +75,39 @@ def test_cursor_with_different_filters_is_rejected(repository: InventoryReposito
     assert exc_info.value.code == "cursor_tampered"
 
 
+def test_instances_are_filtered_by_case_insensitive_q_and_cursor_scope(
+    repository: InventoryRepository,
+) -> None:
+    sort = InventorySort(field="name", direction="asc")
+
+    filtered_page = repository.list_instances(
+        filters=InstanceFilters(cloud_id="dev-cloud", region_id="RegionOne", q="VM-A"),
+        sort=sort,
+        limit=50,
+        cursor=None,
+    )
+
+    assert [item.name for item in filtered_page.items] == ["vm-a"]
+
+    searchable_page = repository.list_instances(
+        filters=InstanceFilters(cloud_id="dev-cloud", region_id="RegionOne", q="vm"),
+        sort=sort,
+        limit=1,
+        cursor=None,
+    )
+    assert searchable_page.next_cursor is not None
+
+    with pytest.raises(CursorTampered) as exc_info:
+        repository.list_instances(
+            filters=InstanceFilters(cloud_id="dev-cloud", region_id="RegionOne", q="vm-a"),
+            sort=sort,
+            limit=1,
+            cursor=searchable_page.next_cursor,
+        )
+
+    assert exc_info.value.code == "cursor_tampered"
+
+
 def test_hypervisors_are_filtered_by_service_status_and_sorted(
     repository: InventoryRepository,
 ) -> None:
@@ -91,6 +124,19 @@ def test_hypervisors_are_filtered_by_service_status_and_sorted(
 
     assert [item.host_name for item in page.items] == ["compute-a", "compute-z"]
     assert {item.service_status for item in page.items} == {"enabled"}
+
+
+def test_hypervisors_are_filtered_by_case_insensitive_q(
+    repository: InventoryRepository,
+) -> None:
+    page = repository.list_hypervisors(
+        filters=HypervisorFilters(cloud_id="dev-cloud", region_id="RegionOne", q="COMPUTE-Z"),
+        sort=InventorySort(field="host_name", direction="asc"),
+        limit=50,
+        cursor=None,
+    )
+
+    assert [item.host_name for item in page.items] == ["compute-z"]
 
 
 def test_detail_ignores_tombstoned_rows(repository: InventoryRepository) -> None:

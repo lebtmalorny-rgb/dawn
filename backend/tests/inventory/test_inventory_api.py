@@ -113,22 +113,39 @@ def test_cursor_tampering_returns_safe_400() -> None:
     }
 
 
-def test_instance_list_accepts_q_query_parameter_as_design_contract() -> None:
+def test_instance_list_filters_by_q_query_parameter() -> None:
     client, _security = _client()
     _login(client, "viewer", "viewer-code")
 
-    response = client.get("/api/v1/instances?q=vm&limit=1")
+    response = client.get("/api/v1/instances?q=vm-a&limit=50")
 
     assert response.status_code == 200
+    assert [item["name"] for item in response.json()["items"]] == ["vm-a"]
 
 
-def test_hypervisor_list_accepts_q_query_parameter_as_design_contract() -> None:
+def test_hypervisor_list_filters_by_q_query_parameter() -> None:
     client, _security = _client()
     _login(client, "viewer", "viewer-code")
 
-    response = client.get("/api/v1/hypervisors?q=compute&limit=1")
+    response = client.get("/api/v1/hypervisors?q=COMPUTE-Z&limit=50")
 
     assert response.status_code == 200
+    assert [item["host_name"] for item in response.json()["items"]] == ["compute-z"]
+
+
+def test_instance_list_limit_response_matches_injected_service_max_limit() -> None:
+    client, _security = _client(
+        repository=_repository(_engine(), max_limit=1),
+        inventory_max_limit=1,
+    )
+    _login(client, "viewer", "viewer-code")
+
+    response = client.get("/api/v1/instances?limit=50&sort=name.asc")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["limit"] == 1
+    assert len(payload["items"]) == 1
 
 
 def test_instance_list_supports_source_updated_at_sort() -> None:
@@ -213,6 +230,43 @@ def test_instance_refresh_requires_csrf_and_records_audit() -> None:
     assert audit_events
     assert audit_events[-1].metadata["operation_id"] == accepted_payload["operation_id"]
     assert idempotency_key not in repr(audit_events[-1].metadata)
+
+
+def test_instance_refresh_operation_id_is_actor_scoped() -> None:
+    client, security = _client()
+    idempotency_key = "shared-refresh-key-secret-canary"
+
+    operator_csrf = _login(client, "operator", "operator-code")
+    operator_response = client.post(
+        "/api/v1/instances/synthetic/RegionOne/instance-0001/refresh",
+        headers={
+            "x-request-id": "operator-refresh",
+            "x-csrf-token": operator_csrf,
+            "idempotency-key": idempotency_key,
+        },
+    )
+
+    client.cookies.clear()
+    admin_csrf = _login(client, "admin", "admin-code")
+    admin_response = client.post(
+        "/api/v1/instances/synthetic/RegionOne/instance-0001/refresh",
+        headers={
+            "x-request-id": "admin-refresh",
+            "x-csrf-token": admin_csrf,
+            "idempotency-key": idempotency_key,
+        },
+    )
+
+    assert operator_response.status_code == 200
+    assert admin_response.status_code == 200
+    operator_operation_id = operator_response.json()["operation_id"]
+    admin_operation_id = admin_response.json()["operation_id"]
+    assert operator_operation_id != admin_operation_id
+    assert idempotency_key not in operator_response.text
+    assert idempotency_key not in admin_response.text
+    assert idempotency_key not in repr(
+        [event.metadata for event in security.audit_sink.events]
+    )
 
 
 def test_instance_refresh_denies_viewer_without_refresh_capability() -> None:
@@ -366,13 +420,27 @@ class FailingInventoryRepository:
 def _client(
     *,
     repository: InventoryRepository | None = None,
+    inventory_default_limit: int = 50,
+    inventory_max_limit: int = 200,
+    operation_signing_key: str = "dev-inventory-operation-signing-key",
     raise_server_exceptions: bool = True,
 ) -> tuple[TestClient, SecurityServices]:
-    app, security = _app(repository=repository)
+    app, security = _app(
+        repository=repository,
+        inventory_default_limit=inventory_default_limit,
+        inventory_max_limit=inventory_max_limit,
+        operation_signing_key=operation_signing_key,
+    )
     return TestClient(app, raise_server_exceptions=raise_server_exceptions), security
 
 
-def _app(*, repository: InventoryRepository | None = None) -> tuple[FastAPI, SecurityServices]:
+def _app(
+    *,
+    repository: InventoryRepository | None = None,
+    inventory_default_limit: int = 50,
+    inventory_max_limit: int = 200,
+    operation_signing_key: str = "dev-inventory-operation-signing-key",
+) -> tuple[FastAPI, SecurityServices]:
     def check() -> HealthReport:
         return HealthReport(status="ok", dependencies={})
 
@@ -380,7 +448,12 @@ def _app(*, repository: InventoryRepository | None = None) -> tuple[FastAPI, Sec
     app = create_app(
         readiness_check=check,
         security_services=security,
-        inventory_services=InventoryServices(repository=repository or _repository(_engine())),
+        inventory_services=InventoryServices(
+            repository=repository or _repository(_engine()),
+            default_limit=inventory_default_limit,
+            max_limit=inventory_max_limit,
+            operation_signing_key=operation_signing_key,
+        ),
     )
     return app, security
 
@@ -407,12 +480,17 @@ def _engine() -> Engine:
     return engine
 
 
-def _repository(engine: Engine) -> InventoryRepository:
+def _repository(
+    engine: Engine,
+    *,
+    default_limit: int = 50,
+    max_limit: int = 200,
+) -> InventoryRepository:
     return InventoryRepository(
         engine=engine,
         cursor_codec=CursorCodec(signing_key="dev-inventory-cursor-key"),
-        default_limit=50,
-        max_limit=200,
+        default_limit=default_limit,
+        max_limit=max_limit,
         stale_after_seconds=900,
     )
 
