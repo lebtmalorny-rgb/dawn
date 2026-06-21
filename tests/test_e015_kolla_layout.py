@@ -72,6 +72,7 @@ def test_backend_template_keeps_one_backend_image_for_all_commands() -> None:
 
     for expected in [
         "FROM {{ namespace }}/{{ image_prefix }}openstack-base:{{ tag }}",
+        "ADD cloud-ui-backend-archive /cloud-ui-backend-source",
         "cloud-ui-backend-source",
         "cloud-ui api",
         "cloud-ui worker",
@@ -94,6 +95,7 @@ def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
 
     for expected in [
         "FROM {{ namespace }}/{{ image_prefix }}base:{{ tag }}",
+        "ADD cloud-ui-frontend-archive /cloud-ui-frontend-source",
         "cloud-ui-frontend-source/frontend/dist",
         "nginx",
     ]:
