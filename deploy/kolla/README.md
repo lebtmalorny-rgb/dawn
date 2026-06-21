@@ -44,6 +44,40 @@ kolla-build --config-file deploy/kolla/kolla-build.conf.example \
 
 Use the later `deploy/kolla/scripts/build-images.sh` script for the lab build and push flow.
 
+## Lab registry prerequisite
+
+The lab registry uses plain HTTP. Configure this only for the isolated lab.
+
+On the build/control host, allow the registry in Podman:
+
+```toml
+# /etc/containers/registries.conf.d/999-dawn-lab.conf
+[[registry]]
+location = "192.168.10.15:5000"
+insecure = true
+```
+
+Then restart the Podman API socket:
+
+```bash
+systemctl restart podman.socket
+```
+
+On the AIO Docker host, merge the registry into `/etc/docker/daemon.json`
+without dropping existing keys:
+
+```json
+{
+  "insecure-registries": ["192.168.10.15:5000"]
+}
+```
+
+Then reload Docker:
+
+```bash
+systemctl reload docker
+```
+
 Example from the build/control host:
 
 ```bash
@@ -78,6 +112,10 @@ Then run:
   -e @/root/dawn-cloud-ui-lab-secrets.yml \
   deploy/kolla/lab/playbooks/smoke.yml
 ```
+
+The smoke playbook verifies API live/ready, frontend HTTP 200, expected image
+pairs, Docker health status and absence of the supplied DB/RabbitMQ URLs in
+Dawn container logs.
 
 Default lab endpoints after deploy:
 

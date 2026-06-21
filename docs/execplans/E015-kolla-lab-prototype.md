@@ -63,6 +63,8 @@ Result: `failed=0`. The smoke playbook verified:
 - API readiness through MariaDB and RabbitMQ checks
 - frontend HTTP 200
 - all four Dawn containers running the expected Kolla images
+- Docker health status for all four Dawn containers
+- absence of the supplied DB/RabbitMQ URLs in Dawn container logs
 
 Default lab endpoints:
 
@@ -96,6 +98,7 @@ closure.
 - Lab API port `18080` collided with existing cAdvisor; the lab now uses
   `18081`.
 - Nginx needs writable `/var/lib/nginx` when running as `cloudui`.
+- Smoke must check container health and supplied secret URL leakage in logs.
 
 ## Rollback
 
@@ -117,6 +120,8 @@ The rollback playbook is guarded to operate only on `/etc/cloud-ui` and
 
 - This is a lab prototype, not the final production Kolla-Ansible role.
 - The registry is HTTP/insecure for the lab.
+- Worker/events health checks are lab liveness checks using `cloud-ui smoke`;
+  production worker health needs a domain-specific signal in a later stage.
 - Credentials are generated lab secrets; production promotion should move them
   to Vault/secman.
 - Docker reports IPv4 forwarding disabled on container start, but the final

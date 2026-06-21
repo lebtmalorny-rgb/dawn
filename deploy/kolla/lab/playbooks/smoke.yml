@@ -67,3 +67,53 @@
           image: "{{ cloud_ui_backend_image }}"
         - name: cloud_ui_frontend
           image: "{{ cloud_ui_frontend_image }}"
+
+    - name: Wait for Dawn lab container health checks
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - inspect
+          - --format
+          - "{{ '{{' }}if .State.Health{{ '}}' }}{{ '{{' }}.State.Health.Status{{ '}}' }}{{ '{{' }}else{{ '}}' }}missing{{ '{{' }}end{{ '}}' }}"
+          - "{{ item }}"
+      register: cloud_ui_health_status
+      changed_when: false
+      retries: 12
+      delay: 5
+      until: cloud_ui_health_status.stdout == "healthy"
+      loop:
+        - cloud_ui_api
+        - cloud_ui_worker
+        - cloud_ui_events
+        - cloud_ui_frontend
+
+    - name: Collect Dawn lab container logs for secret scan
+      ansible.builtin.command:
+        argv:
+          - "{{ cloud_ui_aio_engine }}"
+          - logs
+          - --tail
+          - "500"
+          - "{{ item }}"
+      register: cloud_ui_container_logs
+      changed_when: false
+      no_log: true
+      loop:
+        - cloud_ui_api
+        - cloud_ui_worker
+        - cloud_ui_events
+        - cloud_ui_frontend
+
+    - name: Assert Dawn logs do not expose supplied secret URLs
+      ansible.builtin.assert:
+        that:
+          - >-
+            cloud_ui_database_url not in
+            ((cloud_ui_container_logs.results | map(attribute='stdout') | join('\n')) ~ '\n' ~
+            (cloud_ui_container_logs.results | map(attribute='stderr') | join('\n')))
+          - >-
+            cloud_ui_rabbitmq_url not in
+            ((cloud_ui_container_logs.results | map(attribute='stdout') | join('\n')) ~ '\n' ~
+            (cloud_ui_container_logs.results | map(attribute='stderr') | join('\n')))
+        fail_msg: "Dawn lab container logs contain a supplied secret URL."
+      no_log: true

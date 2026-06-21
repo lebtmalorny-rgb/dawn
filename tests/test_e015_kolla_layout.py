@@ -157,6 +157,7 @@ def test_lab_playbooks_are_reversible_and_use_no_committed_secrets() -> None:
         relative_path: read_text(relative_path) for relative_path in expected_paths
     }
     deploy = lab_file_contents["deploy/kolla/lab/playbooks/deploy.yml"]
+    smoke = lab_file_contents["deploy/kolla/lab/playbooks/smoke.yml"]
     rollback = lab_file_contents["deploy/kolla/lab/playbooks/rollback.yml"]
     group_vars = lab_file_contents["deploy/kolla/lab/group_vars/all.yml.example"]
 
@@ -180,6 +181,14 @@ def test_lab_playbooks_are_reversible_and_use_no_committed_secrets() -> None:
     assert "cloud_ui_rabbitmq_url" in group_vars
     assert "cloud_ui_api_port: 18081" in group_vars
     assert "cloud_ui_api_port: 18080" not in group_vars
+    assert "--health-cmd" in deploy
+    assert "urllib.request.urlopen('http://127.0.0.1:8080/health/live'" in deploy
+    assert "urllib.request.urlopen('http://127.0.0.1:8080/'" in deploy
+    assert "cloud-ui smoke >/dev/null" in deploy
+    assert "logs" in smoke
+    assert "cloud_ui_database_url not in" in smoke
+    assert "cloud_ui_rabbitmq_url not in" in smoke
+    assert ".State.Health.Status" in smoke
 
     forbidden_values = ["cloud_ui_dev", "admin" + "123"]
     for relative_path, content in lab_file_contents.items():
@@ -195,3 +204,45 @@ def test_build_script_prepares_kolla_work_directories() -> None:
     assert 'mkdir -p "${KOLLA_LOGS_DIR}" "${KOLLA_WORK_DIR}"' in script
     assert '--logs-dir "${KOLLA_LOGS_DIR}"' in script
     assert '--work-dir "${KOLLA_WORK_DIR}"' in script
+
+
+def test_kolla_readme_documents_lab_registry_prerequisites() -> None:
+    readme = read_text("deploy/kolla/README.md")
+
+    for expected in [
+        "/etc/containers/registries.conf.d/999-dawn-lab.conf",
+        "location = \"192.168.10.15:5000\"",
+        "insecure = true",
+        "/etc/docker/daemon.json",
+        "\"insecure-registries\"",
+        "192.168.10.15:5000",
+    ]:
+        assert expected in readme
+
+
+def test_project_state_documents_include_e015_evidence() -> None:
+    file_index = read_text("FILE_INDEX.md")
+    current_state = read_text("docs/generated/current-state.md")
+    dkb_traceability = read_text("docs/11_DKB_TRACEABILITY.md")
+
+    for expected in [
+        "Артефакты E01.5",
+        "deploy/kolla/lab/",
+        "docs/execplans/E015-kolla-lab-prototype.md",
+    ]:
+        assert expected in file_index
+
+    for expected in [
+        "E01.5 adds a lab-only Kolla Build prototype",
+        "container-level health checks",
+        "absence of supplied secret URLs",
+        "Production Kolla-Ansible role integration remains a later E09 stage",
+    ]:
+        assert expected in current_state
+
+    for expected in [
+        "E01.5 lab smoke secret-log check",
+        "E01.5 lab registry/image evidence",
+        "E01.5 lab endpoint/deploy evidence",
+    ]:
+        assert expected in dkb_traceability

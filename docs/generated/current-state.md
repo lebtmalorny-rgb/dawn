@@ -85,8 +85,43 @@ Codex sandbox note:
 
 Kolla status:
 
-- E01 is a source application bootstrap, not the Kolla Build integration step;
-- Kolla-compatible image template/build integration remains a later deployment stage.
+- E01 is a source application bootstrap.
+- E01.5 adds a lab-only Kolla Build prototype under `deploy/kolla/`.
+- Production Kolla-Ansible role integration remains a later E09 stage.
+
+## E01.5 Kolla lab prototype state
+
+E01.5 implemented and verified the lab-only Kolla Build/deploy path:
+
+- Kolla custom image templates for exactly two Dawn images:
+  `cloud-ui-backend` and `cloud-ui-frontend`;
+- shared backend image commands: `api`, `worker`, `events`, `db-upgrade`,
+  `smoke`;
+- lab build wrapper: `deploy/kolla/scripts/build-images.sh`;
+- lab registry bootstrap, deploy, smoke and rollback playbooks under
+  `deploy/kolla/lab/`;
+- untracked secret vars file pattern for DB/RabbitMQ URLs;
+- container-level health checks for API, worker, events and frontend in the lab
+  deploy playbook;
+- smoke checks for API liveness/readiness, frontend HTTP 200, expected image
+  pairs, container health status and absence of supplied secret URLs in Dawn
+  container logs.
+
+Live E01.5 verification on 2026-06-21:
+
+| Item | Observed value |
+|---|---|
+| build/control host | `192.168.10.15` |
+| AIO deploy host | `192.168.10.14` |
+| registry | `192.168.10.15:5000` |
+| Kolla tag | `2025.1-rocky-9` |
+| API endpoint | `http://192.168.10.14:18081` |
+| frontend endpoint | `http://192.168.10.14:13080` |
+| Dawn containers | `cloud_ui_api`, `cloud_ui_worker`, `cloud_ui_events`, `cloud_ui_frontend` |
+
+The lab registry is HTTP/insecure and documented as an isolated lab
+prerequisite. Production promotion must replace this with the corporate
+registry/TLS/signing flow.
 
 ## Local host
 
@@ -218,7 +253,6 @@ Not yet verified:
 - whether a separate Kolla build venv exists under `/opt/kolla-venv`;
 - current Kolla base image digest;
 - test project credentials for non-admin least-privilege flows;
-- test registry;
 - RabbitMQ notification transport;
 - MariaDB backup/failover;
 - SIEM/Vault(SecMan)/PKI/PAM/storage/network interfaces.

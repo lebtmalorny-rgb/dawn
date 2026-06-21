@@ -133,6 +133,16 @@
           - api
           - -p
           - "{{ cloud_ui_api_port }}:8080"
+          - --health-cmd
+          - "python3.11 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=3).read()\""
+          - --health-interval
+          - 30s
+          - --health-timeout
+          - 5s
+          - --health-retries
+          - "3"
+          - --health-start-period
+          - 10s
           - "{{ cloud_ui_backend_image }}"
           - cloud-ui
           - api
@@ -152,6 +162,16 @@
           - "{{ cloud_ui_env_file }}"
           - --network
           - "{{ cloud_ui_network_name }}"
+          - --health-cmd
+          - "cloud-ui smoke >/dev/null"
+          - --health-interval
+          - 30s
+          - --health-timeout
+          - 5s
+          - --health-retries
+          - "3"
+          - --health-start-period
+          - 10s
           - "{{ cloud_ui_backend_image }}"
           - cloud-ui
           - worker
@@ -171,6 +191,16 @@
           - "{{ cloud_ui_env_file }}"
           - --network
           - "{{ cloud_ui_network_name }}"
+          - --health-cmd
+          - "cloud-ui smoke >/dev/null"
+          - --health-interval
+          - 30s
+          - --health-timeout
+          - 5s
+          - --health-retries
+          - "3"
+          - --health-start-period
+          - 10s
           - "{{ cloud_ui_backend_image }}"
           - cloud-ui
           - events
@@ -190,4 +220,14 @@
           - "{{ cloud_ui_network_name }}"
           - -p
           - "{{ cloud_ui_frontend_port }}:8080"
+          - --health-cmd
+          - "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/', timeout=3).read()\""
+          - --health-interval
+          - 30s
+          - --health-timeout
+          - 5s
+          - --health-retries
+          - "3"
+          - --health-start-period
+          - 10s
           - "{{ cloud_ui_frontend_image }}"

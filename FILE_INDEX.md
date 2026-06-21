@@ -107,6 +107,19 @@
 | [frontend/](frontend/) | React frontend shell and frontend runtime image. |
 | [tests/smoke.py](tests/smoke.py) | Compose smoke verification. |
 
+## Артефакты E01.5
+
+| Файл | Назначение |
+|---|---|
+| [docs/execplans/E015-kolla-lab-prototype.md](docs/execplans/E015-kolla-lab-prototype.md) | Фактический результат E01.5 Kolla lab prototype и live evidence. |
+| [deploy/kolla/README.md](deploy/kolla/README.md) | Lab-only Kolla Build/deploy/smoke instructions and registry prerequisites. |
+| [deploy/kolla/kolla-build.conf.example](deploy/kolla/kolla-build.conf.example) | Kolla Build config for the two Dawn custom images. |
+| [deploy/kolla/docker/cloud-ui-backend/Dockerfile.j2](deploy/kolla/docker/cloud-ui-backend/Dockerfile.j2) | Kolla template for the shared Dawn backend image. |
+| [deploy/kolla/docker/cloud-ui-frontend/Dockerfile.j2](deploy/kolla/docker/cloud-ui-frontend/Dockerfile.j2) | Kolla template for the Dawn frontend image. |
+| [deploy/kolla/scripts/build-images.sh](deploy/kolla/scripts/build-images.sh) | Lab Kolla Build wrapper with explicit logs/work directories. |
+| [deploy/kolla/lab/](deploy/kolla/lab/) | Lab inventory, vars and bootstrap/deploy/smoke/rollback playbooks. |
+| [tests/test_e015_kolla_layout.py](tests/test_e015_kolla_layout.py) | Contract tests for Kolla layout, lab safety and deploy/smoke expectations. |
+
 ## Минимальный контекст на сессию
 
 Для E00: `AGENTS.md`, `PLANS.md`, `tasks/E00_DISCOVERY.md` и перечисленные там документы.
