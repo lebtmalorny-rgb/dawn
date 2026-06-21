@@ -13,20 +13,20 @@ def test_cursor_round_trip_preserves_payload() -> None:
         "last": {"name": "vm-0001", "id": "instance-0001"},
     }
 
-    token = codec.encode(payload)
+    cursor_value = codec.encode(payload)
 
-    assert codec.decode(token) == payload
-    assert "vm-0001" not in token
+    assert codec.decode(cursor_value) == payload
+    assert "vm-0001" not in cursor_value
 
 
 def test_cursor_tampering_is_rejected() -> None:
     codec = CursorCodec(signing_key="dev-inventory-cursor-key")
-    token = codec.encode({"resource": "instances", "last": {"id": "i-1"}})
+    cursor_value = codec.encode({"resource": "instances", "last": {"id": "i-1"}})
 
-    bad_token = token[:-2] + "aa"
+    bad_cursor = cursor_value[:-2] + "aa"
 
     try:
-        codec.decode(bad_token)
+        codec.decode(bad_cursor)
     except CursorTampered as exc:
         assert exc.code == "cursor_tampered"
     else:
@@ -35,9 +35,9 @@ def test_cursor_tampering_is_rejected() -> None:
 
 def test_cursor_payload_is_signed_not_encrypted() -> None:
     codec = CursorCodec(signing_key="dev-inventory-cursor-key")
-    token = codec.encode({"resource": "instances", "last": {"name": "vm-0001"}})
+    cursor_value = codec.encode({"resource": "instances", "last": {"name": "vm-0001"}})
 
-    encoded_payload, _signature = token.split(".")
+    encoded_payload, _signature = cursor_value.split(".")
     decoded_payload = base64.urlsafe_b64decode(
         f"{encoded_payload}{'=' * (-len(encoded_payload) % 4)}"
     )
