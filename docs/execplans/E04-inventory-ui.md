@@ -124,7 +124,15 @@ frontend inventory pages.
   `tests/security/test_mock_identity.py tests/inventory/test_inventory_api.py tests/security/test_security_api.py`
   -> `33 passed`; full backend `tests -q` -> `107 passed`; scoped Ruff and mypy passed; final
   spec and quality reviews approved with no blocking issues.
-- [ ] Frontend inventory pages.
+- [x] 2026-06-21: Frontend inventory pages implemented. Evidence: commits
+  `1260448 feat: add inventory frontend pages`,
+  `acb7d01 fix: make inventory workspace full width`,
+  `9e1537d fix: complete inventory frontend spec gaps`,
+  `7f5d57a fix: harden inventory frontend request controls`,
+  `b9d9d39 fix: keep refresh affordance inert`; targeted frontend tests
+  `npm test -- --run src/App.test.tsx` -> `22 passed`; `npm run typecheck`,
+  `npm run lint`, `git diff --check 50f3a0d..HEAD`, browser-storage/direct-URL scans passed;
+  final spec and quality reviews approved with no blocking issues.
 - [ ] Scale evidence and documentation.
 - [ ] Final verification, review and integration.
 
@@ -149,6 +157,11 @@ frontend inventory pages.
   finalized.
 - The runtime inventory DB engine is held in FastAPI app state and relies on process shutdown for
   disposal. Add explicit lifespan disposal before production deployment hardening.
+- Frontend refresh affordance is capability-aware but intentionally disabled until the frontend has
+  a complete CSRF/idempotency request contract for the mutating refresh flow. Backend refresh
+  authorization/audit remains covered by API tests.
+- No Playwright/e2e command exists yet in this worktree, so E04.5 browser-level evidence is limited
+  to Vitest/RTL component coverage and static checks.
 
 ## Журнал решений
 
