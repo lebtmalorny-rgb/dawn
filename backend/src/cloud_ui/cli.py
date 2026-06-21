@@ -1,5 +1,6 @@
 import argparse
 import sys
+from importlib.resources import files
 
 import uvicorn
 from alembic import command
@@ -31,9 +32,14 @@ def run_api() -> None:
     )
 
 
+def migration_script_location() -> str:
+    return str(files("cloud_ui.migrations"))
+
+
 def run_db_upgrade() -> None:
     settings = get_settings()
-    cfg = Config("alembic.ini")
+    cfg = Config()
+    cfg.set_main_option("script_location", migration_script_location())
     cfg.set_main_option("sqlalchemy.url", settings.database_url.unicode_string())
     command.upgrade(cfg, "head")
 

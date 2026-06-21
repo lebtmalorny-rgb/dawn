@@ -110,6 +110,19 @@ def test_backend_runtime_dependencies_follow_kolla_constraints() -> None:
         assert forbidden not in pyproject
 
 
+def test_backend_migration_resources_are_packaged_for_kolla_image() -> None:
+    pyproject = read_text("backend/pyproject.toml")
+
+    for relative_path in [
+        "backend/src/cloud_ui/migrations/__init__.py",
+        "backend/src/cloud_ui/migrations/versions/__init__.py",
+    ]:
+        assert (ROOT / relative_path).is_file(), relative_path
+
+    assert "[tool.setuptools.package-data]" in pyproject
+    assert '"cloud_ui.migrations" = ["script.py.mako"]' in pyproject
+
+
 def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
     template = read_text("deploy/kolla/docker/cloud-ui-frontend/Dockerfile.j2")
 
