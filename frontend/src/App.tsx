@@ -246,18 +246,19 @@ export function App() {
     }
 
     let mounted = true;
+    const abortController = new AbortController();
     const params = new URLSearchParams(locationSearch);
     setInventoryState({ type: "loading", view: activeInventoryView });
 
     if (activeInventoryView === "instances") {
-      fetchInstances(params)
+      fetchInstances(params, abortController.signal)
         .then((page) => {
           if (mounted) {
             setInventoryState({ type: "ready", view: "instances", page });
           }
         })
-        .catch(() => {
-          if (mounted) {
+        .catch((error: unknown) => {
+          if (mounted && !isAbortError(error)) {
             setInventoryState({
               type: "error",
               view: "instances",
@@ -266,14 +267,14 @@ export function App() {
           }
         });
     } else {
-      fetchHypervisors(params)
+      fetchHypervisors(params, abortController.signal)
         .then((page) => {
           if (mounted) {
             setInventoryState({ type: "ready", view: "hypervisors", page });
           }
         })
-        .catch(() => {
-          if (mounted) {
+        .catch((error: unknown) => {
+          if (mounted && !isAbortError(error)) {
             setInventoryState({
               type: "error",
               view: "hypervisors",
@@ -285,6 +286,7 @@ export function App() {
 
     return () => {
       mounted = false;
+      abortController.abort();
     };
   }, [activeInventoryView, capabilitySignature, currentCapabilities, locationSearch]);
 
@@ -765,6 +767,8 @@ function renderInstancesPage(
                       <Button
                         aria-label={`Обновить ${item.name}`}
                         className="cloud-ui-table-action"
+                        isDisabled
+                        title="Обновление будет доступно после завершения CSRF-контракта"
                         type="button"
                         variant="secondary"
                       >
@@ -1065,6 +1069,10 @@ function formatHypervisorValue(column: HypervisorColumnKey, item: HypervisorItem
 
 function formatNullable(value: string | null): string {
   return value ?? "-";
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function formatRam(value: number): string {

@@ -329,6 +329,7 @@ const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
 
 const COMMON_LIST_PARAMS = ["cursor", "sort", "q", "cloud_id", "region_id"] as const;
+const SORT_DIRECTIONS = ["asc", "desc"] as const;
 const INSTANCE_LIST_PARAMS = [
   ...COMMON_LIST_PARAMS,
   "project_id",
@@ -345,6 +346,38 @@ const HYPERVISOR_LIST_PARAMS = [
   "availability_zone",
   "maintenance_status"
 ] as const;
+const INSTANCE_SORT_FIELDS = [
+  "instance_id",
+  "name",
+  "project_id",
+  "status",
+  "host_name",
+  "availability_zone",
+  "source_updated_at",
+  "observed_at"
+] as const;
+const HYPERVISOR_SORT_FIELDS = [
+  "hypervisor_id",
+  "host_name",
+  "service_status",
+  "service_state",
+  "availability_zone",
+  "observed_at"
+] as const;
+
+type SortConfig = {
+  allowedFields: readonly string[];
+  defaultSort: string;
+};
+
+const INSTANCE_SORT_CONFIG: SortConfig = {
+  allowedFields: INSTANCE_SORT_FIELDS,
+  defaultSort: "name.asc"
+};
+const HYPERVISOR_SORT_CONFIG: SortConfig = {
+  allowedFields: HYPERVISOR_SORT_FIELDS,
+  defaultSort: "host_name.asc"
+};
 
 function boundedLimit(rawLimit: string | null): string {
   if (rawLimit === null) {
@@ -359,16 +392,40 @@ function boundedLimit(rawLimit: string | null): string {
   return String(Math.max(1, Math.min(Math.trunc(requestedLimit), MAX_LIST_LIMIT)));
 }
 
+function normalizedSort(rawSort: string | null, config: SortConfig): string {
+  if (rawSort === null) {
+    return config.defaultSort;
+  }
+
+  const [field, direction, extra] = rawSort.split(".");
+  if (
+    extra !== undefined ||
+    field === undefined ||
+    direction === undefined ||
+    !config.allowedFields.includes(field) ||
+    !(SORT_DIRECTIONS as readonly string[]).includes(direction)
+  ) {
+    return config.defaultSort;
+  }
+
+  return `${field}.${direction}`;
+}
+
 function inventoryUrl(
   path: string,
   params: URLSearchParams,
-  supportedParams: readonly string[]
+  supportedParams: readonly string[],
+  sortConfig: SortConfig
 ): string {
   const query = new URLSearchParams();
   query.set("limit", boundedLimit(params.get("limit")));
 
   for (const key of supportedParams) {
     if (key === "limit") {
+      continue;
+    }
+    if (key === "sort") {
+      query.set("sort", normalizedSort(params.get("sort"), sortConfig));
       continue;
     }
     for (const value of params.getAll(key)) {
@@ -431,9 +488,13 @@ export async function fetchCapabilities(): Promise<Capabilities> {
 }
 
 export async function fetchInstances(
-  params: URLSearchParams
+  params: URLSearchParams,
+  signal?: AbortSignal
 ): Promise<InventoryPage<InstanceItem>> {
-  const response = await fetch(inventoryUrl("/api/v1/instances", params, INSTANCE_LIST_PARAMS));
+  const response = await fetch(
+    inventoryUrl("/api/v1/instances", params, INSTANCE_LIST_PARAMS, INSTANCE_SORT_CONFIG),
+    signal === undefined ? undefined : { signal }
+  );
   const payload: unknown = await response.json();
 
   if (response.ok && isInventoryPage(payload, isInstanceItem)) {
@@ -444,10 +505,17 @@ export async function fetchInstances(
 }
 
 export async function fetchHypervisors(
-  params: URLSearchParams
+  params: URLSearchParams,
+  signal?: AbortSignal
 ): Promise<InventoryPage<HypervisorItem>> {
   const response = await fetch(
-    inventoryUrl("/api/v1/hypervisors", params, HYPERVISOR_LIST_PARAMS)
+    inventoryUrl(
+      "/api/v1/hypervisors",
+      params,
+      HYPERVISOR_LIST_PARAMS,
+      HYPERVISOR_SORT_CONFIG
+    ),
+    signal === undefined ? undefined : { signal }
   );
   const payload: unknown = await response.json();
 

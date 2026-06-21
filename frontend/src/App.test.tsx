@@ -361,7 +361,7 @@ test("logs in through BFF and hides forbidden role management action", async () 
           })
         };
       }
-      if (url === "/api/v1/instances?limit=50") {
+      if (url === "/api/v1/instances?limit=50&sort=name.asc") {
         return {
           ok: true,
           status: 200,
@@ -421,7 +421,7 @@ test("renders inventory navigation only when capabilities allow it", async () =>
       if (url === "/api/v1/capabilities") {
         return jsonResponse(capabilitiesPayload(["instance.read"]));
       }
-      if (url === "/api/v1/instances?limit=50") {
+      if (url === "/api/v1/instances?limit=50&sort=name.asc") {
         return jsonResponse(inventoryPage([]));
       }
       throw new Error(`unexpected fetch ${url}`);
@@ -463,7 +463,8 @@ test("instances page fetches server-side page from BFF with URL filters", async 
   expect(screen.queryByText("vm-not-returned")).not.toBeInTheDocument();
   await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/instances?limit=50&sort=name.asc&status=ACTIVE"
+      "/api/v1/instances?limit=50&sort=name.asc&status=ACTIVE",
+      expect.objectContaining({ signal: expect.any(Object) })
     );
   });
 });
@@ -480,7 +481,7 @@ test("inventory navigation and table render outside constrained status layout", 
     if (url === "/api/v1/capabilities") {
       return jsonResponse(capabilitiesPayload(["instance.read", "hypervisor.read"]));
     }
-    if (url === "/api/v1/instances?limit=50") {
+    if (url === "/api/v1/instances?limit=50&sort=name.asc") {
       return jsonResponse(inventoryPage([instanceItem({ name: "vm-wide-screen" })]));
     }
     throw new Error(`unexpected fetch ${url}`);
@@ -517,7 +518,7 @@ test("hypervisors page renders partial and stale state", async () => {
       if (url === "/api/v1/capabilities") {
         return jsonResponse(capabilitiesPayload(["hypervisor.read"]));
       }
-      if (url === "/api/v1/hypervisors?limit=50") {
+      if (url === "/api/v1/hypervisors?limit=50&sort=host_name.asc") {
         return jsonResponse(
           inventoryPage([hypervisorItem({ host_name: "compute-stale" })], true, true)
         );
@@ -549,7 +550,7 @@ test("inventory pages do not store result rows in browser storage", async () => 
       if (url === "/api/v1/capabilities") {
         return jsonResponse(capabilitiesPayload(["instance.read"]));
       }
-      if (url === "/api/v1/instances?limit=50") {
+      if (url === "/api/v1/instances?limit=50&sort=name.asc") {
         return jsonResponse(inventoryPage([instanceItem({ name: "vm-storage-check" })]));
       }
       throw new Error(`unexpected fetch ${url}`);
@@ -593,8 +594,117 @@ test("inventory requests clamp limit and exclude unsupported URL view state", as
 
   expect(await screen.findByText("vm-sanitized")).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledWith(
-    "/api/v1/instances?limit=200&cursor=cursor-1&sort=name.asc&status=ACTIVE"
+    "/api/v1/instances?limit=200&cursor=cursor-1&sort=name.asc&status=ACTIVE",
+    expect.objectContaining({ signal: expect.any(Object) })
   );
+});
+
+test("inventory requests default malformed and unsupported instance sort values", async () => {
+  window.history.replaceState({}, "", "/?view=instances&sort=project_id.sideways");
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["instance.read"]));
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/instances?limit=50&sort=name.asc") {
+      return jsonResponse(inventoryPage([instanceItem({ name: "vm-default-sort" })]));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(await screen.findByText("vm-default-sort")).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/v1/instances?limit=50&sort=name.asc",
+    expect.objectContaining({ signal: expect.any(Object) })
+  );
+});
+
+test("inventory requests default unsupported hypervisor sort values", async () => {
+  window.history.replaceState({}, "", "/?view=hypervisors&sort=running_vms.desc");
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["hypervisor.read"]));
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/hypervisors?limit=50&sort=host_name.asc") {
+      return jsonResponse(
+        inventoryPage([hypervisorItem({ host_name: "compute-default-sort" })])
+      );
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(await screen.findByText("compute-default-sort")).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/v1/hypervisors?limit=50&sort=host_name.asc",
+    expect.objectContaining({ signal: expect.any(Object) })
+  );
+});
+
+test("aborts superseded inventory requests when changing inventory view", async () => {
+  window.history.replaceState({}, "", "/?view=instances");
+  const inventorySignals: Array<AbortSignal | null> = [];
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return Promise.resolve(jsonResponse(operatorSessionPayload));
+    }
+    if (url === "/api/v1/health/ready") {
+      return Promise.resolve(jsonResponse(readyPayload));
+    }
+    if (url === "/api/v1/capabilities") {
+      return Promise.resolve(
+        jsonResponse(capabilitiesPayload(["instance.read", "hypervisor.read"]))
+      );
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return Promise.resolve(jsonResponse(inventoryModulesPayload()));
+    }
+    if (url === "/api/v1/instances?limit=50&sort=name.asc") {
+      inventorySignals.push(init?.signal ?? null);
+      return new Promise(() => undefined);
+    }
+    if (url === "/api/v1/hypervisors?limit=50&sort=host_name.asc") {
+      return Promise.resolve(
+        jsonResponse(inventoryPage([hypervisorItem({ host_name: "compute-after-abort" })]))
+      );
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<App />);
+
+  await user.click(await screen.findByRole("link", { name: "Гипервизоры" }));
+
+  expect(await screen.findByText("compute-after-abort")).toBeInTheDocument();
+  expect(inventorySignals[0]).not.toBeNull();
+  expect(inventorySignals[0]?.aborted).toBe(true);
 });
 
 test("next cursor pagination updates URL and fetches one next BFF page", async () => {
@@ -635,7 +745,8 @@ test("next cursor pagination updates URL and fetches one next BFF page", async (
   expect(window.location.search).toBe("?view=instances&sort=name.asc&cursor=cursor-next");
   expect(fetchMock).toHaveBeenCalledTimes(6);
   expect(fetchMock).toHaveBeenCalledWith(
-    "/api/v1/instances?limit=50&cursor=cursor-next&sort=name.asc"
+    "/api/v1/instances?limit=50&cursor=cursor-next&sort=name.asc",
+    expect.objectContaining({ signal: expect.any(Object) })
   );
 });
 
@@ -657,7 +768,7 @@ test("columns and density round trip through URL and control visible table state
       if (url === "/api/v1/inventory/modules") {
         return jsonResponse(inventoryModulesPayload());
       }
-      if (url === "/api/v1/instances?limit=50") {
+      if (url === "/api/v1/instances?limit=50&sort=name.asc") {
         return jsonResponse(inventoryPage([instanceItem({ name: "vm-url-view" })]));
       }
       throw new Error(`unexpected fetch ${url}`);
@@ -689,7 +800,7 @@ test("renders disabled inventory modules from BFF instead of broken links", asyn
     if (url === "/api/v1/inventory/modules") {
       return jsonResponse(inventoryModulesPayload());
     }
-    if (url === "/api/v1/instances?limit=50") {
+    if (url === "/api/v1/instances?limit=50&sort=name.asc") {
       return jsonResponse(inventoryPage([]));
     }
     throw new Error(`unexpected fetch ${url}`);
@@ -724,7 +835,7 @@ test("links instance host and hypervisor relationships to filtered hypervisors v
       if (url === "/api/v1/inventory/modules") {
         return jsonResponse(inventoryModulesPayload());
       }
-      if (url === "/api/v1/instances?limit=50") {
+      if (url === "/api/v1/instances?limit=50&sort=name.asc") {
         return jsonResponse(
           inventoryPage([
             instanceItem({
@@ -770,7 +881,7 @@ test("links hypervisor host and running VM count to filtered instances view", as
       if (url === "/api/v1/inventory/modules") {
         return jsonResponse(inventoryModulesPayload());
       }
-      if (url === "/api/v1/hypervisors?limit=50") {
+      if (url === "/api/v1/hypervisors?limit=50&sort=host_name.asc") {
         return jsonResponse(
           inventoryPage([hypervisorItem({ host_name: "compute-a", running_vms: 7 })])
         );
@@ -810,7 +921,7 @@ test("renders instance actions only for relevant capabilities", async () => {
       if (url === "/api/v1/inventory/modules") {
         return jsonResponse(inventoryModulesPayload());
       }
-      if (url === "/api/v1/instances?limit=50") {
+      if (url === "/api/v1/instances?limit=50&sort=name.asc") {
         return jsonResponse(inventoryPage([instanceItem({ name: "vm-no-action" })]));
       }
       throw new Error(`unexpected fetch ${url}`);
@@ -824,34 +935,40 @@ test("renders instance actions only for relevant capabilities", async () => {
   expect(screen.queryByRole("button", { name: "Обновить vm-no-action" })).not.toBeInTheDocument();
 });
 
-test("renders allowed instance refresh action when capability exists", async () => {
+test("renders allowed instance refresh affordance disabled until refresh contract exists", async () => {
   window.history.replaceState({}, "", "/?view=instances");
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url === "/api/v1/session") {
-        return jsonResponse(operatorSessionPayload);
-      }
-      if (url === "/api/v1/health/ready") {
-        return jsonResponse(readyPayload);
-      }
-      if (url === "/api/v1/capabilities") {
-        return jsonResponse(capabilitiesPayload(["instance.read", "instance.refresh"]));
-      }
-      if (url === "/api/v1/inventory/modules") {
-        return jsonResponse(inventoryModulesPayload());
-      }
-      if (url === "/api/v1/instances?limit=50") {
-        return jsonResponse(inventoryPage([instanceItem({ name: "vm-action" })]));
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    })
-  );
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["instance.read", "instance.refresh"]));
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/instances?limit=50&sort=name.asc") {
+      return jsonResponse(inventoryPage([instanceItem({ name: "vm-action" })]));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
 
   render(<App />);
 
   expect(await screen.findByText("vm-action")).toBeInTheDocument();
   expect(screen.getByText("Действия")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Обновить vm-action" })).toBeInTheDocument();
+  const refreshButton = screen.getByRole("button", { name: "Обновить vm-action" });
+
+  expect(refreshButton).toBeDisabled();
+  await user.click(refreshButton);
+  expect(fetchMock).not.toHaveBeenCalledWith(
+    "/api/v1/instances/synthetic/RegionOne/instance-0001/refresh",
+    expect.anything()
+  );
 });
