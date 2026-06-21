@@ -547,6 +547,8 @@ def _order_by(
     if sort.field == id_field:
         return [direction()]
     id_direction = id_column.asc if sort.direction == "asc" else id_column.desc
+    if not _uses_null_bucket(sort_column):
+        return [direction(), id_direction()]
     return [_null_bucket_column(sort, sort_column).asc(), direction(), id_direction()]
 
 
@@ -562,6 +564,19 @@ def _keyset_condition(
         if sort.direction == "asc":
             return sort_column > last_sort_value
         return sort_column < last_sort_value
+
+    if not _uses_null_bucket(sort_column):
+        if last_sort_value is None:
+            raise CursorTampered()
+        if sort.direction == "asc":
+            return sa.or_(
+                sort_column > last_sort_value,
+                sa.and_(sort_column == last_sort_value, id_column > last_id),
+            )
+        return sa.or_(
+            sort_column < last_sort_value,
+            sa.and_(sort_column == last_sort_value, id_column < last_id),
+        )
 
     last_null_bucket = _null_bucket_value(sort.direction, last_sort_value)
     null_bucket_column = _null_bucket_column(sort, sort_column)
@@ -711,6 +726,10 @@ def _null_bucket_column(
     if sort.direction == "asc":
         return sa.case((sort_column.is_(None), 0), else_=1)
     return sa.case((sort_column.is_(None), 1), else_=0)
+
+
+def _uses_null_bucket(sort_column: sa.Column[Any]) -> bool:
+    return bool(sort_column.nullable)
 
 
 def _null_bucket_value(direction: str, value: object) -> int:

@@ -61,7 +61,7 @@ def test_scale_report_contains_explain_summaries() -> None:
     )
 
 
-def test_explain_uses_actual_measured_repository_select() -> None:
+def test_default_explain_uses_actual_indexed_repository_select() -> None:
     from cloud_ui.inventory.scale_report import ScaleProfile, generate_scale_report
 
     report = generate_scale_report(
@@ -75,10 +75,20 @@ def test_explain_uses_actual_measured_repository_select() -> None:
     )
     scenarios = {scenario.name: scenario for scenario in report.scenarios}
 
-    assert "CASE WHEN" in scenarios["instances_default_page"].explained_sql
-    assert "instances.name IS NULL" in scenarios["instances_default_page"].explained_sql
-    assert "CASE WHEN" in scenarios["hypervisors_default_page"].explained_sql
-    assert "hypervisors.host_name IS NULL" in scenarios["hypervisors_default_page"].explained_sql
+    assert "ORDER BY instances.name ASC, instances.instance_id ASC" in (
+        scenarios["instances_default_page"].explained_sql
+    )
+    assert "CASE WHEN" not in scenarios["instances_default_page"].explained_sql
+    assert "USE TEMP B-TREE" not in " ".join(
+        scenarios["instances_default_page"].explain_summary
+    )
+    assert "ORDER BY hypervisors.host_name ASC, hypervisors.hypervisor_id ASC" in (
+        scenarios["hypervisors_default_page"].explained_sql
+    )
+    assert "CASE WHEN" not in scenarios["hypervisors_default_page"].explained_sql
+    assert "USE TEMP B-TREE" not in " ".join(
+        scenarios["hypervisors_default_page"].explain_summary
+    )
     assert all(scenario.explain_summary for scenario in report.scenarios)
 
 
