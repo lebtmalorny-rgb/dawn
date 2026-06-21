@@ -109,7 +109,11 @@ frontend inventory pages.
   `8fd3f3e fix: bound inventory warning freshness`; targeted tests
   `tests/inventory/test_cursor.py tests/inventory/test_repository.py tests/inventory/test_inventory_migration.py tests/test_config.py`
   -> `23 passed`; scoped Ruff and mypy passed; final quality review approved with no blocking issues.
-- [ ] Synthetic reconciliation.
+- [x] 2026-06-21: Synthetic reconciliation implemented. Evidence: commits
+  `14a08e7 feat: add synthetic inventory reconciliation`,
+  `d17abaf fix: harden synthetic reconciliation state`; targeted tests
+  `tests/inventory/test_reconciliation.py tests/test_cli.py` -> `12 passed`; regression inventory/config tests
+  -> `23 passed`; scoped Ruff and mypy passed; final quality review approved with no blocking issues.
 - [ ] Inventory API and authorization.
 - [ ] Frontend inventory pages.
 - [ ] Scale evidence and documentation.
@@ -125,6 +129,12 @@ frontend inventory pages.
   does not grant `instance.refresh`; E04 will add refresh capability only where tests require it.
 - Null-bucket keyset ordering uses portable SQL `CASE WHEN` expressions. E04.6 scale evidence must
   include `EXPLAIN` for representative sorts and warning queries before claiming p95/index behavior.
+- Synthetic reconciliation generation allocation is sequentially correct for current tests but is
+  not a distributed lock. HA scheduling or multi-worker reconciliation needs a lease/atomic
+  allocation design before production enablement.
+- Finalization failures are visible through region partial state, but they do not yet create a
+  generic `inventory_sync_failures` row. E04 API/UI can surface the region warning; operational
+  failure detail may need a later audit/log event.
 
 ## Журнал решений
 
