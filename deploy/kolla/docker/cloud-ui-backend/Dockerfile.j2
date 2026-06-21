@@ -17,7 +17,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 ADD cloud-ui-backend-archive /cloud-ui-backend-source
 
-RUN {{ macros.install_pip(['/cloud-ui-backend-source/backend'] | customizable("pip_packages")) }} \
+RUN {{ macros.install_pip(['/cloud-ui-backend-source/source/backend'] | customizable("pip_packages")) }} \
     && mkdir -p /etc/cloud-ui /var/lib/cloud-ui /var/log/cloud-ui \
     && chown -R cloudui: /etc/cloud-ui /var/lib/cloud-ui /var/log/cloud-ui \
     && rm -rf /cloud-ui-backend-source
