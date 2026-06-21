@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     session_limit_policy: SessionLimitPolicyName = Field(default="deny")
     session_cookie_secure: bool = Field(default=False)
     session_cookie_samesite: SameSiteName = Field(default="lax")
+    trusted_origins: tuple[str, ...] = Field(
+        default=("http://localhost", "http://127.0.0.1", "http://testserver")
+    )
 
     @model_validator(mode="after")
     def reject_mock_identity_in_production(self) -> "Settings":

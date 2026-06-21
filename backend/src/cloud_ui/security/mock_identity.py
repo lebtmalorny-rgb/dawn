@@ -94,6 +94,7 @@ def build_mock_identity_provider() -> MockIdentityProvider:
                             "audit.read",
                             "operation.read",
                             "role.manage",
+                            "session.manage",
                         }
                     ),
                 ),

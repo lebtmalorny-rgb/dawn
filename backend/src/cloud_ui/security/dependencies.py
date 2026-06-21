@@ -23,6 +23,7 @@ class SecurityServices:
     clock: ManualClock
     session_cookie_secure: bool
     session_cookie_samesite: CookieSameSite
+    trusted_origins: frozenset[str]
 
 
 def build_security_services(settings: Settings | None = None) -> SecurityServices:
@@ -32,6 +33,7 @@ def build_security_services(settings: Settings | None = None) -> SecurityService
         identity_provider = build_mock_identity_provider()
         session_cookie_secure = False
         session_cookie_samesite = "lax"
+        trusted_origins = frozenset({"http://localhost", "http://127.0.0.1", "http://testserver"})
         session_manager = SessionManager(clock=clock)
     else:
         if settings.identity_provider != "mock" or not settings.mock_identity_enabled:
@@ -39,6 +41,7 @@ def build_security_services(settings: Settings | None = None) -> SecurityService
         identity_provider = build_mock_identity_provider()
         session_cookie_secure = settings.session_cookie_secure
         session_cookie_samesite = settings.session_cookie_samesite
+        trusted_origins = frozenset(settings.trusted_origins)
         session_manager = SessionManager(
             clock=clock,
             idle_timeout_seconds=settings.session_idle_timeout_seconds,
@@ -54,4 +57,5 @@ def build_security_services(settings: Settings | None = None) -> SecurityService
         clock=clock,
         session_cookie_secure=session_cookie_secure,
         session_cookie_samesite=session_cookie_samesite,
+        trusted_origins=trusted_origins,
     )

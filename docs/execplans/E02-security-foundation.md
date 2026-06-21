@@ -97,12 +97,13 @@
 - [x] 2026-06-21: Отрицательные сценарии и безопасность. Evidence: `cd backend && .venv/bin/python -m pytest tests/security -q` -> `18 passed`; covers direct 401/403, CSRF, session limit, idle timeout, service role for human denial, simulated OpenStack deny, security headers and UTC audit timestamp validation.
 - [x] 2026-06-21: UI/session/capability smoke. Evidence: `cd frontend && npm test -- --run src/App.test.tsx` -> `6 passed` before final docs updates; covers login shell, capability-gated navigation and malformed session payload.
 - [x] 2026-06-21: Документация и evidence обновлены. Evidence: `docs/06_AUTH_RBAC_SESSIONS.md`, `docs/08_AUDIT_OBSERVABILITY.md`, `docs/11_DKB_TRACEABILITY.md`, `docs/generated/api-register.md`, `docs/generated/risk-register.md`.
+- [x] 2026-06-21: E02 completion pass added admin session listing/revoke, trusted Origin rejection and audit-reader mutating denial. RED evidence: `/session/active` returned 404 and untrusted `Origin` returned 204 before implementation; GREEN targeted evidence: `cd backend && .venv/bin/python -m pytest tests/security/test_security_api.py -q` -> `13 passed`.
 
 ## Неожиданные открытия
 
 - Current backend has no auth/session/RBAC structure, so E02 should introduce small focused modules instead of modifying a pre-existing auth layer.
 - E00/risk docs were finalized first in commit `23f6b6f`, which keeps E02 code/schema rollback separate from E00 requirement/risk clarification.
-- E02 implementation deliberately keeps `/session/active` administrative session listing/revoke out of the current API surface; P0 proves logout, timeout and policy denial, while administrative revoke UX remains a later hardening/admin story.
+- E02 admin session management is API-only: `/session/active` and `DELETE /session/active/{session_id}` are implemented and tested, while a dedicated frontend admin screen remains outside the minimal E02 UI shell.
 - `tests/test_e015_kolla_layout.py` targets Kolla prototype files outside current E02 scope and must not be used as an E02 gate unless that task is explicitly resumed.
 
 ## Журнал решений
@@ -233,14 +234,14 @@ Required commands from `/Users/dmitry/Desktop/dawn`:
 Latest E02 verification results from `.worktrees/e02-security-foundation`:
 
 - `cd backend && .venv/bin/python -m pytest tests/security/test_mock_identity.py -q` -> `3 passed`.
-- `cd backend && .venv/bin/python -m pytest tests/security -q` -> `18 passed`.
+- `cd backend && .venv/bin/python -m pytest tests/security -q` -> `21 passed`.
 - `cd backend && .venv/bin/python -m pytest tests/security/test_security_migration.py -q` -> `1 passed`.
 - `cd frontend && npm test -- --run src/App.test.tsx` -> `6 passed`.
 - `git diff --check` -> no output, exit 0.
 - `./scripts/secret-scan.sh` -> no output, exit 0.
 - `make lint` -> ruff, eslint and secret scan pass.
 - `make typecheck` -> mypy success in 21 source files; frontend `tsc -b` pass.
-- `make test` -> backend `34 passed`; frontend `6 passed`.
+- `make test` -> backend `37 passed`; frontend `6 passed`.
 
 E02-specific tests to add and run as targeted commands while implementing:
 
@@ -270,7 +271,7 @@ E02-specific tests to add and run as targeted commands while implementing:
 
 ## Итог и остаточные риски
 
-E02 creates a P0 portal security foundation: deterministic mock identity is production-hard-disabled, sessions are server-side and cookie-backed, mutating portal endpoints require CSRF, capabilities drive frontend UX while backend repeats authorization, and auth/RBAC failures produce sanitized audit events.
+E02 creates a P0 portal security foundation: deterministic mock identity is production-hard-disabled, sessions are server-side and cookie-backed, administrative revoke is capability- and CSRF-protected, mutating portal endpoints require CSRF and trusted `Origin`, capabilities drive frontend UX while backend repeats authorization, and auth/RBAC/session failures produce sanitized audit events.
 
 Remaining risks after E02 implementation:
 

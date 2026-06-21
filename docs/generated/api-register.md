@@ -15,8 +15,8 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | `GET /session` | current session | frontend | session cookie | E02 | `session.required`, `session.timeout` | implemented in P0 |
 | `POST /session/login` | login start/mock/test flow | frontend | flow-specific | E02 | login success/failure, session limit | implemented in P0; production mock hard-disabled |
 | `POST /session/logout` | logout | frontend | session+CSRF | E02 | logout, CSRF denial | implemented in P0 |
-| `GET /session/active` | active UI sessions | frontend | session+capability | E02+ | protected access | not implemented in E02 P0; capability `session.manage` remains planned |
-| `DELETE /session/active/{session_id}` | revoke session | frontend | session+CSRF+capability | E02+ | revoke | not implemented in E02 P0; capability `session.manage` remains planned |
+| `GET /session/active` | active UI sessions | frontend | session+capability | E02 | protected access | implemented in P0; capability `session.manage` |
+| `DELETE /session/active/{session_id}` | revoke session | frontend | session+CSRF+trusted Origin+capability | E02 | `session.revoke`, CSRF/origin denial | implemented in P0; capability `session.manage` |
 | `GET /capabilities` | effective portal permissions | frontend | session | E02 | protected access | implemented in P0; response contains no policy expression |
 | `POST /admin/role-bindings` | P0 role binding policy probe | frontend/admin future | session+CSRF+capability | E02 | authorization denial | implemented only as security contract path; full admin UI remains planned |
 | `POST /operations/simulated-openstack-action` | P0 OpenStack-deny finality probe | security tests | session+CSRF+capability | E02 | portal denial or OpenStack denial | implemented only as security contract path; real operations start in E06 |

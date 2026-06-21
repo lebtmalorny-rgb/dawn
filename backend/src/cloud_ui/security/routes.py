@@ -17,7 +17,12 @@ from cloud_ui.security.rbac import (
     RoleBindingRequest,
     SubjectType,
 )
-from cloud_ui.security.sessions import SessionExpired, SessionLimitReached, SessionNotFound
+from cloud_ui.security.sessions import (
+    SessionExpired,
+    SessionLimitReached,
+    SessionNotFound,
+    SessionRecord,
+)
 
 SESSION_COOKIE_NAME = "cloud_ui_session"
 CSRF_HEADER_NAME = "x-csrf-token"
@@ -50,6 +55,20 @@ class CapabilitiesResponse(BaseModel):
     capabilities: list[str]
     expires_at: datetime
     policy_revision: str
+
+
+class ActiveSessionPayload(BaseModel):
+    session_id: str
+    subject_id: str
+    display_name: str
+    created_at: datetime
+    last_seen_at: datetime
+    idle_expires_at: datetime
+    absolute_expires_at: datetime
+
+
+class ActiveSessionsResponse(BaseModel):
+    sessions: list[ActiveSessionPayload]
 
 
 class RoleBindingPayload(BaseModel):
@@ -154,6 +173,9 @@ def build_security_router(services: SecurityServices) -> APIRouter:
         session = _require_session(services, request)
         if isinstance(session, JSONResponse):
             return session
+        origin_error = _require_trusted_origin(services, request, session)
+        if origin_error is not None:
+            return origin_error
         csrf_error = _require_csrf(services, request, session)
         if csrf_error is not None:
             return csrf_error
@@ -175,6 +197,86 @@ def build_security_router(services: SecurityServices) -> APIRouter:
         response.status_code = 204
         return response
 
+    @router.get("/session/active", response_model=ActiveSessionsResponse)
+    def active_sessions(request: Request) -> ActiveSessionsResponse | JSONResponse:
+        session = _require_session(services, request)
+        if isinstance(session, JSONResponse):
+            return session
+        try:
+            services.policy_service.require_capability(session.subject, "session.manage")
+        except AuthorizationDenied as exc:
+            _record_audit(
+                services,
+                request,
+                action="authorization.denied",
+                event_type="authorization",
+                outcome="failure",
+                target_type="session",
+                target_id=None,
+                subject=session.subject,
+                session_reference=session.session_id,
+                metadata={"code": exc.code},
+            )
+            return _error(403, exc.code, "Действие запрещено", _request_id(request))
+
+        return ActiveSessionsResponse(
+            sessions=[
+                _active_session_payload(active_session)
+                for active_session in services.session_manager.list_active_sessions()
+            ]
+        )
+
+    @router.delete("/session/active/{session_id}", status_code=204, response_model=None)
+    def revoke_session(
+        session_id: str, request: Request, response: Response
+    ) -> Response | JSONResponse:
+        actor_session = _require_session(services, request)
+        if isinstance(actor_session, JSONResponse):
+            return actor_session
+        origin_error = _require_trusted_origin(services, request, actor_session)
+        if origin_error is not None:
+            return origin_error
+        csrf_error = _require_csrf(services, request, actor_session)
+        if csrf_error is not None:
+            return csrf_error
+
+        try:
+            services.policy_service.require_capability(actor_session.subject, "session.manage")
+        except AuthorizationDenied as exc:
+            _record_audit(
+                services,
+                request,
+                action="authorization.denied",
+                event_type="authorization",
+                outcome="failure",
+                target_type="session",
+                target_id=session_id,
+                subject=actor_session.subject,
+                session_reference=actor_session.session_id,
+                metadata={"code": exc.code},
+            )
+            return _error(403, exc.code, "Действие запрещено", _request_id(request))
+
+        try:
+            target_session = services.session_manager.revoke_session_id(session_id)
+        except SessionNotFound:
+            return _error(404, "session_not_found", "Сессия не найдена", _request_id(request))
+
+        _record_audit(
+            services,
+            request,
+            action="session.revoke",
+            event_type="session",
+            outcome="success",
+            target_type="session",
+            target_id=target_session.session_id,
+            subject=actor_session.subject,
+            session_reference=actor_session.session_id,
+            metadata={"target_subject_id": target_session.subject.subject_id},
+        )
+        response.status_code = 204
+        return response
+
     @router.post("/admin/role-bindings", response_model=None)
     def create_role_binding(
         payload: RoleBindingPayload, request: Request
@@ -182,6 +284,9 @@ def build_security_router(services: SecurityServices) -> APIRouter:
         session = _require_session(services, request)
         if isinstance(session, JSONResponse):
             return session
+        origin_error = _require_trusted_origin(services, request, session)
+        if origin_error is not None:
+            return origin_error
         csrf_error = _require_csrf(services, request, session)
         if csrf_error is not None:
             return csrf_error
@@ -219,6 +324,9 @@ def build_security_router(services: SecurityServices) -> APIRouter:
         session = _require_session(services, request)
         if isinstance(session, JSONResponse):
             return session
+        origin_error = _require_trusted_origin(services, request, session)
+        if origin_error is not None:
+            return origin_error
         csrf_error = _require_csrf(services, request, session)
         if csrf_error is not None:
             return csrf_error
@@ -278,6 +386,18 @@ def _subject_payload(subject: Subject) -> SubjectPayload:
     )
 
 
+def _active_session_payload(session: SessionRecord) -> ActiveSessionPayload:
+    return ActiveSessionPayload(
+        session_id=session.session_id,
+        subject_id=session.subject.subject_id,
+        display_name=session.subject.display_name,
+        created_at=session.created_at,
+        last_seen_at=session.last_seen_at,
+        idle_expires_at=session.idle_expires_at,
+        absolute_expires_at=session.absolute_expires_at,
+    )
+
+
 def _require_session(services: SecurityServices, request: Request) -> Any:
     request_id = _request_id(request)
     session_id = request.cookies.get(SESSION_COOKIE_NAME)
@@ -310,6 +430,27 @@ def _require_session(services: SecurityServices, request: Request) -> Any:
             metadata={},
         )
         return _error(401, "not_authenticated", "Требуется вход", request_id)
+
+
+def _require_trusted_origin(
+    services: SecurityServices, request: Request, session: SessionRecord
+) -> JSONResponse | None:
+    origin = request.headers.get("origin")
+    if origin is None or origin in services.trusted_origins:
+        return None
+    _record_audit(
+        services,
+        request,
+        action="origin.denied",
+        event_type="authorization",
+        outcome="failure",
+        target_type="session",
+        target_id=session.session_id,
+        subject=session.subject,
+        session_reference=session.session_id,
+        metadata={"reason": "untrusted_origin"},
+    )
+    return _error(403, "origin_forbidden", "Источник запроса запрещен", _request_id(request))
 
 
 def _require_csrf(

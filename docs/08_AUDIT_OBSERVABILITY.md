@@ -53,7 +53,7 @@
 
 Чтение обычной inventory page логируется агрегированно по утвержденной политике, чтобы не создать чрезмерный шум и не собрать лишние персональные данные. Просмотр защищенного audit/role/secret metadata логируется всегда.
 
-E02 реализует только базовый in-process audit для `session.login` success/failure, `session.logout`, `session.timeout`, `session.limit_reached`, `session.required`, `csrf.denied`, `authorization.denied` и `openstack.denied`. Durable outbox, delivery state, SIEM/syslog отправка, heartbeat и полный аудит OpenStack/host/storage остаются задачами E07/P3.
+E02 реализует только базовый in-process audit для `session.login` success/failure, `session.logout`, `session.revoke`, `session.timeout`, `session.limit_reached`, `session.required`, `csrf.denied`, `origin.denied`, `authorization.denied` и `openstack.denied`. Durable outbox, delivery state, SIEM/syslog отправка, heartbeat и полный аудит OpenStack/host/storage остаются задачами E07/P3.
 
 ## Redaction
 

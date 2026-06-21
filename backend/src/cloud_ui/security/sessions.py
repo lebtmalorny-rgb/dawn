@@ -87,6 +87,26 @@ class SessionManager:
     def revoke(self, session: SessionRecord) -> None:
         session.revoked_at = self._clock.now()
 
+    def revoke_session_id(self, session_id: str) -> SessionRecord:
+        session = self._sessions.get(session_id)
+        if session is None or session.revoked_at is not None:
+            raise SessionNotFound()
+        session.revoked_at = self._clock.now()
+        return session
+
+    def list_active_sessions(self) -> list[SessionRecord]:
+        now = self._clock.now()
+        return sorted(
+            [
+                session
+                for session in self._sessions.values()
+                if session.revoked_at is None
+                and session.idle_expires_at > now
+                and session.absolute_expires_at > now
+            ],
+            key=lambda session: session.created_at,
+        )
+
     def verify_csrf(self, session: SessionRecord, value: str | None) -> bool:
         return value is not None and hmac.compare_digest(session.csrf, value)
 
