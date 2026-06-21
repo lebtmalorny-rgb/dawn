@@ -51,8 +51,11 @@ def run_db_upgrade() -> None:
     command.upgrade(cfg, "head")
 
 
-def run_inventory_sync_synthetic() -> None:
+def run_inventory_sync_synthetic() -> int:
     settings = get_settings()
+    if settings.environment == "production":
+        raise RuntimeError("Synthetic inventory sync is not allowed in production")
+
     engine = create_db_engine(settings.database_url.unicode_string())
     try:
         repository = InventoryRepository(
@@ -77,12 +80,22 @@ def run_inventory_sync_synthetic() -> None:
     finally:
         engine.dispose()
 
+    if result.status == "partial":
+        print(
+            "inventory synthetic sync partial: "
+            f"instances={result.instance_count} "
+            f"hypervisors={result.hypervisor_count} "
+            f"status={result.status}"
+        )
+        return 2
+
     print(
         "inventory synthetic sync ok: "
         f"instances={result.instance_count} "
         f"hypervisors={result.hypervisor_count} "
         f"status={result.status}"
     )
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -105,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "db-upgrade":
         run_db_upgrade()
     elif args.command == "inventory-sync-synthetic":
-        run_inventory_sync_synthetic()
+        return run_inventory_sync_synthetic()
 
     return 0
 

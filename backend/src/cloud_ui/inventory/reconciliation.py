@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -14,6 +15,7 @@ from cloud_ui.inventory import schema
 from cloud_ui.inventory.repository import InventoryRepository
 
 SyncStatus = Literal["success", "partial"]
+_LOGGER = logging.getLogger(__name__)
 
 
 class InventorySource(Protocol):
@@ -65,66 +67,75 @@ class InventoryReconciler:
         self._chunk_size = chunk_size
 
     def run_full_sync(self, *, request_id: str, correlation_id: str) -> SyncRunResult:
-        generation = self._next_generation()
-        self._ensure_cloud_region(self._now())
+        generation: int | None = None
+        try:
+            generation = self._next_generation()
+            self._ensure_cloud_region(self._now())
 
-        instances = self._sync_resource(
-            resource_type="instances",
-            table=schema.instances,
-            key_columns=("cloud_id", "region_id", "instance_id"),
-            id_column="instance_id",
-            iterator_factory=self._source.iter_instances,
-            generation=generation,
-            request_id=request_id,
-            correlation_id=correlation_id,
-        )
-        if instances.status == "partial":
-            self._mark_region_partial(self._now())
-            return SyncRunResult(
-                status="partial",
-                instance_count=instances.count,
-                hypervisor_count=0,
+            instances = self._sync_resource(
+                resource_type="instances",
+                table=schema.instances,
+                key_columns=("cloud_id", "region_id", "instance_id"),
+                id_column="instance_id",
+                iterator_factory=self._source.iter_instances,
                 generation=generation,
-                instance_run_id=instances.run_id,
-                hypervisor_run_id=None,
+                request_id=request_id,
+                correlation_id=correlation_id,
             )
+            if instances.status == "partial":
+                self._mark_partial_attempt(generation=generation, attempted_at=self._now())
+                return SyncRunResult(
+                    status="partial",
+                    instance_count=instances.count,
+                    hypervisor_count=0,
+                    generation=generation,
+                    instance_run_id=instances.run_id,
+                    hypervisor_run_id=None,
+                )
 
-        hypervisors = self._sync_resource(
-            resource_type="hypervisors",
-            table=schema.hypervisors,
-            key_columns=("cloud_id", "region_id", "hypervisor_id"),
-            id_column="hypervisor_id",
-            iterator_factory=self._source.iter_hypervisors,
-            generation=generation,
-            request_id=request_id,
-            correlation_id=correlation_id,
-        )
-        if hypervisors.status == "partial":
-            self._mark_region_partial(self._now())
+            hypervisors = self._sync_resource(
+                resource_type="hypervisors",
+                table=schema.hypervisors,
+                key_columns=("cloud_id", "region_id", "hypervisor_id"),
+                id_column="hypervisor_id",
+                iterator_factory=self._source.iter_hypervisors,
+                generation=generation,
+                request_id=request_id,
+                correlation_id=correlation_id,
+            )
+            if hypervisors.status == "partial":
+                self._mark_partial_attempt(generation=generation, attempted_at=self._now())
+                return SyncRunResult(
+                    status="partial",
+                    instance_count=instances.count,
+                    hypervisor_count=hypervisors.count,
+                    generation=generation,
+                    instance_run_id=instances.run_id,
+                    hypervisor_run_id=hypervisors.run_id,
+                )
+
+            completed_at = self._now()
+            self._complete_successful_full_sync(
+                instances=instances,
+                hypervisors=hypervisors,
+                generation=generation,
+                completed_at=completed_at,
+            )
             return SyncRunResult(
-                status="partial",
+                status="success",
                 instance_count=instances.count,
                 hypervisor_count=hypervisors.count,
                 generation=generation,
                 instance_run_id=instances.run_id,
                 hypervisor_run_id=hypervisors.run_id,
             )
-
-        completed_at = self._now()
-        self._complete_successful_full_sync(
-            instances=instances,
-            hypervisors=hypervisors,
-            generation=generation,
-            completed_at=completed_at,
-        )
-        return SyncRunResult(
-            status="success",
-            instance_count=instances.count,
-            hypervisor_count=hypervisors.count,
-            generation=generation,
-            instance_run_id=instances.run_id,
-            hypervisor_run_id=hypervisors.run_id,
-        )
+        except Exception:
+            if generation is not None:
+                try:
+                    self._mark_partial_attempt(generation=generation, attempted_at=self._now())
+                except Exception:
+                    _LOGGER.warning("Failed to mark inventory sync partial after unexpected error")
+            raise
 
     def _sync_resource(
         self,
@@ -205,18 +216,6 @@ class InventoryReconciler:
                 )
             return _ResourceSyncResult(status="partial", count=count, run_id=run_id)
 
-        completed_at = self._now()
-        with self._engine.begin() as connection:
-            self._update_run_counts(
-                connection=connection,
-                run_id=run_id,
-                status="success",
-                completed_at=completed_at,
-                items_seen=count,
-                items_upserted=count,
-                items_deleted=0,
-                error_count=0,
-            )
         return _ResourceSyncResult(status="success", count=count, run_id=run_id)
 
     def _next_generation(self) -> int:
@@ -419,6 +418,23 @@ class InventoryReconciler:
                 generation=generation,
                 deleted_at=completed_at,
             )
+            connection.execute(
+                schema.regions.update()
+                .where(
+                    schema.regions.c.cloud_id == self._source.cloud_id,
+                    schema.regions.c.region_id == self._source.region_id,
+                )
+                .values(
+                    last_successful_sync_at=completed_at,
+                    last_attempted_sync_at=completed_at,
+                    sync_status="ok",
+                )
+            )
+            connection.execute(
+                schema.clouds.update()
+                .where(schema.clouds.c.cloud_id == self._source.cloud_id)
+                .values(last_sync_at=completed_at, updated_at=completed_at)
+            )
             self._update_run_counts(
                 connection=connection,
                 run_id=instances.run_id,
@@ -439,26 +455,19 @@ class InventoryReconciler:
                 items_deleted=hypervisor_deleted,
                 error_count=0,
             )
-            connection.execute(
-                schema.regions.update()
-                .where(
-                    schema.regions.c.cloud_id == self._source.cloud_id,
-                    schema.regions.c.region_id == self._source.region_id,
-                )
-                .values(
-                    last_successful_sync_at=completed_at,
-                    last_attempted_sync_at=completed_at,
-                    sync_status="ok",
-                )
-            )
-            connection.execute(
-                schema.clouds.update()
-                .where(schema.clouds.c.cloud_id == self._source.cloud_id)
-                .values(last_sync_at=completed_at, updated_at=completed_at)
-            )
 
-    def _mark_region_partial(self, attempted_at: datetime) -> None:
+    def _mark_partial_attempt(self, *, generation: int, attempted_at: datetime) -> None:
         with self._engine.begin() as connection:
+            connection.execute(
+                schema.inventory_sync_runs.update()
+                .where(
+                    schema.inventory_sync_runs.c.cloud_id == self._source.cloud_id,
+                    schema.inventory_sync_runs.c.region_id == self._source.region_id,
+                    schema.inventory_sync_runs.c.generation == generation,
+                    schema.inventory_sync_runs.c.status != "success",
+                )
+                .values(status="partial", completed_at=attempted_at)
+            )
             connection.execute(
                 schema.regions.update()
                 .where(

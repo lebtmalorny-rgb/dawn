@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
 import sqlalchemy as sa
 from sqlalchemy.engine import Engine
 
@@ -39,6 +40,11 @@ class FailingOnSecondHypervisorChunkSource(SyntheticInventorySource):
             if index == 2:
                 raise RuntimeError("hypervisor source failed")
             yield chunk
+
+
+class FinalizationFailureReconciler(InventoryReconciler):
+    def _complete_successful_full_sync(self, **_kwargs: Any) -> None:
+        raise RuntimeError("finalization failed")
 
 
 def test_synthetic_full_sync_populates_instances_and_hypervisors() -> None:
@@ -152,17 +158,18 @@ def test_partial_hypervisor_failure_does_not_tombstone_missing_instance_rows() -
     engine = _create_engine()
     try:
         repository = _repository(engine)
+        clock = StepClock()
         InventoryReconciler(
             repository=repository,
             source=SyntheticInventorySource(instance_count=12, hypervisor_count=3),
-            clock=StepClock(),
+            clock=clock,
             chunk_size=5,
         ).run_full_sync(request_id="request-success", correlation_id="correlation-success")
 
         result = InventoryReconciler(
             repository=repository,
             source=FailingOnSecondHypervisorChunkSource(instance_count=10, hypervisor_count=3),
-            clock=StepClock(),
+            clock=clock,
             chunk_size=2,
         ).run_full_sync(request_id="request-partial", correlation_id="correlation-partial")
 
@@ -170,6 +177,41 @@ def test_partial_hypervisor_failure_does_not_tombstone_missing_instance_rows() -
         assert _active_count(engine, schema.instances) == 12
         assert _deleted_ids(engine, schema.instances, "instance_id") == []
         assert _sync_run_statuses(engine)["hypervisors"][-1] == "partial"
+        assert _run_status(engine, generation=2, resource_type="instances") != "success"
+
+        page = repository.list_instances(
+            filters=InstanceFilters(cloud_id="synthetic", region_id="RegionOne"),
+            sort=InventorySort(field="instance_id", direction="asc"),
+            limit=50,
+            cursor=None,
+        )
+
+        assert page.partial is True
+        assert [warning.code for warning in page.warnings] == ["inventory_source_chunk_failed"]
+    finally:
+        engine.dispose()
+
+
+def test_finalization_failure_marks_region_partial_and_reraises() -> None:
+    engine = _create_engine()
+    try:
+        repository = _repository(engine)
+        reconciler = FinalizationFailureReconciler(
+            repository=repository,
+            source=SyntheticInventorySource(instance_count=12, hypervisor_count=3),
+            clock=StepClock(),
+            chunk_size=5,
+        )
+
+        with pytest.raises(RuntimeError, match="finalization failed"):
+            reconciler.run_full_sync(
+                request_id="request-finalization-failure",
+                correlation_id="correlation-finalization-failure",
+            )
+
+        assert _region_status(engine) == "partial"
+        assert _run_status(engine, generation=1, resource_type="instances") != "success"
+        assert _run_status(engine, generation=1, resource_type="hypervisors") != "success"
     finally:
         engine.dispose()
 
@@ -236,6 +278,26 @@ def _sync_run_statuses(engine: Engine) -> dict[str, list[str]]:
         for row in connection.execute(statement).mappings():
             statuses.setdefault(str(row["resource_type"]), []).append(str(row["status"]))
     return statuses
+
+
+def _run_status(engine: Engine, *, generation: int, resource_type: str) -> str:
+    statement = sa.select(schema.inventory_sync_runs.c.status).where(
+        schema.inventory_sync_runs.c.cloud_id == "synthetic",
+        schema.inventory_sync_runs.c.region_id == "RegionOne",
+        schema.inventory_sync_runs.c.generation == generation,
+        schema.inventory_sync_runs.c.resource_type == resource_type,
+    )
+    with engine.connect() as connection:
+        return str(connection.execute(statement).scalar_one())
+
+
+def _region_status(engine: Engine) -> str:
+    statement = sa.select(schema.regions.c.sync_status).where(
+        schema.regions.c.cloud_id == "synthetic",
+        schema.regions.c.region_id == "RegionOne",
+    )
+    with engine.connect() as connection:
+        return str(connection.execute(statement).scalar_one())
 
 
 def _active_count(engine: Engine, table: sa.Table) -> int:

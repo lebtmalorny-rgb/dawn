@@ -87,7 +87,7 @@ class InventoryRepository:
                 rows=page_rows,
                 has_more=len(rows) > page_limit,
             )
-            warnings = self._warnings(connection, filters.cloud_id, filters.region_id, "instances")
+            warnings = self._warnings(connection, filters.cloud_id, filters.region_id)
             freshness = self._freshness(
                 connection,
                 schema.instances,
@@ -167,7 +167,6 @@ class InventoryRepository:
                 connection,
                 filters.cloud_id,
                 filters.region_id,
-                "hypervisors",
             )
             freshness = self._freshness(
                 connection,
@@ -276,7 +275,6 @@ class InventoryRepository:
         connection: sa.Connection,
         cloud_id: str,
         region_id: str,
-        resource_type: str,
     ) -> list[InventoryWarning]:
         statement = (
             sa.select(schema.inventory_sync_failures)
@@ -290,7 +288,6 @@ class InventoryRepository:
             .where(
                 schema.inventory_sync_failures.c.cloud_id == cloud_id,
                 schema.inventory_sync_failures.c.region_id == region_id,
-                schema.inventory_sync_failures.c.resource_type == resource_type,
                 sa.or_(
                     schema.regions.c.last_successful_sync_at.is_(None),
                     schema.inventory_sync_failures.c.occurred_at
@@ -303,15 +300,49 @@ class InventoryRepository:
             )
             .limit(_WARNING_LIMIT)
         )
-        rows = connection.execute(statement).mappings()
+        rows = list(connection.execute(statement).mappings())
+        if rows:
+            return [
+                InventoryWarning(
+                    code=str(row["error_code"]),
+                    title="Inventory synchronization partially failed",
+                    detail=str(row["safe_message"]),
+                    source=str(row["source"]),
+                )
+                for row in rows
+            ]
+
+        region = (
+            connection.execute(
+                sa.select(
+                    schema.regions.c.sync_status,
+                    schema.regions.c.last_attempted_sync_at,
+                    schema.regions.c.last_successful_sync_at,
+                ).where(
+                    schema.regions.c.cloud_id == cloud_id,
+                    schema.regions.c.region_id == region_id,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if region is None or region["sync_status"] != "partial":
+            return []
+        last_attempted_sync_at = _as_utc(region["last_attempted_sync_at"])
+        last_successful_sync_at = _as_utc(region["last_successful_sync_at"])
+        if last_attempted_sync_at is None or (
+            last_successful_sync_at is not None
+            and last_attempted_sync_at <= last_successful_sync_at
+        ):
+            return []
+
         return [
             InventoryWarning(
-                code=str(row["error_code"]),
+                code="inventory_sync_partial",
                 title="Inventory synchronization partially failed",
-                detail=str(row["safe_message"]),
-                source=str(row["source"]),
+                detail="Inventory synchronization did not complete for this region.",
+                source="inventory",
             )
-            for row in rows
         ]
 
     def _freshness(
