@@ -114,7 +114,16 @@ frontend inventory pages.
   `d17abaf fix: harden synthetic reconciliation state`; targeted tests
   `tests/inventory/test_reconciliation.py tests/test_cli.py` -> `12 passed`; regression inventory/config tests
   -> `23 passed`; scoped Ruff and mypy passed; final quality review approved with no blocking issues.
-- [ ] Inventory API and authorization.
+- [x] 2026-06-21: Inventory API and authorization implemented. Evidence: commits
+  `8559c34 feat: add inventory API routes`,
+  `b5ebae4 test: cover inventory API authorization denials`,
+  `a088056 test: update inventory auth expectations`,
+  `4de9fa2 fix: require idempotency for inventory refresh`,
+  `945f5c1 fix: harden inventory API contract`,
+  `f620e7e fix: align inventory API filters and limits`; targeted API/security tests
+  `tests/security/test_mock_identity.py tests/inventory/test_inventory_api.py tests/security/test_security_api.py`
+  -> `33 passed`; full backend `tests -q` -> `107 passed`; scoped Ruff and mypy passed; final
+  spec and quality reviews approved with no blocking issues.
 - [ ] Frontend inventory pages.
 - [ ] Scale evidence and documentation.
 - [ ] Final verification, review and integration.
@@ -135,6 +144,11 @@ frontend inventory pages.
 - Finalization failures are visible through region partial state, but they do not yet create a
   generic `inventory_sync_failures` row. E04 API/UI can surface the region warning; operational
   failure detail may need a later audit/log event.
+- Inventory API list parameters are safely clamped at runtime. OpenAPI currently exposes integer
+  `limit` but not configured maximum/default metadata; update this when generated API docs are
+  finalized.
+- The runtime inventory DB engine is held in FastAPI app state and relies on process shutdown for
+  disposal. Add explicit lifespan disposal before production deployment hardening.
 
 ## Журнал решений
 
