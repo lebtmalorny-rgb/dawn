@@ -9,18 +9,22 @@ class _FakeOp:
         self.created_tables: list[str] = []
         self.dropped_tables: list[str] = []
         self.created_indexes: list[tuple[str, str, object]] = []
+        self.operations: list[tuple[str, str]] = []
 
     def create_table(self, name: str, *columns: Any, **kwargs: Any) -> None:
         self.created_tables.append(name)
+        self.operations.append(("create_table", name))
 
     def drop_table(self, name: str) -> None:
         self.dropped_tables.append(name)
+        self.operations.append(("drop_table", name))
 
     def create_index(self, name: str, table_name: str, columns: list[str]) -> None:
         self.created_indexes.append((name, table_name, tuple(columns)))
+        self.operations.append(("create_index", name))
 
     def drop_index(self, name: str, table_name: str) -> None:
-        pass
+        self.operations.append(("drop_index", name))
 
 
 def test_inventory_migration_creates_and_drops_expected_tables(monkeypatch: Any) -> None:
@@ -59,3 +63,11 @@ def test_inventory_migration_creates_and_drops_expected_tables(monkeypatch: Any)
         "hypervisors",
         ("cloud_id", "region_id", "deleted_at", "host_name", "hypervisor_id"),
     ) in fake_op.created_indexes
+    assert (
+        "ix_inventory_sync_failures_recent",
+        "inventory_sync_failures",
+        ("cloud_id", "region_id", "resource_type", "occurred_at", "failure_id"),
+    ) in fake_op.created_indexes
+    assert fake_op.operations.index(
+        ("drop_index", "ix_inventory_sync_failures_recent")
+    ) < fake_op.operations.index(("drop_table", "inventory_sync_failures"))

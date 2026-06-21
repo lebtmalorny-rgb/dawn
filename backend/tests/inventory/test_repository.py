@@ -462,6 +462,158 @@ def test_sync_failures_return_bounded_recent_warnings_and_stale_freshness(
     assert page.freshness.is_stale is True
 
 
+def test_sync_failure_before_success_does_not_make_instances_partial(
+    repository: InventoryRepository,
+    engine: Engine,
+) -> None:
+    now = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+    _seed_cloud_region(
+        engine,
+        cloud_id="fresh-cloud",
+        region_id="RegionFresh",
+        now=now,
+        last_successful_sync_at=now,
+    )
+    _insert_instances(
+        engine,
+        [
+            _instance_row(
+                now=now,
+                cloud_id="fresh-cloud",
+                region_id="RegionFresh",
+                instance_id="fresh-0001",
+                name="vm-fresh",
+                status="ACTIVE",
+                deleted_at=None,
+            )
+        ],
+    )
+    _insert_sync_run(
+        engine,
+        run_id="run-fresh-instances",
+        cloud_id="fresh-cloud",
+        region_id="RegionFresh",
+        resource_type="instances",
+        now=now,
+    )
+    _insert_sync_failures(
+        engine,
+        [
+            {
+                "failure_id": "failure-before-success",
+                "run_id": "run-fresh-instances",
+                "cloud_id": "fresh-cloud",
+                "region_id": "RegionFresh",
+                "resource_type": "instances",
+                "source": "nova",
+                "chunk_cursor": None,
+                "error_code": "old-error",
+                "safe_message": "old failure",
+                "occurred_at": now - timedelta(minutes=10),
+            }
+        ],
+    )
+
+    page = repository.list_instances(
+        filters=InstanceFilters(cloud_id="fresh-cloud", region_id="RegionFresh"),
+        sort=InventorySort(field="name", direction="asc"),
+        limit=50,
+        cursor=None,
+    )
+
+    assert page.partial is False
+    assert page.warnings == []
+
+
+def test_sync_failure_after_success_makes_instances_partial(
+    repository: InventoryRepository,
+    engine: Engine,
+) -> None:
+    now = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+    _seed_cloud_region(
+        engine,
+        cloud_id="warning-cloud",
+        region_id="RegionWarning",
+        now=now,
+        last_successful_sync_at=now,
+    )
+    _insert_instances(
+        engine,
+        [
+            _instance_row(
+                now=now,
+                cloud_id="warning-cloud",
+                region_id="RegionWarning",
+                instance_id="warning-0001",
+                name="vm-warning",
+                status="ACTIVE",
+                deleted_at=None,
+            )
+        ],
+    )
+    _insert_sync_run(
+        engine,
+        run_id="run-warning-instances",
+        cloud_id="warning-cloud",
+        region_id="RegionWarning",
+        resource_type="instances",
+        now=now,
+    )
+    _insert_sync_failures(
+        engine,
+        [
+            {
+                "failure_id": "failure-after-success",
+                "run_id": "run-warning-instances",
+                "cloud_id": "warning-cloud",
+                "region_id": "RegionWarning",
+                "resource_type": "instances",
+                "source": "nova",
+                "chunk_cursor": None,
+                "error_code": "new-error",
+                "safe_message": "new failure",
+                "occurred_at": now + timedelta(seconds=1),
+            }
+        ],
+    )
+
+    page = repository.list_instances(
+        filters=InstanceFilters(cloud_id="warning-cloud", region_id="RegionWarning"),
+        sort=InventorySort(field="name", direction="asc"),
+        limit=50,
+        cursor=None,
+    )
+
+    assert page.partial is True
+    assert [warning.code for warning in page.warnings] == ["new-error"]
+
+
+def test_empty_recent_successful_region_is_not_stale(
+    repository: InventoryRepository,
+    engine: Engine,
+) -> None:
+    recent_sync = datetime.now(UTC)
+    _seed_cloud_region(
+        engine,
+        cloud_id="empty-cloud",
+        region_id="RegionEmpty",
+        now=recent_sync,
+        last_successful_sync_at=recent_sync,
+    )
+
+    page = repository.list_instances(
+        filters=InstanceFilters(cloud_id="empty-cloud", region_id="RegionEmpty"),
+        sort=InventorySort(field="name", direction="asc"),
+        limit=50,
+        cursor=None,
+    )
+
+    assert page.items == []
+    assert page.freshness.observed_at is None
+    assert page.freshness.last_successful_sync_at == recent_sync
+    assert page.freshness.is_stale is False
+
+
 def test_replace_rows_updates_instances_and_hypervisors(
     repository: InventoryRepository,
 ) -> None:
@@ -635,6 +787,43 @@ def _hypervisor_row(
 def _insert_instances(engine: Engine, rows: list[dict[str, object]]) -> None:
     with engine.begin() as connection:
         connection.execute(schema.instances.insert(), rows)
+
+
+def _insert_sync_run(
+    engine: Engine,
+    *,
+    run_id: str,
+    cloud_id: str,
+    region_id: str,
+    resource_type: str,
+    now: datetime,
+) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            schema.inventory_sync_runs.insert(),
+            {
+                "run_id": run_id,
+                "cloud_id": cloud_id,
+                "region_id": region_id,
+                "resource_type": resource_type,
+                "sync_mode": "full",
+                "generation": 1,
+                "status": "failed",
+                "started_at": now - timedelta(minutes=10),
+                "completed_at": now - timedelta(minutes=5),
+                "request_id": f"request-{run_id}",
+                "correlation_id": f"correlation-{run_id}",
+                "items_seen": 1,
+                "items_upserted": 1,
+                "items_deleted": 0,
+                "error_count": 1,
+            },
+        )
+
+
+def _insert_sync_failures(engine: Engine, rows: list[dict[str, object]]) -> None:
+    with engine.begin() as connection:
+        connection.execute(schema.inventory_sync_failures.insert(), rows)
 
 
 def _seed_cloud_region(

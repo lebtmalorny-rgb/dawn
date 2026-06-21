@@ -95,6 +95,14 @@ inventory_sync_failures = sa.Table(
         ["inventory_sync_runs.run_id"],
         ondelete="CASCADE",
     ),
+    sa.Index(
+        "ix_inventory_sync_failures_recent",
+        "cloud_id",
+        "region_id",
+        "resource_type",
+        "occurred_at",
+        "failure_id",
+    ),
 )
 
 instances = sa.Table(

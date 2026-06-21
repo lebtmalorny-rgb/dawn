@@ -93,6 +93,11 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
     )
+    op.create_index(
+        "ix_inventory_sync_failures_recent",
+        "inventory_sync_failures",
+        ["cloud_id", "region_id", "resource_type", "occurred_at", "failure_id"],
+    )
     op.create_table(
         "instances",
         sa.Column("cloud_id", sa.String(length=128), nullable=False),
@@ -229,6 +234,7 @@ def downgrade() -> None:
     op.drop_index("ix_instances_name_page", table_name="instances")
     op.drop_table("hypervisors")
     op.drop_table("instances")
+    op.drop_index("ix_inventory_sync_failures_recent", table_name="inventory_sync_failures")
     op.drop_table("inventory_sync_failures")
     op.drop_table("inventory_sync_cursors")
     op.drop_table("inventory_sync_runs")

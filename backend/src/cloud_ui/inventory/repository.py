@@ -276,10 +276,22 @@ class InventoryRepository:
     ) -> list[InventoryWarning]:
         statement = (
             sa.select(schema.inventory_sync_failures)
+            .join(
+                schema.regions,
+                sa.and_(
+                    schema.regions.c.cloud_id == schema.inventory_sync_failures.c.cloud_id,
+                    schema.regions.c.region_id == schema.inventory_sync_failures.c.region_id,
+                ),
+            )
             .where(
                 schema.inventory_sync_failures.c.cloud_id == cloud_id,
                 schema.inventory_sync_failures.c.region_id == region_id,
                 schema.inventory_sync_failures.c.resource_type == resource_type,
+                sa.or_(
+                    schema.regions.c.last_successful_sync_at.is_(None),
+                    schema.inventory_sync_failures.c.occurred_at
+                    > schema.regions.c.last_successful_sync_at,
+                ),
             )
             .order_by(
                 schema.inventory_sync_failures.c.occurred_at.desc(),
@@ -322,7 +334,8 @@ class InventoryRepository:
                 )
             ).scalar_one_or_none()
         )
-        is_stale = observed_at is None or datetime.now(UTC) - observed_at > timedelta(
+        recency_marker = _newest_datetime(observed_at, last_successful_sync_at)
+        is_stale = recency_marker is None or datetime.now(UTC) - recency_marker > timedelta(
             seconds=self._stale_after_seconds
         )
         return InventoryFreshness(
@@ -571,6 +584,13 @@ def _as_utc(value: object) -> datetime | None:
     if value.tzinfo is None or offset is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _newest_datetime(*values: datetime | None) -> datetime | None:
+    timestamps = [value for value in values if value is not None]
+    if not timestamps:
+        return None
+    return max(timestamps)
 
 
 def _json_scalar(value: object) -> str | int | float | bool | None:
