@@ -22,6 +22,8 @@ from cloud_ui.inventory.models import (
     InventoryWarning,
 )
 
+_WARNING_LIMIT = 5
+
 
 class InventoryRepository:
     def __init__(
@@ -272,10 +274,18 @@ class InventoryRepository:
         region_id: str,
         resource_type: str,
     ) -> list[InventoryWarning]:
-        statement = sa.select(schema.inventory_sync_failures).where(
-            schema.inventory_sync_failures.c.cloud_id == cloud_id,
-            schema.inventory_sync_failures.c.region_id == region_id,
-            schema.inventory_sync_failures.c.resource_type == resource_type,
+        statement = (
+            sa.select(schema.inventory_sync_failures)
+            .where(
+                schema.inventory_sync_failures.c.cloud_id == cloud_id,
+                schema.inventory_sync_failures.c.region_id == region_id,
+                schema.inventory_sync_failures.c.resource_type == resource_type,
+            )
+            .order_by(
+                schema.inventory_sync_failures.c.occurred_at.desc(),
+                schema.inventory_sync_failures.c.failure_id.desc(),
+            )
+            .limit(_WARNING_LIMIT)
         )
         rows = connection.execute(statement).mappings()
         return [
@@ -425,12 +435,12 @@ def _order_by(
     sort_column: sa.Column[Any],
     id_column: sa.Column[Any],
     id_field: str,
-) -> list[sa.UnaryExpression[Any]]:
+) -> list[sa.ColumnElement[Any]]:
     direction = sort_column.asc if sort.direction == "asc" else sort_column.desc
     if sort.field == id_field:
         return [direction()]
     id_direction = id_column.asc if sort.direction == "asc" else id_column.desc
-    return [direction(), id_direction()]
+    return [_null_bucket_column(sort, sort_column).asc(), direction(), id_direction()]
 
 
 def _keyset_condition(
@@ -445,14 +455,27 @@ def _keyset_condition(
         if sort.direction == "asc":
             return sort_column > last_sort_value
         return sort_column < last_sort_value
-    if sort.direction == "asc":
-        return sa.or_(
+
+    last_null_bucket = _null_bucket_value(sort.direction, last_sort_value)
+    null_bucket_column = _null_bucket_column(sort, sort_column)
+    if last_sort_value is None:
+        same_bucket_condition = (
+            id_column > last_id if sort.direction == "asc" else id_column < last_id
+        )
+    elif sort.direction == "asc":
+        same_bucket_condition = sa.or_(
             sort_column > last_sort_value,
             sa.and_(sort_column == last_sort_value, id_column > last_id),
         )
+    else:
+        same_bucket_condition = sa.or_(
+            sort_column < last_sort_value,
+            sa.and_(sort_column == last_sort_value, id_column < last_id),
+        )
+
     return sa.or_(
-        sort_column < last_sort_value,
-        sa.and_(sort_column == last_sort_value, id_column < last_id),
+        null_bucket_column > last_null_bucket,
+        sa.and_(null_bucket_column == last_null_bucket, same_bucket_condition),
     )
 
 
@@ -565,3 +588,18 @@ def _keyset_sort_value(sort_column: sa.Column[Any], value: object) -> object:
         except ValueError as exc:
             raise CursorTampered() from exc
     return value
+
+
+def _null_bucket_column(
+    sort: InventorySort,
+    sort_column: sa.Column[Any],
+) -> sa.ColumnElement[int]:
+    if sort.direction == "asc":
+        return sa.case((sort_column.is_(None), 0), else_=1)
+    return sa.case((sort_column.is_(None), 1), else_=0)
+
+
+def _null_bucket_value(direction: str, value: object) -> int:
+    if direction == "asc":
+        return 0 if value is None else 1
+    return 1 if value is None else 0

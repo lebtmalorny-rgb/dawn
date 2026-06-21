@@ -74,3 +74,24 @@ def test_settings_accept_dummy_dev_values() -> None:
     assert settings.inventory_stale_after_seconds == 900
     assert settings.inventory_synthetic_instance_count == 10_000
     assert settings.inventory_synthetic_hypervisor_count == 1_000
+
+
+def test_settings_reject_dev_inventory_cursor_key_in_production() -> None:
+    with pytest.raises(ValidationError, match="development inventory cursor signing key"):
+        Settings(
+            database_url="mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui",
+            rabbitmq_url="amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui",
+            environment="production",
+            identity_provider="external",
+            mock_identity_enabled=False,
+        )
+
+
+def test_settings_still_reject_mock_identity_in_production() -> None:
+    with pytest.raises(ValidationError, match="Mock identity provider"):
+        Settings(
+            database_url="mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui",
+            rabbitmq_url="amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui",
+            environment="production",
+            inventory_cursor_signing_key="production-inventory-cursor-key",
+        )

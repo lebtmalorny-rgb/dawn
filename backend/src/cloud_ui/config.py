@@ -8,6 +8,7 @@ EnvironmentName = Literal["local", "test", "production"]
 IdentityProviderName = Literal["mock", "external"]
 SessionLimitPolicyName = Literal["deny", "disconnect_oldest"]
 SameSiteName = Literal["lax", "strict"]
+DEV_INVENTORY_CURSOR_SIGNING_KEY = "dev-inventory-cursor-key"
 
 
 class Settings(BaseSettings):
@@ -38,17 +39,25 @@ class Settings(BaseSettings):
     placement_microversion: str = Field(default="1.39")
     inventory_default_limit: int = Field(default=50, ge=1, le=200)
     inventory_max_limit: int = Field(default=200, ge=1, le=200)
-    inventory_cursor_signing_key: str = Field(default="dev-inventory-cursor-key", min_length=16)
+    inventory_cursor_signing_key: str = Field(
+        default=DEV_INVENTORY_CURSOR_SIGNING_KEY,
+        min_length=16,
+    )
     inventory_stale_after_seconds: int = Field(default=900, ge=60)
     inventory_synthetic_instance_count: int = Field(default=10_000, ge=1)
     inventory_synthetic_hypervisor_count: int = Field(default=1_000, ge=1)
 
     @model_validator(mode="after")
-    def reject_mock_identity_in_production(self) -> "Settings":
+    def reject_unsafe_production_settings(self) -> "Settings":
         if self.environment == "production" and (
             self.identity_provider == "mock" or self.mock_identity_enabled
         ):
             raise ValueError("Mock identity provider is not allowed in production")
+        if (
+            self.environment == "production"
+            and self.inventory_cursor_signing_key == DEV_INVENTORY_CURSOR_SIGNING_KEY
+        ):
+            raise ValueError("Production cannot use the development inventory cursor signing key")
         return self
 
 
