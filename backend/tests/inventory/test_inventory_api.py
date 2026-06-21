@@ -110,6 +110,27 @@ def test_instance_refresh_requires_csrf_and_records_audit() -> None:
     )
 
 
+def test_instance_refresh_denies_viewer_without_refresh_capability() -> None:
+    client, security = _client()
+    csrf = _login(client, "viewer", "viewer-code")
+
+    response = client.post(
+        "/api/v1/instances/synthetic/RegionOne/instance-0001/refresh",
+        headers={"x-request-id": "viewer-refresh-denied", "x-csrf-token": csrf},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden"
+    assert any(
+        event.action == "authorization.denied"
+        and event.actor_id == "mock-user-viewer"
+        and event.target_id == "synthetic/RegionOne/instance-0001"
+        and event.metadata["code"] == "forbidden"
+        and event.metadata["capability"] == "instance.refresh"
+        for event in security.audit_sink.events
+    )
+
+
 def test_hypervisor_list_and_detail_require_hypervisor_read() -> None:
     client, security = _client()
     _login(client, "viewer", "viewer-code")
@@ -134,6 +155,22 @@ def test_hypervisor_list_and_detail_require_hypervisor_read() -> None:
     assert any(
         event.action == "authorization.denied"
         and event.actor_id == "mock-user-auditor"
+        and event.metadata["capability"] == "hypervisor.read"
+        for event in security.audit_sink.events
+    )
+
+    detail_denied_response = client.get(
+        "/api/v1/hypervisors/synthetic/RegionOne/hyp-0001",
+        headers={"x-request-id": "auditor-hypervisor-detail-denied"},
+    )
+
+    assert detail_denied_response.status_code == 403
+    assert detail_denied_response.json()["error"]["code"] == "forbidden"
+    assert any(
+        event.action == "authorization.denied"
+        and event.actor_id == "mock-user-auditor"
+        and event.target_id == "synthetic/RegionOne/hyp-0001"
+        and event.metadata["code"] == "forbidden"
         and event.metadata["capability"] == "hypervisor.read"
         for event in security.audit_sink.events
     )
