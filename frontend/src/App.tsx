@@ -768,7 +768,6 @@ function renderInstancesPage(
                         aria-label={`Обновить ${item.name}`}
                         className="cloud-ui-table-action"
                         isDisabled
-                        title="Обновление будет доступно после завершения CSRF-контракта"
                         type="button"
                         variant="secondary"
                       >

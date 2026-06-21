@@ -966,6 +966,7 @@ test("renders allowed instance refresh affordance disabled until refresh contrac
   const refreshButton = screen.getByRole("button", { name: "Обновить vm-action" });
 
   expect(refreshButton).toBeDisabled();
+  expect(refreshButton).not.toHaveAttribute("title");
   await user.click(refreshButton);
   expect(fetchMock).not.toHaveBeenCalledWith(
     "/api/v1/instances/synthetic/RegionOne/instance-0001/refresh",
