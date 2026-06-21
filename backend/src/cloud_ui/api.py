@@ -5,6 +5,12 @@ from starlette.middleware.base import RequestResponseEndpoint
 
 from cloud_ui.config import get_settings
 from cloud_ui.health import HealthReport, ReadinessCheck, build_readiness_check
+from cloud_ui.inventory.routes import (
+    InventoryServices,
+    build_inventory_router,
+    build_inventory_services,
+    unavailable_inventory_services,
+)
 from cloud_ui.security.dependencies import SecurityServices, build_security_services
 from cloud_ui.security.routes import build_security_router
 
@@ -32,6 +38,7 @@ def build_health_router(check: ReadinessCheck) -> APIRouter:
 def create_app(
     readiness_check: ReadinessCheck | None = None,
     security_services: SecurityServices | None = None,
+    inventory_services: InventoryServices | None = None,
 ) -> FastAPI:
     check = readiness_check
     if check is None:
@@ -44,8 +51,18 @@ def create_app(
     if security is None:
         security = build_security_services(settings)
 
+    inventory = inventory_services
+    if inventory is None:
+        if settings is None:
+            inventory = unavailable_inventory_services()
+        else:
+            inventory = build_inventory_services(settings)
+
     app = FastAPI(title="Cloud UI API", version="0.1.0")
     app.state.security_services = security
+    app.state.inventory_services = inventory
+    if inventory.engine is not None:
+        app.state.inventory_engine = inventory.engine
 
     @app.middleware("http")
     async def add_request_id(request: Request, call_next: RequestResponseEndpoint) -> Response:
@@ -65,5 +82,6 @@ def create_app(
     app.include_router(build_health_router(check))
     app.include_router(build_health_router(check), prefix="/api/v1")
     app.include_router(build_security_router(security), prefix="/api/v1")
+    app.include_router(build_inventory_router(inventory, security), prefix="/api/v1")
 
     return app

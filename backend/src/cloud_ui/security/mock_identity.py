@@ -65,6 +65,7 @@ def build_mock_identity_provider() -> MockIdentityProvider:
                             "hypervisor.read",
                             "group.read",
                             "operation.read",
+                            "instance.refresh",
                             "workflow.execute.maintenance-host",
                         }
                     ),
@@ -92,6 +93,9 @@ def build_mock_identity_provider() -> MockIdentityProvider:
                     capabilities=frozenset(
                         {
                             "audit.read",
+                            "instance.read",
+                            "instance.refresh",
+                            "hypervisor.read",
                             "operation.read",
                             "role.manage",
                             "session.manage",
