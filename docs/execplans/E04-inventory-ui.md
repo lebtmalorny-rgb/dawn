@@ -99,7 +99,10 @@ frontend inventory pages.
   `9caac49 docs: add E04 inventory UI design`.
 - [x] 2026-06-21: Baseline verified. Evidence: `make test` -> backend `58 passed`, frontend
   `6 passed`.
-- [ ] Schema and migration.
+- [x] 2026-06-21: Schema and migration implemented. Evidence: commit
+  `f638dea feat: add inventory read model migration`; targeted tests
+  `tests/inventory/test_inventory_migration.py tests/security/test_security_migration.py` -> `2 passed`;
+  spec and quality reviews approved.
 - [ ] Cursor, DTO and repository.
 - [ ] Synthetic reconciliation.
 - [ ] Inventory API and authorization.
