@@ -1,6 +1,6 @@
 # Актуальный реестр рисков
 
-- Stage: E02 security foundation
+- Stage: E03 OpenStack adapter contracts
 - Last updated: 2026-06-21
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
@@ -51,6 +51,13 @@
 | R-044 | ДКБ-69 conflicts with Python runtime | Backend and OpenStack services require interpreters. | Minimal runtime, SBOM/scan, non-root, formal waiver/exception. | E08/E12 |
 | R-045 | ДКБ-72 storage architecture external | Portal cannot prove no hypervisor filesystem use. | Storage owner must provide Cinder/Ceph/Nova path evidence. | E12 |
 | R-046 | AIO lab evidence may not transfer to HA deployment | Current lab is all-in-one; production Kolla HA behavior differs. | E09/E10 must run HA/failover/load evidence in representative environment. | E09/E10 |
+
+## E03 adapter contract risks
+
+| ID | Риск | Текущее положение | Митигация | Stage |
+|---|---|---|---|---|
+| R-060 | Adapter contract drift from real OpenStack | E03 uses sanitized fixtures and fixed microversions; optional live smoke is pending without approved read-only credential. | Keep fixtures versioned, run smoke only with safe test credential, update microversions deliberately. | E03/E04 |
+| R-061 | Token/header leakage in adapter errors | E03 errors redact details and tests assert sensitive values do not appear in repr. | Continue canary tests for future auth adapter and audit/log sinks. | E03 |
 
 ## Operational hygiene risks
 

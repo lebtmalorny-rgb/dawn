@@ -10,6 +10,7 @@ SECRET_MARKERS = (
     "secret",
     "token",
     "credential",
+    "authorization",
     "database_url",
     "rabbitmq_url",
 )

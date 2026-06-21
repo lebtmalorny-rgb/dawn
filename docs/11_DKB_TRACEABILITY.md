@@ -42,6 +42,14 @@ E02 добавляет портальные доказательства для 
 - Research decision: Consul is treated through Masakari hostmonitor `monitoring_driver=consul` and `matrix.yaml`; Consul Events and Prometheus exporter metrics are diagnostic/corroborating signals, not standalone authoritative recovery triggers.
 - Current risk register for E00/E02 transition is `docs/generated/risk-register.md`; it tracks open risks separately from formal ДКБ status and does not claim compliance.
 
+## Обновление требований 2026-06-21: E03 OpenStack adapters
+
+E03 добавляет только backend adapter contracts для read-only Keystone, Nova и Placement. Изменение не добавляет browser endpoints, не передает OpenStack token/application credential в UI и не меняет session/RBAC model:
+
+- ДКБ-01/03/12: adapters находятся за backend boundary; frontend не получает raw OpenStack schema и не вызывает OpenStack API напрямую. Доказательства: `backend/tests/integrations/test_keystone_adapter.py`, `backend/tests/integrations/test_nova_adapter.py`, `backend/tests/integrations/test_placement_adapter.py`.
+- ДКБ-46/49/51: adapter errors несут `request_id`/`correlation_id` и редактируют `authorization`/`token` details до `repr`/log-facing представления. Доказательства: `backend/tests/integrations/test_base.py`, `backend/tests/integrations/test_http.py`, `backend/tests/test_redaction.py`.
+- ДКБ-77/82: API и integration registers обновлены для Keystone/Nova/Placement с microversions `2.96`/`1.39`, timeout/retry contract и статусом offline evidence. Техническое блокирование неиспользуемых API, firewall/ACL, TLS/mTLS и production PKI остаются E08/E09/P3.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

@@ -22,6 +22,10 @@ _CLOUD_UI_ENVIRONMENT_NAMES = {
     "CLOUD_UI_SESSION_COOKIE_SECURE",
     "CLOUD_UI_SESSION_COOKIE_SAMESITE",
     "CLOUD_UI_TRUSTED_ORIGINS",
+    "CLOUD_UI_OPENSTACK_TIMEOUT_SECONDS",
+    "CLOUD_UI_OPENSTACK_MAX_ATTEMPTS",
+    "CLOUD_UI_NOVA_MICROVERSION",
+    "CLOUD_UI_PLACEMENT_MICROVERSION",
 }
 
 
@@ -54,3 +58,7 @@ def test_settings_accept_dummy_dev_values() -> None:
     assert settings.api_port == 8080
     assert settings.database_url.unicode_string().startswith("mysql+pymysql://")
     assert settings.environment == "local"
+    assert settings.openstack_timeout_seconds == 2.0
+    assert settings.openstack_max_attempts == 2
+    assert settings.nova_microversion == "2.96"
+    assert settings.placement_microversion == "1.39"

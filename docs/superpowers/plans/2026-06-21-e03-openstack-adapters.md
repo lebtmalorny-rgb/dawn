@@ -18,7 +18,6 @@ Create:
 backend/src/cloud_ui/integrations/__init__.py
 backend/src/cloud_ui/integrations/base.py
 backend/src/cloud_ui/integrations/http.py
-backend/src/cloud_ui/integrations/openstack_config.py
 backend/src/cloud_ui/integrations/keystone/__init__.py
 backend/src/cloud_ui/integrations/keystone/adapter.py
 backend/src/cloud_ui/integrations/keystone/dto.py

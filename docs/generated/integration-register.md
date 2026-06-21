@@ -1,16 +1,16 @@
 # Integration register
 
-- Stage: E00
-- Status: draft
+- Stage: E03
+- Status: Keystone/Nova/Placement offline adapter contracts implemented; safe live smoke remains pending
 
 ## Integration summary
 
 | Integration | Purpose | Direction | Stage | Current status | Owner |
 |---|---|---|---|---|---|
 | Corporate IdP | human identity and MFA | portal API -> IdP/Keystone federation | E02/P1 | unknown | IAM owner |
-| Keystone | token, scope, roles, service catalog | API/worker -> Keystone | E02/E03 | reachable at `https://192.168.10.250:5000` with Kolla CA | OpenStack owner |
-| Nova | instances, hypervisors, services, aggregates | worker/API -> Nova | E03/E04 | reachable via HTTPS service catalog | OpenStack owner |
-| Placement | resource provider inventory/usage | worker/API -> Placement | E03/E04 | reachable via HTTPS service catalog | OpenStack owner |
+| Keystone | token, scope, roles, service catalog | API/worker -> Keystone | E02/E03 | E03 offline contract tests implemented; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
+| Nova | instances, hypervisors, services, aggregates | worker/API -> Nova | E03/E04 | E03 offline contract tests implemented with microversion `2.96`; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
+| Placement | resource provider inventory/usage | worker/API -> Placement | E03/E04 | E03 offline contract tests implemented with microversion `1.39`; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
 | Mistral | long-running workflow execution | worker -> Mistral | E06 | enabled; endpoint `https://192.168.10.250:8989/v2` | Workflow/platform owner |
 | Watcher | goals, strategies, audits, continuous audits, action plans, actions, recommendations and optimization risk state | worker/API -> Watcher; operations may execute via Mistral | E06+ | enabled; endpoint `https://192.168.10.250:9322`; Prometheus exporter datasource selected first, contract pending | OpenStack owner |
 | Masakari | failover segments, segment hosts, notifications, monitor events and recovery timeline | worker/API -> Masakari; recovery actions may execute via Mistral/Nova workflow; Masakari hostmonitor -> Consul for network health where enabled | E06+ | API/engine enabled; endpoint `https://192.168.10.250:15868`; monitors disabled for AIO lab; Consul not on current test node | OpenStack owner |

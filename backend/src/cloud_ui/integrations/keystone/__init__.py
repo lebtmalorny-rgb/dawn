@@ -1,0 +1,1 @@
+"""Keystone read-only adapter."""

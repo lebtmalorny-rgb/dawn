@@ -1,8 +1,8 @@
 # API register
 
-- Stage: E02
+- Stage: E03
 - DKB: ДКБ-77 draft register
-- Status: E02 P0 session/capability endpoints implemented; remaining inventory/workflow/audit APIs are planned interfaces, not blocking evidence yet
+- Status: E03 read-only Keystone/Nova/Placement adapter contracts implemented offline; browser inventory/workflow/audit APIs are still planned interfaces, not blocking evidence yet
 
 ## Portal API
 
@@ -70,9 +70,9 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 
 | External API | Purpose | Version/microversion | Stage | Status | Evidence required |
 |---|---|---|---|---|---|
-| Keystone Identity API v3 | auth context, scopes, roles, catalog | observed `v3.14` discovery | E02/E03 | reachable at `https://192.168.10.250:5000` with Kolla CA | contract tests, redaction, production PKI gap |
-| Nova API | instances, hypervisors, services, aggregates | microversion pending | E03/E04 | reachable via HTTPS service catalog | microversion smoke, contract fixtures |
-| Placement API | resource provider capacity | microversion pending | E03/E04 | reachable via HTTPS service catalog | contract fixtures |
+| Keystone Identity API v3 | version discovery and sanitized catalog fixture mapping | observed `v3.14`; E03 contract fixture | E02/E03 | offline adapter contract implemented; optional live smoke pending safe read-only credential | `backend/tests/integrations/test_keystone_adapter.py`; production PKI gap remains |
+| Nova API | read-only instances, hypervisors, compute services, aggregates, server groups | microversion `2.96` | E03/E04 | offline adapter contract implemented; no browser endpoint/read model yet | `backend/tests/integrations/test_nova_adapter.py`; optional live smoke pending |
+| Placement API | read-only resource providers, inventory, usage | microversion `1.39` | E03/E04 | offline adapter contract implemented; enrichment only | `backend/tests/integrations/test_placement_adapter.py`; optional live smoke pending |
 | Mistral API v2 | workflow execution | endpoint `/v2` | E06 | enabled; internal/public endpoint `https://192.168.10.250:8989/v2` | idempotency/lost response tests |
 | Watcher API v1 | goals/strategies/audit templates/audits/continuous audits/action plans/actions/recommendations | endpoint observed | E06+ | enabled; internal/public endpoint `https://192.168.10.250:9322` | contract fixtures; telemetry datasource freshness tests |
 | Masakari API | segments/hosts/notifications/recovery state | endpoint observed | E06+ | enabled; internal/public endpoint `https://192.168.10.250:15868`; Consul-backed hostmonitor path selected but not deployed on current test node | contract fixtures; hostmonitor Consul matrix fixtures; Nova conflict tests |

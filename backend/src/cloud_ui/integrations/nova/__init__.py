@@ -1,0 +1,1 @@
+"""Nova read-only adapter."""

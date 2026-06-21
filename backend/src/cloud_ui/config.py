@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     trusted_origins: tuple[str, ...] = Field(
         default=("http://localhost", "http://127.0.0.1", "http://testserver")
     )
+    openstack_timeout_seconds: float = Field(default=2.0, gt=0)
+    openstack_max_attempts: int = Field(default=2, ge=1, le=5)
+    nova_microversion: str = Field(default="2.96")
+    placement_microversion: str = Field(default="1.39")
 
     @model_validator(mode="after")
     def reject_mock_identity_in_production(self) -> "Settings":

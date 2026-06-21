@@ -18,7 +18,7 @@
   - `docs/05_API_AND_INTEGRATIONS.md`;
   - `docs/13_TEST_STRATEGY.md`.
 - Approved design spec: `docs/superpowers/specs/2026-06-21-e03-openstack-adapters-design.md`.
-- Current backend dependencies place `httpx==0.28.1` under `dev`; E03 production code will import `httpx`, so `httpx` must move to runtime dependencies.
+- Initial backend dependencies placed `httpx==0.28.1` under `dev`; E03 production code imports `httpx`, so `httpx` moved to runtime dependencies.
 
 ## Scope
 
@@ -72,22 +72,25 @@
 
 - [x] 2026-06-21: E03 design spec created and committed. Evidence: commit `2e92243 docs: add E03 adapter design`.
 - [x] 2026-06-21: Baseline in E03 worktree verified. Evidence: `make test` -> backend `37 passed`, frontend `6 passed`.
-- [ ] Shared contracts and retry policy.
-- [ ] HTTP transport.
-- [ ] Keystone adapter.
-- [ ] Nova adapter.
-- [ ] Placement adapter.
-- [ ] Documentation, evidence and review.
+- [x] 2026-06-21: Shared contracts and retry policy implemented. Evidence: `tests/integrations/test_base.py`.
+- [x] 2026-06-21: HTTP transport and OpenStack runtime settings implemented. Evidence: `tests/integrations/test_http.py`, `tests/test_config.py`.
+- [x] 2026-06-21: Keystone adapter implemented. Evidence: `tests/integrations/test_keystone_adapter.py`.
+- [x] 2026-06-21: Nova adapter implemented. Evidence: `tests/integrations/test_nova_adapter.py`.
+- [x] 2026-06-21: Placement adapter implemented. Evidence: `tests/integrations/test_placement_adapter.py`.
+- [x] 2026-06-21: Documentation, evidence and review updated. Evidence: generated registers, DKB traceability and command results below.
 
 ## Неожиданные открытия
 
 - `httpx==0.28.1` is already available as a dev dependency, but production adapter code needs it as a runtime dependency.
+- Existing redaction markers did not include `authorization`; E03 added it so adapter errors cannot expose bearer-style header values in `repr`.
+- Code review found two hardening gaps before merge: caller-supplied headers could override context/microversion headers, and resource IDs in path segments were not URL-encoded. Regression tests now cover both.
 
 ## Журнал решений
 
 - 2026-06-21: Use explicit `httpx` REST adapter boundary for E03. Alternative: `openstacksdk` behind thread pool. Reason: E03 acceptance emphasizes mock HTTP/service layer and offline contract tests; raw SDK auth flow is not approved yet. Consequence: E03 covers read-only contract mapping and does not claim full OpenStack SDK compatibility.
 - 2026-06-21: Keep live lab smoke optional and pending by default. Alternative: use provided lab hosts immediately. Reason: no safe read-only test project credential has been proven in repo context; production/admin credentials must not be used.
 - 2026-06-21: Fix Nova and Placement microversions in settings with conservative initial values, then document them. Alternative: discover dynamically in E03. Reason: task input requires fixed microversions before adapter usage.
+- 2026-06-21: Keep OpenStack runtime settings in existing `cloud_ui.config.Settings` instead of adding separate `openstack_config.py`. Alternative: a dedicated config module. Reason: E03 only adds four scalar settings and the existing config layer already provides typed env parsing/tests.
 
 ## Детальный план реализации
 
@@ -98,7 +101,6 @@ Files to create:
 - `backend/src/cloud_ui/integrations/__init__.py`
 - `backend/src/cloud_ui/integrations/base.py`
 - `backend/src/cloud_ui/integrations/http.py`
-- `backend/src/cloud_ui/integrations/openstack_config.py`
 - `backend/src/cloud_ui/integrations/keystone/__init__.py`
 - `backend/src/cloud_ui/integrations/keystone/adapter.py`
 - `backend/src/cloud_ui/integrations/keystone/dto.py`
@@ -128,12 +130,13 @@ E03 has no database migration and no public browser endpoint change. Rollback is
 
 Required commands from `/Users/dmitry/Desktop/dawn/.worktrees/e03-openstack-adapters`:
 
-- `cd backend && .venv/bin/python -m pytest tests/integrations -q` -> all E03 adapter tests pass offline.
-- `git diff --check` -> no whitespace errors.
-- `./scripts/secret-scan.sh` -> no secret matches.
-- `make lint` -> backend ruff, frontend eslint and secret scan pass.
-- `make typecheck` -> backend mypy and frontend `tsc -b` pass.
-- `make test` -> backend pytest and frontend vitest pass.
+- `cd backend && .venv/bin/python -m pytest tests/integrations -q` -> `21 passed in 0.05s`.
+- `git diff --check` -> no output, exit 0.
+- `./scripts/secret-scan.sh` -> no output, exit 0.
+- `make lint` -> backend Ruff `All checks passed!`, frontend ESLint passed, secret scan passed.
+- `make typecheck` -> backend mypy `Success: no issues found in 33 source files`, frontend `tsc -b` passed.
+- `make test` -> backend `58 passed in 0.33s`, frontend Vitest `6 passed`.
+- `rg -n "httpx|OpenStackHttpClient|requests" backend/src/cloud_ui/api.py backend/src/cloud_ui/health.py backend/src/cloud_ui/cli.py backend/src/cloud_ui/worker.py backend/src/cloud_ui/security` -> no output, exit 1; route handlers do not import the adapter transport.
 
 Optional smoke:
 
