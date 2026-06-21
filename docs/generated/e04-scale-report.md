@@ -18,17 +18,17 @@ This report is generated from the portal read model populated by synthetic recon
 - instances seen: 10000
 - hypervisors seen: 1000
 - generation: 1
-- elapsed seconds: 3.233677
-- peak Python memory MiB: 3.624
+- elapsed seconds: 3.240481
+- peak Python memory MiB: 3.622
 
 ## Read-model scenarios
 
 | Scenario | Resource | Page size | Rows returned | p95 seconds | SQL p95 | SQL max | SQLite EXPLAIN summary |
 |---|---|---:|---:|---:|---:|---:|---|
-| `instances_default_page` | instances | 50 | 50 | 0.003307 | 5 | 5 | SEARCH instances USING INDEX ix_instances_name_page (cloud_id=? AND region_id=? AND deleted_at=?) |
-| `instances_filtered_project_status` | instances | 50 | 50 | 0.003171 | 5 | 5 | SEARCH instances USING INDEX ix_instances_project_status (cloud_id=? AND region_id=? AND deleted_at=? AND project_id=? AND status=?) |
-| `hypervisors_default_page` | hypervisors | 50 | 50 | 0.002877 | 5 | 5 | SEARCH hypervisors USING INDEX ix_hypervisors_host_page (cloud_id=? AND region_id=? AND deleted_at=?) |
-| `hypervisors_filtered_service_status_az` | hypervisors | 50 | 50 | 0.002896 | 5 | 5 | SEARCH hypervisors USING INDEX ix_hypervisors_az (cloud_id=? AND region_id=? AND availability_zone=?) |
+| `instances_default_page` | instances | 50 | 50 | 0.003311 | 5 | 5 | SEARCH instances USING INDEX ix_instances_name_page (cloud_id=? AND region_id=? AND deleted_at=?) |
+| `instances_filtered_project_status` | instances | 50 | 50 | 0.003371 | 5 | 5 | SEARCH instances USING INDEX ix_instances_project_status (cloud_id=? AND region_id=? AND deleted_at=? AND project_id=? AND status=?) |
+| `hypervisors_default_page` | hypervisors | 50 | 50 | 0.002975 | 5 | 5 | SEARCH hypervisors USING INDEX ix_hypervisors_host_page (cloud_id=? AND region_id=? AND deleted_at=?) |
+| `hypervisors_filtered_service_status_az` | hypervisors | 50 | 50 | 0.003222 | 5 | 5 | SEARCH hypervisors USING INDEX ix_hypervisors_az (cloud_id=? AND region_id=? AND availability_zone=?) |
 
 ## Findings
 
