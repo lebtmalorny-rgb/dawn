@@ -137,13 +137,25 @@ frontend inventory pages.
   `72a9da0 feat: add E04 synthetic scale report`,
   `1dec331 docs: refresh E04 scale evidence`,
   `551f38c fix: explain measured inventory queries`,
-  `764fa97 docs: refresh measured E04 scale report`; `make test-load` generated
+  `764fa97 docs: refresh measured E04 scale report`,
+  `1c9d753 fix: keep default inventory sorts indexed`,
+  `985736b docs: refresh indexed E04 scale report`; `make test-load` generated
   `docs/generated/e04-scale-report.md` for 10 000 instances / 1 000 hypervisors with
   `success=True`, SQL max `5`, p95 below 2 s in all scenarios, SQLite `EXPLAIN QUERY PLAN`
-  from captured measured repository SQL, and peak Python memory `3.622 MiB`; targeted tests
+  from captured measured repository SQL, indexed default sorts
+  `ix_instances_name_page`/`ix_hypervisors_host_page`, and peak Python memory `3.622 MiB`; targeted tests
   `tests/inventory/test_scale_report.py tests/inventory/test_reconciliation.py tests/inventory/test_repository.py`
   -> `28 passed`; scoped Ruff, scoped mypy, secret scan and final spec/quality reviews approved.
-- [ ] Final verification, review and integration.
+- [x] 2026-06-21: Final verification, review and integration completed. Evidence:
+  commits `520695f docs: update E04 inventory registers`,
+  `f1df645 docs: refresh final E04 scale report`,
+  `1c9d753 fix: keep default inventory sorts indexed`,
+  `985736b docs: refresh indexed E04 scale report`; final gates
+  `make lint` -> passed, `make typecheck` -> passed, `make test` -> backend `112 passed`,
+  frontend `22 passed`, `make test-load` -> `success=True`, SQL max `5`, default p95
+  `0.003311s`/`0.002975s`, `git diff --check HEAD` -> passed, `make security` -> passed.
+  Final code review initially found one Important indexed-sort evidence gap; fix was re-reviewed
+  with no remaining Critical/Important findings.
 
 ## Неожиданные открытия
 
@@ -153,8 +165,9 @@ frontend inventory pages.
   must remain injectable so existing security tests do not start requiring runtime DB settings.
 - Current mock identity already grants `instance.read` and `hypervisor.read` to viewer/operator, but
   does not grant `instance.refresh`; E04 will add refresh capability only where tests require it.
-- Null-bucket keyset ordering uses portable SQL `CASE WHEN` expressions. E04.6 scale evidence must
-  include `EXPLAIN` for representative sorts and warning queries before claiming p95/index behavior.
+- Null-bucket keyset ordering uses portable SQL `CASE WHEN` expressions only for nullable sort
+  columns. E04.6 scale evidence captures measured repository SQL and confirms default
+  `name`/`host_name` sorts use the page indexes without SQLite temp sorting.
 - Synthetic reconciliation generation allocation is sequentially correct for current tests but is
   not a distributed lock. HA scheduling or multi-worker reconciliation needs a lease/atomic
   allocation design before production enablement.
@@ -172,9 +185,8 @@ frontend inventory pages.
 - No Playwright/e2e command exists yet in this worktree, so E04.5 browser-level evidence is limited
   to Vitest/RTL component coverage and static checks.
 - E04.6 synthetic scale report is local SQLite evidence only, not production MariaDB/HA evidence.
-  The measured default instance and hypervisor scenarios include SQLite `USE TEMP B-TREE FOR ORDER BY`
-  because repository null-bucket ordering is part of the real list SQL; this is documented rather
-  than hidden.
+  The measured default instance and hypervisor scenarios now use the dedicated page indexes, while
+  production MariaDB/HA repeat evidence remains required before a deployment performance claim.
 
 ## Журнал решений
 
