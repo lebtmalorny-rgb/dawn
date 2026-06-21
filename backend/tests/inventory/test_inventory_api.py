@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import sqlalchemy as sa
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
@@ -177,9 +178,9 @@ def test_hypervisor_list_and_detail_require_hypervisor_read() -> None:
 
 
 def test_openapi_contains_inventory_paths() -> None:
-    client, _security = _client()
+    app, _security = _app()
 
-    openapi_schema = client.app.openapi()
+    openapi_schema = app.openapi()
 
     assert "/api/v1/instances" in openapi_schema["paths"]
     assert "/api/v1/hypervisors" in openapi_schema["paths"]
@@ -195,6 +196,11 @@ def test_inventory_routes_do_not_import_openstack_http_transport() -> None:
 
 
 def _client() -> tuple[TestClient, SecurityServices]:
+    app, security = _app()
+    return TestClient(app), security
+
+
+def _app() -> tuple[FastAPI, SecurityServices]:
     def check() -> HealthReport:
         return HealthReport(status="ok", dependencies={})
 
@@ -204,7 +210,7 @@ def _client() -> tuple[TestClient, SecurityServices]:
         security_services=security,
         inventory_services=InventoryServices(repository=_repository(_engine())),
     )
-    return TestClient(app), security
+    return app, security
 
 
 def _login(client: TestClient, login: str, credential: str) -> str:

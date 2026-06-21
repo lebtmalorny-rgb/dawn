@@ -19,6 +19,7 @@ def test_mock_identity_authenticates_known_operator_without_browser_secrets() ->
     assert result.subject.capabilities == frozenset(
         {
             "instance.read",
+            "instance.refresh",
             "hypervisor.read",
             "group.read",
             "operation.read",
