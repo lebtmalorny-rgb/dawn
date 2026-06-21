@@ -103,7 +103,12 @@ frontend inventory pages.
   `f638dea feat: add inventory read model migration`; targeted tests
   `tests/inventory/test_inventory_migration.py tests/security/test_security_migration.py` -> `2 passed`;
   spec and quality reviews approved.
-- [ ] Cursor, DTO and repository.
+- [x] 2026-06-21: Cursor, DTO and repository implemented. Evidence: commits
+  `079919f feat: add inventory repository and cursors`,
+  `6c5b163 fix: harden inventory pagination and config`,
+  `8fd3f3e fix: bound inventory warning freshness`; targeted tests
+  `tests/inventory/test_cursor.py tests/inventory/test_repository.py tests/inventory/test_inventory_migration.py tests/test_config.py`
+  -> `23 passed`; scoped Ruff and mypy passed; final quality review approved with no blocking issues.
 - [ ] Synthetic reconciliation.
 - [ ] Inventory API and authorization.
 - [ ] Frontend inventory pages.
@@ -118,6 +123,8 @@ frontend inventory pages.
   must remain injectable so existing security tests do not start requiring runtime DB settings.
 - Current mock identity already grants `instance.read` and `hypervisor.read` to viewer/operator, but
   does not grant `instance.refresh`; E04 will add refresh capability only where tests require it.
+- Null-bucket keyset ordering uses portable SQL `CASE WHEN` expressions. E04.6 scale evidence must
+  include `EXPLAIN` for representative sorts and warning queries before claiming p95/index behavior.
 
 ## Журнал решений
 
