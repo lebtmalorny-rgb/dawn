@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     openstack_max_attempts: int = Field(default=2, ge=1, le=5)
     nova_microversion: str = Field(default="2.96")
     placement_microversion: str = Field(default="1.39")
+    inventory_default_limit: int = Field(default=50, ge=1, le=200)
+    inventory_max_limit: int = Field(default=200, ge=1, le=200)
+    inventory_cursor_signing_key: str = Field(default="dev-inventory-cursor-key", min_length=16)
+    inventory_stale_after_seconds: int = Field(default=900, ge=60)
+    inventory_synthetic_instance_count: int = Field(default=10_000, ge=1)
+    inventory_synthetic_hypervisor_count: int = Field(default=1_000, ge=1)
 
     @model_validator(mode="after")
     def reject_mock_identity_in_production(self) -> "Settings":

@@ -26,6 +26,12 @@ _CLOUD_UI_ENVIRONMENT_NAMES = {
     "CLOUD_UI_OPENSTACK_MAX_ATTEMPTS",
     "CLOUD_UI_NOVA_MICROVERSION",
     "CLOUD_UI_PLACEMENT_MICROVERSION",
+    "CLOUD_UI_INVENTORY_DEFAULT_LIMIT",
+    "CLOUD_UI_INVENTORY_MAX_LIMIT",
+    "CLOUD_UI_INVENTORY_CURSOR_SIGNING_KEY",
+    "CLOUD_UI_INVENTORY_STALE_AFTER_SECONDS",
+    "CLOUD_UI_INVENTORY_SYNTHETIC_INSTANCE_COUNT",
+    "CLOUD_UI_INVENTORY_SYNTHETIC_HYPERVISOR_COUNT",
 }
 
 
@@ -62,3 +68,9 @@ def test_settings_accept_dummy_dev_values() -> None:
     assert settings.openstack_max_attempts == 2
     assert settings.nova_microversion == "2.96"
     assert settings.placement_microversion == "1.39"
+    assert settings.inventory_default_limit == 50
+    assert settings.inventory_max_limit == 200
+    assert settings.inventory_cursor_signing_key == "dev-inventory-cursor-key"
+    assert settings.inventory_stale_after_seconds == 900
+    assert settings.inventory_synthetic_instance_count == 10_000
+    assert settings.inventory_synthetic_hypervisor_count == 1_000
