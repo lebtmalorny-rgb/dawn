@@ -1,11 +1,17 @@
 import argparse
 import sys
+from datetime import UTC, datetime
 
 import uvicorn
 from alembic import command
 from alembic.config import Config
 
 from cloud_ui.config import get_settings
+from cloud_ui.db import create_db_engine
+from cloud_ui.inventory.cursor import CursorCodec
+from cloud_ui.inventory.reconciliation import InventoryReconciler
+from cloud_ui.inventory.repository import InventoryRepository
+from cloud_ui.inventory.synthetic import SyntheticInventorySource
 from cloud_ui.logging import configure_logging
 from cloud_ui.worker import run_loop
 
@@ -14,7 +20,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cloud-ui")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for command_name in ("api", "worker", "events", "db-upgrade", "smoke"):
+    for command_name in (
+        "api",
+        "worker",
+        "events",
+        "db-upgrade",
+        "inventory-sync-synthetic",
+        "smoke",
+    ):
         subparsers.add_parser(command_name)
 
     return parser
@@ -38,6 +51,40 @@ def run_db_upgrade() -> None:
     command.upgrade(cfg, "head")
 
 
+def run_inventory_sync_synthetic() -> None:
+    settings = get_settings()
+    engine = create_db_engine(settings.database_url.unicode_string())
+    try:
+        repository = InventoryRepository(
+            engine=engine,
+            cursor_codec=CursorCodec(signing_key=settings.inventory_cursor_signing_key),
+            default_limit=settings.inventory_default_limit,
+            max_limit=settings.inventory_max_limit,
+            stale_after_seconds=settings.inventory_stale_after_seconds,
+        )
+        source = SyntheticInventorySource(
+            instance_count=settings.inventory_synthetic_instance_count,
+            hypervisor_count=settings.inventory_synthetic_hypervisor_count,
+        )
+        result = InventoryReconciler(
+            repository=repository,
+            source=source,
+            clock=lambda: datetime.now(UTC),
+        ).run_full_sync(
+            request_id="cli-inventory-sync-synthetic",
+            correlation_id="cli-inventory-sync-synthetic",
+        )
+    finally:
+        engine.dispose()
+
+    print(
+        "inventory synthetic sync ok: "
+        f"instances={result.instance_count} "
+        f"hypervisors={result.hypervisor_count} "
+        f"status={result.status}"
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -57,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
         run_loop("events")
     elif args.command == "db-upgrade":
         run_db_upgrade()
+    elif args.command == "inventory-sync-synthetic":
+        run_inventory_sync_synthetic()
 
     return 0
 

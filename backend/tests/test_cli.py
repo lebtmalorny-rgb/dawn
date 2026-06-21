@@ -6,7 +6,7 @@ from cloud_ui.cli import build_parser, main, run_db_upgrade
 def test_cli_accepts_expected_commands() -> None:
     parser = build_parser()
 
-    for command in ("api", "worker", "events", "db-upgrade", "smoke"):
+    for command in ("api", "worker", "events", "db-upgrade", "inventory-sync-synthetic", "smoke"):
         args = parser.parse_args([command])
         assert args.command == command
 
@@ -58,3 +58,23 @@ def test_db_upgrade_sets_database_url_and_upgrades_head(monkeypatch: Any) -> Non
     assert cfg.path == "alembic.ini"
     assert cfg.options["sqlalchemy.url"] == "mysql+pymysql://user:pass@db:3306/cloud_ui"
     assert captured["revision"] == "head"
+
+
+def test_inventory_sync_synthetic_dispatches_to_runner(monkeypatch: Any) -> None:
+    class FakeSettings:
+        log_level = "INFO"
+
+    called: list[str] = []
+
+    def fake_run_inventory_sync_synthetic() -> None:
+        called.append("inventory-sync-synthetic")
+
+    monkeypatch.setattr("cloud_ui.cli.get_settings", lambda: FakeSettings())
+    monkeypatch.setattr("cloud_ui.cli.configure_logging", lambda _level: None)
+    monkeypatch.setattr(
+        "cloud_ui.cli.run_inventory_sync_synthetic",
+        fake_run_inventory_sync_synthetic,
+    )
+
+    assert main(["inventory-sync-synthetic"]) == 0
+    assert called == ["inventory-sync-synthetic"]

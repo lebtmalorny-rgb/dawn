@@ -41,6 +41,10 @@ class InventoryRepository:
         self._max_limit = max_limit
         self._stale_after_seconds = stale_after_seconds
 
+    @property
+    def engine(self) -> Engine:
+        return self._engine
+
     def list_instances(
         self,
         *,
