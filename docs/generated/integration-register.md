@@ -1,7 +1,7 @@
 # Integration register
 
-- Stage: E03
-- Status: Keystone/Nova/Placement offline adapter contracts implemented; safe live smoke remains pending
+- Stage: E04
+- Status: Keystone/Nova/Placement offline adapter contracts remain implemented; E04 inventory read model/API/UI and synthetic reconciliation evidence added; safe live smoke remains pending
 
 ## Integration summary
 
@@ -9,7 +9,7 @@
 |---|---|---|---|---|---|
 | Corporate IdP | human identity and MFA | portal API -> IdP/Keystone federation | E02/P1 | unknown | IAM owner |
 | Keystone | token, scope, roles, service catalog | API/worker -> Keystone | E02/E03 | E03 offline contract tests implemented; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
-| Nova | instances, hypervisors, services, aggregates | worker/API -> Nova | E03/E04 | E03 offline contract tests implemented with microversion `2.96`; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
+| Nova | instances, hypervisors, services, aggregates | worker/API -> Nova | E03/E04 | E03 offline contract tests implemented with microversion `2.96`; E04 read-model reconciliation is proven with deterministic synthetic source; safe live Nova comparison remains pending until a read-only test credential is available outside git | OpenStack owner |
 | Placement | resource provider inventory/usage | worker/API -> Placement | E03/E04 | E03 offline contract tests implemented with microversion `1.39`; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
 | Mistral | long-running workflow execution | worker -> Mistral | E06 | enabled; endpoint `https://192.168.10.250:8989/v2` | Workflow/platform owner |
 | Watcher | goals, strategies, audits, continuous audits, action plans, actions, recommendations and optimization risk state | worker/API -> Watcher; operations may execute via Mistral | E06+ | enabled; endpoint `https://192.168.10.250:9322`; Prometheus exporter datasource selected first, contract pending | OpenStack owner |
@@ -17,8 +17,8 @@
 | Telemetry datasource | capacity/health metrics, Watcher datasource freshness and Masakari incident corroboration | worker/API -> Prometheus query API first; exporters `openstack-exporter` and `node_exporter`; Ceilometer/Gnocchi/Aetos later | E10/P3 | Prometheus exporter path selected; endpoints, retention and coverage pending | Monitoring owner |
 | Heat | optional stacks/workflow module | worker/API -> Heat or via Mistral | after decision | reachable via HTTPS service catalog | Product owner |
 | RabbitMQ `/cloud-ui` | jobs, outbox, events | API/worker/events -> RabbitMQ | E01+ | planned | Messaging owner |
-| OpenStack notifications | read model acceleration | notification transport -> event consumer | E04/E07 | unknown | Messaging/OpenStack owner |
-| MariaDB `cloud_ui` | portal state, sessions, read model | API/worker/events -> MariaDB | E01+ | planned | DB owner |
+| OpenStack notifications | read model acceleration | notification transport -> event consumer | E04/E07 | not bound in E04; reconciliation remains correctness authority and event acceleration requires contract/security review | Messaging/OpenStack owner |
+| MariaDB `cloud_ui` | portal state, sessions, read model | API/worker/events -> MariaDB | E01+ | E04 schema/repository/API contract implemented; local automated tests use SQLite, production MariaDB deployment and migration evidence remain pending | DB owner |
 | SIEM/test sink | authoritative audit delivery | audit worker -> SIEM | E07 | unknown | SIEM owner |
 | Vault (SecMan) | secret storage and lifecycle | backend/deploy -> Vault | E08 | product identified; endpoint/auth/path policy unknown | Vault owner |
 | Corporate PKI | TLS/mTLS certificates | deploy/runtime -> PKI | E08/E09 | unknown | PKI owner |

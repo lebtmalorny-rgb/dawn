@@ -1,6 +1,6 @@
 # Актуальный реестр рисков
 
-- Stage: E03 OpenStack adapter contracts
+- Stage: E04 Inventory read model and UI
 - Last updated: 2026-06-21
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
@@ -8,7 +8,7 @@
 
 | ID | Риск | Текущее решение | Остаток |
 |---|---|---|---|
-| R-001 | Использовать Prometheus как источник inventory UI | Inventory source of truth: OpenStack APIs -> portal read model -> paginated portal API. Prometheus/Ceilometer/Gnocchi/Aodh допускаются только как telemetry enrichment. | Нужно реализовать E04 read model и доказать, что list UI не делает live fan-out. |
+| R-001 | Использовать Prometheus как источник inventory UI | Inventory source of truth: OpenStack APIs -> portal read model -> paginated portal API. Prometheus/Ceilometer/Gnocchi/Aodh допускаются только как telemetry enrichment. | E04 реализует read model/API/UI и synthetic scale evidence без live fan-out; production MariaDB/live OpenStack/HA evidence остаются E09/E10/P3. |
 | R-002 | Самостоятельная эвакуация по Consul/Prometheus signals | Самостоятельный portal-side controller отложен; Masakari read/status остается first-class, а recovery path использует штатный Masakari hostmonitor Consul driver + `matrix.yaml` where enabled. | Нужен отдельный lab proof для Masakari/Consul; `processmonitor` остается diagnostic/R&D. |
 | R-003 | WebSocket как преждевременная зависимость | Baseline real-time transport: SSE + HTTP commands + polling fallback. WebSocket только через ADR и load/backpressure evidence. | Проверить proxy/SSE в target HAProxy chain. |
 
@@ -27,10 +27,10 @@
 
 | ID | Риск | Текущее положение | Митигация | Stage |
 |---|---|---|---|---|
-| R-020 | UI перегружает OpenStack API | Стратегия описана: read model, reconciliation chunks, bounded adapters, no fan-out. Численные лимиты не утверждены. | E04/E10 должны измерить calls per UI action, p95/p99, queue depth, stale age. | E04/E10 |
-| R-021 | Stale read model приведет к неверному действию | Требования требуют `observed_at`, `source_updated_at`, `sync_status`, precondition refresh. | Mutating workflows must perform freshness/precondition checks and show stale/unknown state. | E04/E06 |
-| R-022 | Notification transport assumptions unreliable | ADR-003 оставляет transport/payload/permissions unknown. | Notifications accelerate only; reconciliation remains correctness authority. | E03/E04/E07 |
-| R-023 | Large topology/search leaks protected resource existence | Topology/search must be capability-aware and redacted. | Backend filters nodes/edges/counts; partial counts marked as partial; no raw graph dumps. | E04/E10 |
+| R-020 | UI перегружает OpenStack API | E04 list/detail APIs read only from the portal read model. `docs/generated/e04-scale-report.md` records 10 000 synthetic instances / 1 000 hypervisors, page limit 200, SQL max 5 and p95 below the provisional 2 s budget on local SQLite. | Repeat evidence on production-like MariaDB/HA with live adapter call counts, queue depth, stale age and p95/p99 in E09/E10. | E04/E10 |
+| R-021 | Stale read model приведет к неверному действию | E04 API/UI expose freshness, stale/partial warnings and sync status; frontend refresh affordance is intentionally inert until the mutating frontend CSRF/idempotency flow is complete. | Future mutating workflows must perform freshness/precondition checks before Nova/Mistral actions and audit the result. | E04/E06 |
+| R-022 | Notification transport assumptions unreliable | ADR-003 оставляет transport/payload/permissions unknown; E04 does not bind to real notifications. | Notifications accelerate only; full reconciliation remains correctness authority until E07 contract and security evidence exist. | E03/E04/E07 |
+| R-023 | Large topology/search leaks protected resource existence | E04 exposes future topology/capacity/service-health modules only as disabled descriptors with capability metadata. | Implement backend scope filtering, redaction and partial counts before enabling real topology/search endpoints. | E04/E10 |
 
 ## Telemetry and recovery signal risks
 
@@ -69,6 +69,6 @@
 
 ## Immediate priority order
 
-1. Finish E02 documentation/evidence and self-review after final verification.
+1. Finish E04 documentation/evidence and self-review after final verification.
 2. Keep ADR-001/test federation, Vault/SecMan, SIEM delivery and IAM/PAM/SoD evidence as explicit external gaps.
-3. Do not extend E02 into inventory, Prometheus, Masakari or workflow implementation.
+3. Do not extend E04 into dynamic groups, Mistral workflows, live notification binding or production mutating Nova actions.
