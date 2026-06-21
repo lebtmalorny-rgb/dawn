@@ -55,6 +55,65 @@ function inventoryPage<T>(items: T[], partial = false, isStale = false) {
   };
 }
 
+function inventoryPageWithNextCursor<T>(items: T[], nextCursor: string) {
+  return {
+    ...inventoryPage(items),
+    next_cursor: nextCursor
+  };
+}
+
+function inventoryModulesPayload() {
+  return {
+    modules: [
+      {
+        key: "instances",
+        title: "Инстансы",
+        path: "/api/v1/instances",
+        enabled: true,
+        required_capability: "instance.read",
+        status: "enabled",
+        reason: null
+      },
+      {
+        key: "hypervisors",
+        title: "Гипервизоры",
+        path: "/api/v1/hypervisors",
+        enabled: true,
+        required_capability: "hypervisor.read",
+        status: "enabled",
+        reason: null
+      },
+      {
+        key: "compute_services",
+        title: "Сервисы Nova Compute",
+        path: null,
+        enabled: false,
+        required_capability: null,
+        status: "disabled",
+        reason: "adapter_not_enabled"
+      },
+      {
+        key: "topology",
+        title: "Топология",
+        path: null,
+        enabled: false,
+        required_capability: null,
+        status: "disabled",
+        reason: "adapter_not_enabled"
+      },
+      {
+        key: "capacity",
+        title: "Емкость",
+        path: null,
+        enabled: false,
+        required_capability: null,
+        status: "disabled",
+        reason: "adapter_not_enabled"
+      }
+    ]
+  };
+}
+
 function instanceItem(overrides: Record<string, unknown> = {}) {
   return {
     cloud_id: "synthetic",
@@ -388,7 +447,10 @@ test("instances page fetches server-side page from BFF with URL filters", async 
     if (url === "/api/v1/capabilities") {
       return jsonResponse(capabilitiesPayload(["instance.read"]));
     }
-    if (url === "/api/v1/instances?limit=50&status=ACTIVE&sort=name.asc") {
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/instances?limit=50&sort=name.asc&status=ACTIVE") {
       return jsonResponse(inventoryPage([instanceItem({ name: "vm-from-server" })]));
     }
     throw new Error(`unexpected fetch ${url}`);
@@ -401,7 +463,7 @@ test("instances page fetches server-side page from BFF with URL filters", async 
   expect(screen.queryByText("vm-not-returned")).not.toBeInTheDocument();
   await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/instances?limit=50&status=ACTIVE&sort=name.asc"
+      "/api/v1/instances?limit=50&sort=name.asc&status=ACTIVE"
     );
   });
 });
@@ -498,4 +560,298 @@ test("inventory pages do not store result rows in browser storage", async () => 
 
   expect(await screen.findByText("vm-storage-check")).toBeInTheDocument();
   expect(storageSet).not.toHaveBeenCalled();
+});
+
+test("inventory requests clamp limit and exclude unsupported URL view state", async () => {
+  window.history.replaceState(
+    {},
+    "",
+    "/?view=instances&status=ACTIVE&sort=name.asc&limit=999&cursor=cursor-1&columns=name,host_name&density=compact&rows=copied&unsupported=value"
+  );
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["instance.read"]));
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/instances?limit=200&cursor=cursor-1&sort=name.asc&status=ACTIVE") {
+      return jsonResponse(inventoryPage([instanceItem({ name: "vm-sanitized" })]));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(await screen.findByText("vm-sanitized")).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/v1/instances?limit=200&cursor=cursor-1&sort=name.asc&status=ACTIVE"
+  );
+});
+
+test("next cursor pagination updates URL and fetches one next BFF page", async () => {
+  window.history.replaceState({}, "", "/?view=instances&sort=name.asc");
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["instance.read"]));
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/instances?limit=50&sort=name.asc") {
+      return jsonResponse(
+        inventoryPageWithNextCursor([instanceItem({ name: "vm-page-1" })], "cursor-next")
+      );
+    }
+    if (url === "/api/v1/instances?limit=50&cursor=cursor-next&sort=name.asc") {
+      return jsonResponse(inventoryPage([instanceItem({ name: "vm-page-2" })]));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<App />);
+
+  expect(await screen.findByText("vm-page-1")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Следующая страница" }));
+
+  expect(await screen.findByText("vm-page-2")).toBeInTheDocument();
+  expect(window.location.search).toBe("?view=instances&sort=name.asc&cursor=cursor-next");
+  expect(fetchMock).toHaveBeenCalledTimes(6);
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/v1/instances?limit=50&cursor=cursor-next&sort=name.asc"
+  );
+});
+
+test("columns and density round trip through URL and control visible table state", async () => {
+  window.history.replaceState({}, "", "/?view=instances&columns=name,host_name&density=compact");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/v1/session") {
+        return jsonResponse(operatorSessionPayload);
+      }
+      if (url === "/api/v1/health/ready") {
+        return jsonResponse(readyPayload);
+      }
+      if (url === "/api/v1/capabilities") {
+        return jsonResponse(capabilitiesPayload(["instance.read", "hypervisor.read"]));
+      }
+      if (url === "/api/v1/inventory/modules") {
+        return jsonResponse(inventoryModulesPayload());
+      }
+      if (url === "/api/v1/instances?limit=50") {
+        return jsonResponse(inventoryPage([instanceItem({ name: "vm-url-view" })]));
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    })
+  );
+
+  render(<App />);
+
+  const table = await screen.findByRole("table", { name: "Таблица ВМ" });
+  expect(within(table).getByText("Имя")).toBeInTheDocument();
+  expect(within(table).getByText("Узел")).toBeInTheDocument();
+  expect(within(table).queryByText("Проект")).not.toBeInTheDocument();
+  expect(table).toHaveAttribute("data-density", "compact");
+  expect(window.location.search).toBe("?view=instances&columns=name,host_name&density=compact");
+});
+
+test("renders disabled inventory modules from BFF instead of broken links", async () => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["instance.read", "hypervisor.read"]));
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/instances?limit=50") {
+      return jsonResponse(inventoryPage([]));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(await screen.findByText("Сервисы Nova Compute")).toBeInTheDocument();
+  expect(screen.getByText("Топология")).toBeInTheDocument();
+  expect(screen.getByText("Емкость")).toBeInTheDocument();
+  expect(screen.getAllByText("Отключено")).toHaveLength(3);
+  expect(screen.queryByRole("link", { name: "Сервисы Nova Compute" })).not.toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledWith("/api/v1/inventory/modules");
+});
+
+test("links instance host and hypervisor relationships to filtered hypervisors view", async () => {
+  window.history.replaceState({}, "", "/?view=instances");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/v1/session") {
+        return jsonResponse(operatorSessionPayload);
+      }
+      if (url === "/api/v1/health/ready") {
+        return jsonResponse(readyPayload);
+      }
+      if (url === "/api/v1/capabilities") {
+        return jsonResponse(capabilitiesPayload(["instance.read", "hypervisor.read"]));
+      }
+      if (url === "/api/v1/inventory/modules") {
+        return jsonResponse(inventoryModulesPayload());
+      }
+      if (url === "/api/v1/instances?limit=50") {
+        return jsonResponse(
+          inventoryPage([
+            instanceItem({
+              name: "vm-linked",
+              host_name: "compute-a",
+              hypervisor_id: "hypervisor-0001"
+            })
+          ])
+        );
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    })
+  );
+
+  render(<App />);
+
+  expect(await screen.findByText("vm-linked")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "compute-a" })).toHaveAttribute(
+    "href",
+    "?view=hypervisors&host_name=compute-a"
+  );
+  expect(screen.getByRole("link", { name: "hypervisor-0001" })).toHaveAttribute(
+    "href",
+    "?view=hypervisors&q=hypervisor-0001"
+  );
+});
+
+test("links hypervisor host and running VM count to filtered instances view", async () => {
+  window.history.replaceState({}, "", "/?view=hypervisors");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/v1/session") {
+        return jsonResponse(operatorSessionPayload);
+      }
+      if (url === "/api/v1/health/ready") {
+        return jsonResponse(readyPayload);
+      }
+      if (url === "/api/v1/capabilities") {
+        return jsonResponse(capabilitiesPayload(["instance.read", "hypervisor.read"]));
+      }
+      if (url === "/api/v1/inventory/modules") {
+        return jsonResponse(inventoryModulesPayload());
+      }
+      if (url === "/api/v1/hypervisors?limit=50") {
+        return jsonResponse(
+          inventoryPage([hypervisorItem({ host_name: "compute-a", running_vms: 7 })])
+        );
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    })
+  );
+
+  render(<App />);
+
+  expect(await screen.findByText("compute-a")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "compute-a" })).toHaveAttribute(
+    "href",
+    "?view=instances&host_name=compute-a"
+  );
+  expect(screen.getByRole("link", { name: "7 ВМ" })).toHaveAttribute(
+    "href",
+    "?view=instances&host_name=compute-a"
+  );
+});
+
+test("renders instance actions only for relevant capabilities", async () => {
+  window.history.replaceState({}, "", "/?view=instances");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/v1/session") {
+        return jsonResponse(operatorSessionPayload);
+      }
+      if (url === "/api/v1/health/ready") {
+        return jsonResponse(readyPayload);
+      }
+      if (url === "/api/v1/capabilities") {
+        return jsonResponse(capabilitiesPayload(["instance.read"]));
+      }
+      if (url === "/api/v1/inventory/modules") {
+        return jsonResponse(inventoryModulesPayload());
+      }
+      if (url === "/api/v1/instances?limit=50") {
+        return jsonResponse(inventoryPage([instanceItem({ name: "vm-no-action" })]));
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    })
+  );
+
+  render(<App />);
+
+  expect(await screen.findByText("vm-no-action")).toBeInTheDocument();
+  expect(screen.queryByText("Действия")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Обновить vm-no-action" })).not.toBeInTheDocument();
+});
+
+test("renders allowed instance refresh action when capability exists", async () => {
+  window.history.replaceState({}, "", "/?view=instances");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/v1/session") {
+        return jsonResponse(operatorSessionPayload);
+      }
+      if (url === "/api/v1/health/ready") {
+        return jsonResponse(readyPayload);
+      }
+      if (url === "/api/v1/capabilities") {
+        return jsonResponse(capabilitiesPayload(["instance.read", "instance.refresh"]));
+      }
+      if (url === "/api/v1/inventory/modules") {
+        return jsonResponse(inventoryModulesPayload());
+      }
+      if (url === "/api/v1/instances?limit=50") {
+        return jsonResponse(inventoryPage([instanceItem({ name: "vm-action" })]));
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    })
+  );
+
+  render(<App />);
+
+  expect(await screen.findByText("vm-action")).toBeInTheDocument();
+  expect(screen.getByText("Действия")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Обновить vm-action" })).toBeInTheDocument();
 });

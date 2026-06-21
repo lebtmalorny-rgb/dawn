@@ -18,6 +18,7 @@ import {
   type Capabilities,
   type HypervisorItem,
   type InstanceItem,
+  type InventoryModuleDescriptor,
   type InventoryPage,
   type Readiness,
   type Subject,
@@ -25,6 +26,7 @@ import {
   fetchCurrentSession,
   fetchHypervisors,
   fetchInstances,
+  fetchInventoryModules,
   fetchReadiness,
   login
 } from "./api";
@@ -35,6 +37,23 @@ const SESSION_UNAVAILABLE_MESSAGE = "Сессия недоступна";
 const CAPABILITIES_UNAVAILABLE_MESSAGE = "Список прав недоступен";
 
 type InventoryView = "instances" | "hypervisors";
+type Density = "compact" | "comfortable";
+type InstanceColumnKey =
+  | "name"
+  | "status"
+  | "project_id"
+  | "host_name"
+  | "hypervisor_id"
+  | "availability_zone"
+  | "observed_at";
+type HypervisorColumnKey =
+  | "host_name"
+  | "service_status"
+  | "service_state"
+  | "running_vms"
+  | "capacity"
+  | "availability_zone"
+  | "observed_at";
 
 type LoadState =
   | { type: "loading" }
@@ -59,10 +78,88 @@ type InventoryState =
   | { type: "ready"; view: "hypervisors"; page: InventoryPage<HypervisorItem> }
   | { type: "error"; view: InventoryView; message: string };
 
+type InventoryModulesState =
+  | { type: "idle" }
+  | { type: "loading" }
+  | { type: "ready"; modules: InventoryModuleDescriptor[] }
+  | { type: "error"; message: string };
+
+const INVENTORY_MODULES_UNAVAILABLE_MESSAGE = "Модули inventory недоступны";
+
+const INSTANCE_COLUMN_KEYS = [
+  "name",
+  "status",
+  "project_id",
+  "host_name",
+  "hypervisor_id",
+  "availability_zone",
+  "observed_at"
+] as const;
+const DEFAULT_INSTANCE_COLUMNS: InstanceColumnKey[] = [
+  "name",
+  "status",
+  "project_id",
+  "host_name",
+  "hypervisor_id",
+  "availability_zone",
+  "observed_at"
+];
+const INSTANCE_COLUMN_LABELS: Record<InstanceColumnKey, string> = {
+  name: "Имя",
+  status: "Статус",
+  project_id: "Проект",
+  host_name: "Узел",
+  hypervisor_id: "Гипервизор",
+  availability_zone: "Зона",
+  observed_at: "Наблюдение"
+};
+
+const HYPERVISOR_COLUMN_KEYS = [
+  "host_name",
+  "service_status",
+  "service_state",
+  "running_vms",
+  "capacity",
+  "availability_zone",
+  "observed_at"
+] as const;
+const DEFAULT_HYPERVISOR_COLUMNS: HypervisorColumnKey[] = [
+  "host_name",
+  "service_status",
+  "service_state",
+  "running_vms",
+  "capacity",
+  "observed_at"
+];
+const HYPERVISOR_COLUMN_LABELS: Record<HypervisorColumnKey, string> = {
+  host_name: "Узел",
+  service_status: "Статус сервиса",
+  service_state: "Состояние",
+  running_vms: "ВМ",
+  capacity: "Емкость",
+  availability_zone: "Зона",
+  observed_at: "Наблюдение"
+};
+
+const INVENTORY_FILTER_KEYS = [
+  "q",
+  "project_id",
+  "status",
+  "host_name",
+  "hypervisor_id",
+  "availability_zone",
+  "service_status",
+  "service_state",
+  "maintenance_status"
+] as const;
+
 export function App() {
   const [state, setState] = useState<LoadState>({ type: "loading" });
   const [authState, setAuthState] = useState<AuthState>({ type: "loading" });
   const [inventoryState, setInventoryState] = useState<InventoryState>({ type: "idle" });
+  const [inventoryModulesState, setInventoryModulesState] = useState<InventoryModulesState>({
+    type: "idle"
+  });
   const [locationSearch, setLocationSearch] = useState(() => window.location.search);
   const [loginName, setLoginName] = useState("");
   const [credential, setCredential] = useState("");
@@ -191,6 +288,37 @@ export function App() {
     };
   }, [activeInventoryView, capabilitySignature, currentCapabilities, locationSearch]);
 
+  useEffect(() => {
+    if (
+      currentCapabilities === null ||
+      !hasInventoryAccess(currentCapabilities.capabilities)
+    ) {
+      setInventoryModulesState({ type: "idle" });
+      return;
+    }
+
+    let mounted = true;
+    setInventoryModulesState({ type: "loading" });
+    fetchInventoryModules()
+      .then((modules) => {
+        if (mounted) {
+          setInventoryModulesState({ type: "ready", modules });
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setInventoryModulesState({
+            type: "error",
+            message: INVENTORY_MODULES_UNAVAILABLE_MESSAGE
+          });
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [capabilitySignature, currentCapabilities]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
@@ -213,6 +341,18 @@ export function App() {
     params.set("view", view);
     params.delete("cursor");
     window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
+    setLocationSearch(window.location.search);
+  }
+
+  function handleInventoryNextPage(cursor: string) {
+    const params = new URLSearchParams(locationSearch);
+    params.set("cursor", cursor);
+    window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
+    setLocationSearch(window.location.search);
+  }
+
+  function handleInventoryLinkSelect(href: string) {
+    window.history.pushState({}, "", `${window.location.pathname}${href}`);
     setLocationSearch(window.location.search);
   }
 
@@ -331,6 +471,9 @@ export function App() {
               activeView={activeInventoryView}
               capabilities={authState.capabilities}
               locationSearch={locationSearch}
+              modulesState={inventoryModulesState}
+              onInventoryLinkSelect={handleInventoryLinkSelect}
+              onInventoryNextPage={handleInventoryNextPage}
               onInventoryViewSelect={handleInventoryViewSelect}
               state={inventoryState}
             />
@@ -379,16 +522,26 @@ function hasSessionNavigation(capabilities: Capabilities): boolean {
   );
 }
 
+function hasInventoryAccess(capabilities: string[]): boolean {
+  return capabilities.includes("instance.read") || capabilities.includes("hypervisor.read");
+}
+
 function InventoryWorkArea({
   activeView,
   capabilities,
   locationSearch,
+  modulesState,
+  onInventoryLinkSelect,
+  onInventoryNextPage,
   onInventoryViewSelect,
   state
 }: {
   activeView: InventoryView | null;
   capabilities: Capabilities | null;
   locationSearch: string;
+  modulesState: InventoryModulesState;
+  onInventoryLinkSelect: (href: string) => void;
+  onInventoryNextPage: (cursor: string) => void;
   onInventoryViewSelect: (view: InventoryView) => void;
   state: InventoryState;
 }) {
@@ -426,6 +579,7 @@ function InventoryWorkArea({
           {activeView === "instances" ? "Виртуальные машины" : "Список гипервизоров"}
         </Title>
       </div>
+      <InventoryModules state={modulesState} />
 
       {state.type === "loading" && state.view === activeView && (
         <Bullseye className="cloud-ui-loading">
@@ -440,12 +594,24 @@ function InventoryWorkArea({
       {state.type === "ready" &&
         state.view === "instances" &&
         activeView === "instances" &&
-        renderInstancesPage(state.page)}
+        renderInstancesPage(
+          state.page,
+          locationSearch,
+          capabilities,
+          onInventoryLinkSelect,
+          onInventoryNextPage
+        )}
 
       {state.type === "ready" &&
         state.view === "hypervisors" &&
         activeView === "hypervisors" &&
-        renderHypervisorsPage(state.page)}
+        renderHypervisorsPage(
+          state.page,
+          locationSearch,
+          capabilities,
+          onInventoryLinkSelect,
+          onInventoryNextPage
+        )}
     </section>
   );
 }
@@ -493,6 +659,46 @@ function InventoryNavigation({
   );
 }
 
+function InventoryModules({ state }: { state: InventoryModulesState }) {
+  if (state.type === "idle") {
+    return null;
+  }
+
+  if (state.type === "loading") {
+    return (
+      <div className="cloud-ui-module-strip" aria-label="Модули inventory">
+        <span className="cloud-ui-muted">Загрузка модулей inventory...</span>
+      </div>
+    );
+  }
+
+  if (state.type === "error") {
+    return <Alert variant="warning" title={state.message} />;
+  }
+
+  return (
+    <ul className="cloud-ui-module-strip" aria-label="Модули inventory">
+      {state.modules.map((module) => (
+        <li className="cloud-ui-module-item" key={module.key}>
+          <span>{module.title}</span>
+          <span
+            className={
+              module.enabled
+                ? "cloud-ui-badge cloud-ui-badge-enabled"
+                : "cloud-ui-badge cloud-ui-badge-disabled"
+            }
+          >
+            {module.enabled ? "Доступно" : "Отключено"}
+          </span>
+          {module.required_capability !== null && (
+            <span className="cloud-ui-module-meta">{module.required_capability}</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function renderInventoryNotices<T>(page: InventoryPage<T>) {
   return (
     <div className="cloud-ui-inventory-notices" aria-label="Состояние данных">
@@ -512,7 +718,18 @@ function renderInventoryNotices<T>(page: InventoryPage<T>) {
   );
 }
 
-function renderInstancesPage(page: InventoryPage<InstanceItem>) {
+function renderInstancesPage(
+  page: InventoryPage<InstanceItem>,
+  locationSearch: string,
+  capabilities: Capabilities,
+  onInventoryLinkSelect: (href: string) => void,
+  onInventoryNextPage: (cursor: string) => void
+) {
+  const columns = parseInstanceColumns(locationSearch);
+  const density = parseDensity(locationSearch);
+  const canReadHypervisors = capabilities.capabilities.includes("hypervisor.read");
+  const canRefreshInstances = capabilities.capabilities.includes("instance.refresh");
+
   return (
     <div className="cloud-ui-inventory-page">
       {renderInventoryNotices(page)}
@@ -520,37 +737,73 @@ function renderInstancesPage(page: InventoryPage<InstanceItem>) {
         <p className="cloud-ui-empty">Нет ВМ для выбранных фильтров.</p>
       ) : (
         <div className="cloud-ui-table-wrapper">
-          <table className="cloud-ui-table" aria-label="Таблица ВМ">
+          <table className="cloud-ui-table" aria-label="Таблица ВМ" data-density={density}>
             <thead>
               <tr>
-                <th scope="col">Имя</th>
-                <th scope="col">Статус</th>
-                <th scope="col">Проект</th>
-                <th scope="col">Узел</th>
-                <th scope="col">Зона</th>
-                <th scope="col">Наблюдение</th>
+                {columns.map((column) => (
+                  <th key={column} scope="col">
+                    {INSTANCE_COLUMN_LABELS[column]}
+                  </th>
+                ))}
+                {canRefreshInstances && <th scope="col">Действия</th>}
               </tr>
             </thead>
             <tbody>
               {page.items.map((item) => (
                 <tr key={`${item.cloud_id}:${item.region_id}:${item.instance_id}`}>
-                  <th scope="row">{item.name}</th>
-                  <td>{item.status}</td>
-                  <td>{item.project_id}</td>
-                  <td>{formatNullable(item.host_name)}</td>
-                  <td>{formatNullable(item.availability_zone)}</td>
-                  <td>{formatUtc(item.observed_at)}</td>
+                  {columns.map((column) =>
+                    renderInstanceCell(
+                      column,
+                      item,
+                      canReadHypervisors,
+                      locationSearch,
+                      onInventoryLinkSelect
+                    )
+                  )}
+                  {canRefreshInstances && (
+                    <td>
+                      <Button
+                        aria-label={`Обновить ${item.name}`}
+                        className="cloud-ui-table-action"
+                        type="button"
+                        variant="secondary"
+                      >
+                        Обновить
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      {page.next_cursor !== null && (
+        <div className="cloud-ui-pagination">
+          <Button
+            onClick={() => onInventoryNextPage(page.next_cursor as string)}
+            type="button"
+            variant="secondary"
+          >
+            Следующая страница
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
 
-function renderHypervisorsPage(page: InventoryPage<HypervisorItem>) {
+function renderHypervisorsPage(
+  page: InventoryPage<HypervisorItem>,
+  locationSearch: string,
+  capabilities: Capabilities,
+  onInventoryLinkSelect: (href: string) => void,
+  onInventoryNextPage: (cursor: string) => void
+) {
+  const columns = parseHypervisorColumns(locationSearch);
+  const density = parseDensity(locationSearch);
+  const canReadInstances = capabilities.capabilities.includes("instance.read");
+
   return (
     <div className="cloud-ui-inventory-page">
       {renderInventoryNotices(page)}
@@ -558,38 +811,256 @@ function renderHypervisorsPage(page: InventoryPage<HypervisorItem>) {
         <p className="cloud-ui-empty">Нет гипервизоров для выбранных фильтров.</p>
       ) : (
         <div className="cloud-ui-table-wrapper">
-          <table className="cloud-ui-table" aria-label="Таблица гипервизоров">
+          <table
+            className="cloud-ui-table"
+            aria-label="Таблица гипервизоров"
+            data-density={density}
+          >
             <thead>
               <tr>
-                <th scope="col">Узел</th>
-                <th scope="col">Статус сервиса</th>
-                <th scope="col">Состояние</th>
-                <th scope="col">vCPU</th>
-                <th scope="col">ОЗУ</th>
-                <th scope="col">Наблюдение</th>
+                {columns.map((column) => (
+                  <th key={column} scope="col">
+                    {HYPERVISOR_COLUMN_LABELS[column]}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {page.items.map((item) => (
                 <tr key={`${item.cloud_id}:${item.region_id}:${item.hypervisor_id}`}>
-                  <th scope="row">{item.host_name}</th>
-                  <td>{item.service_status}</td>
-                  <td>{item.service_state}</td>
-                  <td>
-                    {item.vcpus_used}/{item.vcpus_total}
-                  </td>
-                  <td>
-                    {formatRam(item.ram_mb_used)} / {formatRam(item.ram_mb_total)}
-                  </td>
-                  <td>{formatUtc(item.observed_at)}</td>
+                  {columns.map((column) =>
+                    renderHypervisorCell(
+                      column,
+                      item,
+                      canReadInstances,
+                      locationSearch,
+                      onInventoryLinkSelect
+                    )
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      {page.next_cursor !== null && (
+        <div className="cloud-ui-pagination">
+          <Button
+            onClick={() => onInventoryNextPage(page.next_cursor as string)}
+            type="button"
+            variant="secondary"
+          >
+            Следующая страница
+          </Button>
+        </div>
+      )}
     </div>
   );
+}
+
+function renderInstanceCell(
+  column: InstanceColumnKey,
+  item: InstanceItem,
+  canReadHypervisors: boolean,
+  locationSearch: string,
+  onInventoryLinkSelect: (href: string) => void
+) {
+  const key = `${item.instance_id}:${column}`;
+  if (column === "name") {
+    return (
+      <th key={key} scope="row">
+        {item.name}
+      </th>
+    );
+  }
+  if (column === "host_name") {
+    return (
+      <td key={key}>
+        {item.host_name !== null && canReadHypervisors
+          ? renderInventoryLink(
+              item.host_name,
+              filteredInventoryHref(
+                "hypervisors",
+                { host_name: item.host_name },
+                locationSearch
+              ),
+              onInventoryLinkSelect
+            )
+          : formatNullable(item.host_name)}
+      </td>
+    );
+  }
+  if (column === "hypervisor_id") {
+    return (
+      <td key={key}>
+        {item.hypervisor_id !== null && canReadHypervisors
+          ? renderInventoryLink(
+              item.hypervisor_id,
+              filteredInventoryHref("hypervisors", { q: item.hypervisor_id }, locationSearch),
+              onInventoryLinkSelect
+            )
+          : formatNullable(item.hypervisor_id)}
+      </td>
+    );
+  }
+  if (column === "observed_at") {
+    return <td key={key}>{formatUtc(item.observed_at)}</td>;
+  }
+  return <td key={key}>{formatInstanceValue(column, item)}</td>;
+}
+
+function renderHypervisorCell(
+  column: HypervisorColumnKey,
+  item: HypervisorItem,
+  canReadInstances: boolean,
+  locationSearch: string,
+  onInventoryLinkSelect: (href: string) => void
+) {
+  const key = `${item.hypervisor_id}:${column}`;
+  if (column === "host_name") {
+    return (
+      <th key={key} scope="row">
+        {canReadInstances
+          ? renderInventoryLink(
+              item.host_name,
+              filteredInventoryHref(
+                "instances",
+                { host_name: item.host_name },
+                locationSearch
+              ),
+              onInventoryLinkSelect
+            )
+          : item.host_name}
+      </th>
+    );
+  }
+  if (column === "running_vms") {
+    const label = `${item.running_vms} ВМ`;
+    return (
+      <td key={key}>
+        {canReadInstances
+          ? renderInventoryLink(
+              label,
+              filteredInventoryHref(
+                "instances",
+                { host_name: item.host_name },
+                locationSearch
+              ),
+              onInventoryLinkSelect
+            )
+          : label}
+      </td>
+    );
+  }
+  if (column === "capacity") {
+    return (
+      <td key={key}>
+        vCPU {item.vcpus_used}/{item.vcpus_total}; RAM {formatRam(item.ram_mb_used)} /{" "}
+        {formatRam(item.ram_mb_total)}
+      </td>
+    );
+  }
+  if (column === "observed_at") {
+    return <td key={key}>{formatUtc(item.observed_at)}</td>;
+  }
+  return <td key={key}>{formatHypervisorValue(column, item)}</td>;
+}
+
+function renderInventoryLink(
+  label: string,
+  href: string,
+  onInventoryLinkSelect: (href: string) => void
+) {
+  return (
+    <a
+      href={href}
+      onClick={(event) => {
+        event.preventDefault();
+        onInventoryLinkSelect(href);
+      }}
+    >
+      {label}
+    </a>
+  );
+}
+
+function filteredInventoryHref(
+  view: InventoryView,
+  filters: Partial<Record<(typeof INVENTORY_FILTER_KEYS)[number], string>>,
+  locationSearch: string
+): string {
+  const params = new URLSearchParams(locationSearch);
+  params.set("view", view);
+  params.delete("cursor");
+  params.delete("sort");
+  params.delete("columns");
+  for (const key of INVENTORY_FILTER_KEYS) {
+    params.delete(key);
+  }
+  for (const [key, value] of Object.entries(filters)) {
+    params.set(key, value);
+  }
+  return `?${params.toString()}`;
+}
+
+function parseDensity(locationSearch: string): Density {
+  const density = new URLSearchParams(locationSearch).get("density");
+  return density === "compact" ? "compact" : "comfortable";
+}
+
+function parseInstanceColumns(locationSearch: string): InstanceColumnKey[] {
+  const requestedColumns = parseColumnList(locationSearch).filter(isInstanceColumnKey);
+  return requestedColumns.length > 0 ? requestedColumns : DEFAULT_INSTANCE_COLUMNS;
+}
+
+function parseHypervisorColumns(locationSearch: string): HypervisorColumnKey[] {
+  const requestedColumns = parseColumnList(locationSearch).filter(isHypervisorColumnKey);
+  return requestedColumns.length > 0 ? requestedColumns : DEFAULT_HYPERVISOR_COLUMNS;
+}
+
+function parseColumnList(locationSearch: string): string[] {
+  const rawColumns = new URLSearchParams(locationSearch).get("columns");
+  if (rawColumns === null) {
+    return [];
+  }
+  return rawColumns
+    .split(",")
+    .map((column) => column.trim())
+    .filter((column) => column !== "");
+}
+
+function isInstanceColumnKey(value: string): value is InstanceColumnKey {
+  return (INSTANCE_COLUMN_KEYS as readonly string[]).includes(value);
+}
+
+function isHypervisorColumnKey(value: string): value is HypervisorColumnKey {
+  return (HYPERVISOR_COLUMN_KEYS as readonly string[]).includes(value);
+}
+
+function formatInstanceValue(column: InstanceColumnKey, item: InstanceItem): string {
+  if (column === "status") {
+    return item.status;
+  }
+  if (column === "project_id") {
+    return item.project_id;
+  }
+  if (column === "availability_zone") {
+    return formatNullable(item.availability_zone);
+  }
+  return "";
+}
+
+function formatHypervisorValue(column: HypervisorColumnKey, item: HypervisorItem): string {
+  if (column === "service_status") {
+    return item.service_status;
+  }
+  if (column === "service_state") {
+    return item.service_state;
+  }
+  if (column === "availability_zone") {
+    return formatNullable(item.availability_zone);
+  }
+  return "";
 }
 
 function formatNullable(value: string | null): string {

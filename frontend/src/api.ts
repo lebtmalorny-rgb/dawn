@@ -325,16 +325,55 @@ function isInventoryModulesPayload(
   );
 }
 
-function inventoryUrl(path: string, params: URLSearchParams): string {
-  const query = new URLSearchParams();
-  const requestedLimit = params.get("limit");
-  query.set("limit", requestedLimit ?? "50");
+const DEFAULT_LIST_LIMIT = 50;
+const MAX_LIST_LIMIT = 200;
 
-  for (const [key, value] of params) {
-    if (key === "limit" || key === "view" || key === "columns" || key === "density") {
+const COMMON_LIST_PARAMS = ["cursor", "sort", "q", "cloud_id", "region_id"] as const;
+const INSTANCE_LIST_PARAMS = [
+  ...COMMON_LIST_PARAMS,
+  "project_id",
+  "status",
+  "host_name",
+  "hypervisor_id",
+  "availability_zone"
+] as const;
+const HYPERVISOR_LIST_PARAMS = [
+  ...COMMON_LIST_PARAMS,
+  "service_status",
+  "service_state",
+  "host_name",
+  "availability_zone",
+  "maintenance_status"
+] as const;
+
+function boundedLimit(rawLimit: string | null): string {
+  if (rawLimit === null) {
+    return String(DEFAULT_LIST_LIMIT);
+  }
+
+  const requestedLimit = Number(rawLimit);
+  if (!Number.isFinite(requestedLimit)) {
+    return String(DEFAULT_LIST_LIMIT);
+  }
+
+  return String(Math.max(1, Math.min(Math.trunc(requestedLimit), MAX_LIST_LIMIT)));
+}
+
+function inventoryUrl(
+  path: string,
+  params: URLSearchParams,
+  supportedParams: readonly string[]
+): string {
+  const query = new URLSearchParams();
+  query.set("limit", boundedLimit(params.get("limit")));
+
+  for (const key of supportedParams) {
+    if (key === "limit") {
       continue;
     }
-    query.append(key, value);
+    for (const value of params.getAll(key)) {
+      query.append(key, value);
+    }
   }
 
   return `${path}?${query.toString()}`;
@@ -394,7 +433,7 @@ export async function fetchCapabilities(): Promise<Capabilities> {
 export async function fetchInstances(
   params: URLSearchParams
 ): Promise<InventoryPage<InstanceItem>> {
-  const response = await fetch(inventoryUrl("/api/v1/instances", params));
+  const response = await fetch(inventoryUrl("/api/v1/instances", params, INSTANCE_LIST_PARAMS));
   const payload: unknown = await response.json();
 
   if (response.ok && isInventoryPage(payload, isInstanceItem)) {
@@ -407,7 +446,9 @@ export async function fetchInstances(
 export async function fetchHypervisors(
   params: URLSearchParams
 ): Promise<InventoryPage<HypervisorItem>> {
-  const response = await fetch(inventoryUrl("/api/v1/hypervisors", params));
+  const response = await fetch(
+    inventoryUrl("/api/v1/hypervisors", params, HYPERVISOR_LIST_PARAMS)
+  );
   const payload: unknown = await response.json();
 
   if (response.ok && isInventoryPage(payload, isHypervisorItem)) {
