@@ -12,6 +12,15 @@ _CLOUD_UI_ENVIRONMENT_NAMES = {
     "CLOUD_UI_API_PORT",
     "CLOUD_UI_LOG_LEVEL",
     "CLOUD_UI_CONFIG_VERSION",
+    "CLOUD_UI_ENVIRONMENT",
+    "CLOUD_UI_IDENTITY_PROVIDER",
+    "CLOUD_UI_MOCK_IDENTITY_ENABLED",
+    "CLOUD_UI_SESSION_IDLE_TIMEOUT_SECONDS",
+    "CLOUD_UI_SESSION_ABSOLUTE_LIFETIME_SECONDS",
+    "CLOUD_UI_SIMULTANEOUS_SESSION_LIMIT",
+    "CLOUD_UI_SESSION_LIMIT_POLICY",
+    "CLOUD_UI_SESSION_COOKIE_SECURE",
+    "CLOUD_UI_SESSION_COOKIE_SAMESITE",
 }
 
 
@@ -43,3 +52,4 @@ def test_settings_accept_dummy_dev_values() -> None:
 
     assert settings.api_port == 8080
     assert settings.database_url.unicode_string().startswith("mysql+pymysql://")
+    assert settings.environment == "local"

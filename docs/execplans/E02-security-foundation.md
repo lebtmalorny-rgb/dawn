@@ -9,7 +9,7 @@
 ## Контекст и текущее состояние
 
 - Repository root: `/Users/dmitry/Desktop/dawn`.
-- Current branch/worktree contains uncommitted E00 docs/risk updates. `docs/generated/risk-register.md` tracks R-050: do not mix E02 schema/code with unfinalized E00 documentation.
+- E00 docs/risk updates are committed as `23f6b6f docs: align realtime ops requirements`; E02 implementation is isolated in worktree `.worktrees/e02-security-foundation`.
 - Backend files currently present:
   - `backend/src/cloud_ui/api.py`: FastAPI app factory, health routes and request ID middleware.
   - `backend/src/cloud_ui/config.py`: `Settings` with DB/RabbitMQ/API options.
@@ -20,6 +20,7 @@
   - `frontend/src/App.tsx`: readiness UI only.
   - `frontend/src/api.ts`: readiness fetcher.
   - `frontend/src/App.test.tsx`: readiness tests.
+- At plan start, auth/session/RBAC/audit baseline was absent. E02 now introduces the focused P0 security modules, tests and migration listed below.
 - E02 input documents read:
   - `docs/06_AUTH_RBAC_SESSIONS.md`;
   - `docs/08_AUDIT_OBSERVABILITY.md`;
@@ -90,17 +91,18 @@
 - [x] 2026-06-21: Risk register created for E00/E02 transition.
 - [x] 2026-06-21: E02 ExecPlan created.
 - [x] 2026-06-21: E00/risk docs patch verified and reviewed before E02 code. Evidence: `git diff --check`, `./scripts/secret-scan.sh`, stale-statement `rg`, `make lint`, `make typecheck`, `make test`.
-- [ ] E00/risk diff committed or explicitly accepted as the E02 implementation base.
-- [ ] Contract and test double.
-- [ ] Minimal implementation.
-- [ ] Отрицательные сценарии и безопасность.
-- [ ] UI/session/capability smoke.
-- [ ] Документация, evidence и review.
+- [x] 2026-06-21: E00/risk diff committed as E02 implementation base. Evidence: commit `23f6b6f docs: align realtime ops requirements`.
+- [x] 2026-06-21: Contract and test double. Evidence: `backend/src/cloud_ui/security/identity.py`, `mock_identity.py`; RED `ModuleNotFoundError`, GREEN `cd backend && .venv/bin/python -m pytest tests/security/test_mock_identity.py -q` -> `3 passed`.
+- [x] 2026-06-21: Minimal implementation. Evidence: `0002_security_foundation` migration, session/login/logout/capabilities API, in-memory P0 audit/session services.
+- [x] 2026-06-21: Отрицательные сценарии и безопасность. Evidence: `cd backend && .venv/bin/python -m pytest tests/security -q` -> `18 passed`; covers direct 401/403, CSRF, session limit, idle timeout, service role for human denial, simulated OpenStack deny, security headers and UTC audit timestamp validation.
+- [x] 2026-06-21: UI/session/capability smoke. Evidence: `cd frontend && npm test -- --run src/App.test.tsx` -> `6 passed` before final docs updates; covers login shell, capability-gated navigation and malformed session payload.
+- [x] 2026-06-21: Документация и evidence обновлены. Evidence: `docs/06_AUTH_RBAC_SESSIONS.md`, `docs/08_AUDIT_OBSERVABILITY.md`, `docs/11_DKB_TRACEABILITY.md`, `docs/generated/api-register.md`, `docs/generated/risk-register.md`.
 
 ## Неожиданные открытия
 
 - Current backend has no auth/session/RBAC structure, so E02 should introduce small focused modules instead of modifying a pre-existing auth layer.
-- Current worktree is dirty with E00/risk docs. Starting E02 code before finalizing those changes would make review and rollback unclear.
+- E00/risk docs were finalized first in commit `23f6b6f`, which keeps E02 code/schema rollback separate from E00 requirement/risk clarification.
+- E02 implementation deliberately keeps `/session/active` administrative session listing/revoke out of the current API surface; P0 proves logout, timeout and policy denial, while administrative revoke UX remains a later hardening/admin story.
 - `tests/test_e015_kolla_layout.py` targets Kolla prototype files outside current E02 scope and must not be used as an E02 gate unless that task is explicitly resumed.
 
 ## Журнал решений
@@ -228,6 +230,18 @@ Required commands from `/Users/dmitry/Desktop/dawn`:
 - `make typecheck` -> backend mypy and frontend `tsc -b` pass.
 - `make test` -> backend pytest and frontend vitest pass.
 
+Latest E02 verification results from `.worktrees/e02-security-foundation`:
+
+- `cd backend && .venv/bin/python -m pytest tests/security/test_mock_identity.py -q` -> `3 passed`.
+- `cd backend && .venv/bin/python -m pytest tests/security -q` -> `18 passed`.
+- `cd backend && .venv/bin/python -m pytest tests/security/test_security_migration.py -q` -> `1 passed`.
+- `cd frontend && npm test -- --run src/App.test.tsx` -> `6 passed`.
+- `git diff --check` -> no output, exit 0.
+- `./scripts/secret-scan.sh` -> no output, exit 0.
+- `make lint` -> ruff, eslint and secret scan pass.
+- `make typecheck` -> mypy success in 21 source files; frontend `tsc -b` pass.
+- `make test` -> backend `34 passed`; frontend `6 passed`.
+
 E02-specific tests to add and run as targeted commands while implementing:
 
 - `cd backend && .venv/bin/python -m pytest tests/security -q`;
@@ -256,10 +270,12 @@ E02-specific tests to add and run as targeted commands while implementing:
 
 ## Итог и остаточные риски
 
-This plan is created before E02 code starts. Remaining risks before implementation:
+E02 creates a P0 portal security foundation: deterministic mock identity is production-hard-disabled, sessions are server-side and cookie-backed, mutating portal endpoints require CSRF, capabilities drive frontend UX while backend repeats authorization, and auth/RBAC failures produce sanitized audit events.
 
-- E00/risk diff is still uncommitted in this worktree.
-- ADR-001 production/test federation details remain incomplete.
+Remaining risks after E02 implementation:
+
+- Session/audit persistence is schema-ready through Alembic, but current runtime service is in-memory P0; DB-backed repositories and hashed persisted CSRF/session records are required before multi-instance/integrated use.
+- ADR-001 production/test federation details remain incomplete; mock identity is not production evidence.
 - Vault/SecMan production key storage remains E08.
-- SIEM delivery remains E07.
-- IAM/PAM/SoD evidence remains external/P3.
+- SIEM delivery remains E07; E02 only records in-process audit events.
+- IAM/PAM/SoD evidence remains external/P3 and ДКБ-04/05/07 are not closed by portal mock tests.

@@ -17,6 +17,19 @@
 - При изменении реализации обновляются столбцы этапа/evidence и сохраняется ссылка на фактический test report/config/ADR.
 - Требование считается закрытым только после review владельцем безопасности; Codex не присваивает финальный статус соответствия.
 
+## Обновление требований 2026-06-21: E02 security foundation
+
+E02 добавляет портальные доказательства для auth/session/RBAC, но не закрывает внешний IAM/PAM/SIEM/PKI контур:
+
+- ДКБ-01/01.01/01.03/01.04/01.05/01.06: портал получил deny-by-default `PolicyService`, P0 role matrix (`cloud_viewer`, `cloud_operator`, `security_auditor`, `portal_admin`) и capability API. Доказательства: `backend/tests/security/test_security_api.py`, `frontend/src/App.test.tsx`, `docs/06_AUTH_RBAC_SESSIONS.md`.
+- ДКБ-02/02.01/02.02/02.03: E02 разделяет human/service subject types и запрещает назначение `service` роли human subject. Доказательство: `test_role_binding_denies_service_role_for_human_subject`.
+- ДКБ-03/12: frontend скрывает недоступные действия по capabilities, а backend повторно проверяет прямой request. Доказательство: direct request получает `401/403`, UI capability test скрывает `role.manage` action.
+- ДКБ-13: login/session responses не содержат OpenStack token/application credential; frontend не пишет session data в `localStorage`/`sessionStorage`; audit metadata редактируется до хранения. Доказательства: `test_mock_identity_authenticates_known_operator_without_browser_secrets`, frontend storage spy, `backend/tests/security/test_audit.py`.
+- ДКБ-15: production mock identity hard-disabled через config validation. Это только P0/test evidence; production federation/auth-policy selection остается за ADR-001 и внешним IdP.
+- ДКБ-20/21: E02 реализует opaque server-side session cookie, idle timeout 900 seconds, absolute lifetime, logout/revoke path, CSRF для mutating endpoints и default simultaneous-session policy `deny`. Доказательства: `backend/tests/security/test_sessions.py`, `test_session_limit_deny_policy_blocks_second_login`, `test_csrf_rejects_state_changing_request`.
+- ДКБ-46-53: E02 создает только baseline audit events для login success/failure, logout, timeout, session limit, CSRF/authorization/OpenStack denial. Durable outbox, SIEM delivery, heartbeat and full OpenStack/host audit coverage remain E07/P3.
+- ДКБ-04/05/07 не закрыты E02. Портальные доказательства сужают риск misuse service-role, но непересечение административных ролей, персональный запуск админских действий, исключения для local/service accounts и PAM-аудит требуют доказательств владельца корпоративного IAM/PAM.
+
 ## Обновление требований 2026-06-21: Mistral/Watcher/Masakari и real-time UX
 
 Новый блок требований расширяет будущие evidence, но не меняет текущий статус соответствия:

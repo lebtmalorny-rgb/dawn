@@ -1,8 +1,8 @@
 # API register
 
-- Stage: E00
+- Stage: E02
 - DKB: ДКБ-77 draft register
-- Status: planned interfaces, not blocking evidence yet
+- Status: E02 P0 session/capability endpoints implemented; remaining inventory/workflow/audit APIs are planned interfaces, not blocking evidence yet
 
 ## Portal API
 
@@ -12,12 +12,14 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 |---|---|---|---|---|---|---|
 | `GET /health/live` | process liveness | HAProxy/Kolla | none/internal route policy | E01 | no | HAProxy/internal routing |
 | `GET /health/ready` | dependency readiness | HAProxy/Kolla | none/internal route policy | E01 | no | HAProxy/internal routing |
-| `GET /session` | current session | frontend | session cookie | E02 | access/session events | route disabled until E02 |
-| `POST /session/login` | login start/mock/test flow | frontend | flow-specific | E02 | login success/failure | production mock hard-disabled |
-| `POST /session/logout` | logout | frontend | session+CSRF | E02 | logout | route disabled until E02 |
-| `GET /session/active` | active UI sessions | frontend | session+capability | E02 | protected access | capability `session.manage` |
-| `DELETE /session/active/{session_id}` | revoke session | frontend | session+CSRF+capability | E02 | revoke | capability `session.manage` |
-| `GET /capabilities` | effective portal permissions | frontend | session | E02 | optional protected access | route disabled until E02 |
+| `GET /session` | current session | frontend | session cookie | E02 | `session.required`, `session.timeout` | implemented in P0 |
+| `POST /session/login` | login start/mock/test flow | frontend | flow-specific | E02 | login success/failure, session limit | implemented in P0; production mock hard-disabled |
+| `POST /session/logout` | logout | frontend | session+CSRF | E02 | logout, CSRF denial | implemented in P0 |
+| `GET /session/active` | active UI sessions | frontend | session+capability | E02+ | protected access | not implemented in E02 P0; capability `session.manage` remains planned |
+| `DELETE /session/active/{session_id}` | revoke session | frontend | session+CSRF+capability | E02+ | revoke | not implemented in E02 P0; capability `session.manage` remains planned |
+| `GET /capabilities` | effective portal permissions | frontend | session | E02 | protected access | implemented in P0; response contains no policy expression |
+| `POST /admin/role-bindings` | P0 role binding policy probe | frontend/admin future | session+CSRF+capability | E02 | authorization denial | implemented only as security contract path; full admin UI remains planned |
+| `POST /operations/simulated-openstack-action` | P0 OpenStack-deny finality probe | security tests | session+CSRF+capability | E02 | portal denial or OpenStack denial | implemented only as security contract path; real operations start in E06 |
 | `GET /instances` | paged instance list | frontend | session+capability | E04 | aggregate inventory read policy | capability `instance.read` |
 | `GET /instances/{cloud_id}/{region_id}/{instance_id}` | instance detail | frontend | session+capability+scope | E04 | protected access policy | capability `instance.read` |
 | `POST /instances/{...}/refresh` | targeted refresh | frontend | session+CSRF+capability | E04 | admin refresh | capability `instance.refresh` |

@@ -33,6 +33,20 @@ Keystone roles, scopes и policy сервисов решают, разрешен
 
 Технологические identity отделены от human identity. Роль `service` не показывается как пользовательская.
 
+### P0 role matrix E02
+
+E02 реализует минимальную deterministic matrix для проверки portal RBAC без production identity:
+
+| Роль | Тип subject | Capabilities | Назначение в P0 |
+|---|---|---|---|
+| `cloud_viewer` | human | `instance.read`, `hypervisor.read`, `group.read`, `operation.read` | read-only shell и проверка отсутствия mutating permissions |
+| `cloud_operator` | human | `instance.read`, `hypervisor.read`, `group.read`, `operation.read`, `workflow.execute.maintenance-host` | happy path оператора и проверка, что portal allow не обходит OpenStack deny |
+| `security_auditor` | human | `audit.read`, `operation.read` | аудит без mutating permissions |
+| `portal_admin` | human | `audit.read`, `operation.read`, `role.manage` | проверка role-binding policy без `admin-all` shortcut |
+| `service` | service only | определяется отдельным service identity | не назначается human subject; E02 API возвращает `403 service_role_for_human` |
+
+Эта матрица является P0 test double. Production роли и группы должны приходить из корпоративного IdP/Keystone federation и подтверждаться IAM/PAM evidence.
+
 ## Scope
 
 Permission оценивается минимум по:
@@ -84,6 +98,8 @@ Frontend использует ответ для UX. Любой mutating endpoint
 ### Ограничение одновременных сессий
 
 Политика `deny` или `disconnect_oldest` конфигурируется. Изменение политики является security configuration и покрывается тестами. CLI/OpenStack token sessions находятся вне UI session registry и требуют политики IdP/Keystone.
+
+E02 выбирает `deny` как default P0 policy: второй login того же subject отклоняется с безопасным `409 session_limit_reached` и audit event. `disconnect_oldest` оставлен как конфигурируемая политика для отдельного hardening/test cycle.
 
 ### Хранение OpenStack context
 

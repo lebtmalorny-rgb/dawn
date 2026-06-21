@@ -1,6 +1,6 @@
 # Актуальный реестр рисков
 
-- Stage: E00/E02 transition
+- Stage: E02 security foundation
 - Last updated: 2026-06-21
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
@@ -16,12 +16,12 @@
 
 | ID | Риск | Почему важен | Митигация в E02 | Evidence |
 |---|---|---|---|---|
-| R-010 | Test identity/federation flow не выбран | Нельзя доказать P1 login/session/RBAC без утвержденного test identity path. | Начать с deterministic mock provider, production-hard-disabled; Keystone/federation adapter оставить за feature flag до ADR-001 evidence. | Contract tests: mock нельзя включить в production profile; ADR-001 updated. |
-| R-011 | Role matrix недостаточно конкретна | Backend RBAC и UI capabilities могут разойтись или стать admin-all. | Seed минимальные роли `cloud_viewer`, `cloud_operator`, `security_auditor`, `portal_admin`; deny by default; service role not assignable to human. | Negative RBAC matrix and capability snapshot tests. |
-| R-012 | Session secret/key storage не определен для production | Cookie/session signing/encryption без owner и rotation не закрывает ДКБ. | В P0 использовать generated local test key; production требует Vault/SecMan reference and startup failure if missing. | Secret scan, config tests, ДКБ gap remains E08. |
-| R-013 | UI route hiding mistaken for authorization | ДКБ-12 нельзя закрыть только frontend guard. | Backend policy middleware/service повторно проверяет каждый protected endpoint; frontend получает capabilities only for UX. | Direct HTTP 403 tests and UI hidden-action tests. |
-| R-014 | Portal allow может обойти OpenStack deny | Portal roles сужают права, но не расширяют Keystone/OpenStack policy. | Ввести simulated OpenStack deny в E02 tests; E03 adapters preserve 403 as final denial. | Test: portal capability allow + OpenStack deny -> 403/audit. |
-| R-015 | Audit baseline слишком поздно появится | E02 login/denial без audit не доказывают security gates. | В E02 добавить минимальный audit event/outbox path для auth events, без SIEM claim. | Login success/failure/logout/revoke/denial audit tests. |
+| R-010 | Test identity/federation flow не выбран | Нельзя доказать P1 login/session/RBAC без утвержденного test identity path. | E02 реализует deterministic mock provider, production-hard-disable; Keystone/federation adapter остается за feature flag до ADR-001 evidence. | `backend/tests/security/test_mock_identity.py`, `backend/tests/test_config.py`. Остаток: ADR-001/test federation не закрыт. |
+| R-011 | Role matrix недостаточно конкретна | Backend RBAC и UI capabilities могут разойтись или стать admin-all. | E02 seed roles: `cloud_viewer`, `cloud_operator`, `security_auditor`, `portal_admin`; deny by default; service role not assignable to human. | `docs/06_AUTH_RBAC_SESSIONS.md` P0 matrix, `backend/tests/security/test_security_api.py`, frontend capability test. |
+| R-012 | Session secret/key storage не определен для production | Cookie/session signing/encryption без owner и rotation не закрывает ДКБ. | E02 uses opaque random session IDs and server-side P0 records; production persistence/key lifecycle remains Vault/SecMan E08. | `backend/tests/security/test_sessions.py`, `./scripts/secret-scan.sh`. Остаток: DB-backed encrypted session context and rotation. |
+| R-013 | UI route hiding mistaken for authorization | ДКБ-12 нельзя закрыть только frontend guard. | E02 backend policy service повторно проверяет protected endpoints; frontend получает capabilities only for UX. | Direct request/403 tests in `backend/tests/security/test_security_api.py`; hidden action test in `frontend/src/App.test.tsx`. |
+| R-014 | Portal allow может обойти OpenStack deny | Portal roles сужают права, но не расширяют Keystone/OpenStack policy. | E02 adds simulated OpenStack deny contract; E03 adapters must preserve real OpenStack 403 as final denial. | `test_portal_allow_does_not_override_simulated_openstack_deny` -> `403 openstack_forbidden` and audit event. |
+| R-015 | Audit baseline слишком поздно появится | E02 login/denial без audit не доказывают security gates. | E02 records in-process sanitized audit events for auth/session/authorization, without SIEM delivery claim. | `backend/tests/security/test_audit.py`, `backend/tests/security/test_security_api.py`. Остаток: durable outbox/SIEM E07. |
 
 ## Риски inventory/read model и OpenStack API load
 
@@ -56,14 +56,12 @@
 
 | ID | Риск | Текущее положение | Митигация | Stage |
 |---|---|---|---|---|
-| R-050 | Dirty worktree hides ownership of changes | Current E00 updates are uncommitted. | Before E02 implementation, finalize or commit E00 risk/docs patch; do not mix E02 schema/code with unrelated docs. | Now |
+| R-050 | Dirty worktree hides ownership of changes | E00 risk/docs patch was finalized before E02 code. | E02 worktree is based on commit `23f6b6f docs: align realtime ops requirements`; schema/code changes are separate. | Done |
 | R-051 | Ignored local worktrees can break scans | `.worktrees/**` previously caused secret-scan false positives. | `scripts/secret-scan.sh` excludes ignored worktrees; regression test added. | Done, keep covered |
 | R-052 | Kolla prototype tests in root may not match current gate | `tests/test_e015_kolla_layout.py` targets deployment files not in current root state. | Do not use that test as E00/E02 gate unless E01.5/Kolla prototype files are restored or task requires it. | E09/E015 |
 
 ## Immediate priority order
 
-1. Close E00 docs/risk patch with tests and review evidence.
-2. Create E02 ExecPlan before code changes.
-3. Implement E02.1 identity/provider contracts and negative tests first.
-4. Add server-side sessions/RBAC only after deny-by-default contract is explicit.
-5. Keep inventory, Prometheus and Masakari out of E02 implementation scope except for capability names and risk references.
+1. Finish E02 documentation/evidence and self-review after final verification.
+2. Keep ADR-001/test federation, Vault/SecMan, SIEM delivery and IAM/PAM/SoD evidence as explicit external gaps.
+3. Do not extend E02 into inventory, Prometheus, Masakari or workflow implementation.
