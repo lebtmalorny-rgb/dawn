@@ -86,6 +86,7 @@ class ScenarioEvidence:
     p95_seconds: float
     query_count_max: int
     query_count_p95: int
+    explained_sql: str
     explain_summary: tuple[str, ...]
 
 
@@ -106,7 +107,6 @@ class _Scenario:
     resource: ResourceType
     page_size: int
     list_page: Callable[[], int]
-    explain_statement: Callable[[], sa.Select[Any]]
 
 
 class _StepClock:
@@ -122,6 +122,12 @@ class _StepClock:
 @dataclass
 class _StatementCounter:
     count: int = 0
+
+
+@dataclass
+class _CapturedStatement:
+    statement: str | None = None
+    parameters: Any = None
 
 
 def generate_scale_report(
@@ -239,11 +245,6 @@ def _scenarios(
                     cursor=None,
                 ).items
             ),
-            explain_statement=lambda: _instance_explain_statement(
-                filters=instance_default_filters,
-                sort=instance_default_sort,
-                limit=profile.page_size,
-            ),
         ),
         _Scenario(
             name="instances_filtered_project_status",
@@ -256,11 +257,6 @@ def _scenarios(
                     limit=profile.page_size,
                     cursor=None,
                 ).items
-            ),
-            explain_statement=lambda: _instance_explain_statement(
-                filters=instance_filtered_filters,
-                sort=instance_filtered_sort,
-                limit=profile.page_size,
             ),
         ),
         _Scenario(
@@ -275,11 +271,6 @@ def _scenarios(
                     cursor=None,
                 ).items
             ),
-            explain_statement=lambda: _hypervisor_explain_statement(
-                filters=hypervisor_default_filters,
-                sort=hypervisor_default_sort,
-                limit=profile.page_size,
-            ),
         ),
         _Scenario(
             name="hypervisors_filtered_service_status_az",
@@ -293,11 +284,6 @@ def _scenarios(
                     cursor=None,
                 ).items
             ),
-            explain_statement=lambda: _hypervisor_explain_statement(
-                filters=hypervisor_filtered_filters,
-                sort=hypervisor_filtered_sort,
-                limit=profile.page_size,
-            ),
         ),
     )
 
@@ -310,10 +296,15 @@ def _run_scenario(
     durations: list[float] = []
     query_counts: list[int] = []
     returned_count = 0
+    captured_statement = _CapturedStatement()
 
     for _ in range(profile.sample_iterations):
         counter = _StatementCounter()
-        before_cursor_execute = _statement_listener(counter)
+        before_cursor_execute = _statement_listener(
+            counter=counter,
+            capture=captured_statement,
+            resource=scenario.resource,
+        )
 
         sa.event.listen(engine, "before_cursor_execute", before_cursor_execute)
         started = time.perf_counter()
@@ -332,12 +323,16 @@ def _run_scenario(
         p95_seconds=_percentile(durations, 95),
         query_count_max=max(query_counts),
         query_count_p95=math.ceil(_percentile([float(count) for count in query_counts], 95)),
-        explain_summary=_explain_summary(engine, scenario.explain_statement()),
+        explained_sql=_required_statement(captured_statement),
+        explain_summary=_explain_summary(engine, captured_statement),
     )
 
 
 def _statement_listener(
+    *,
     counter: _StatementCounter,
+    capture: _CapturedStatement,
+    resource: ResourceType,
 ) -> Callable[[sa.Connection, object, str, object, object, bool], None]:
     def before_cursor_execute(
         _conn: sa.Connection,
@@ -348,8 +343,26 @@ def _statement_listener(
         _executemany: bool,
     ) -> None:
         counter.count += 1
+        if capture.statement is None and _is_page_select(_statement, resource):
+            capture.statement = _statement
+            capture.parameters = _parameters
 
     return before_cursor_execute
+
+
+def _is_page_select(statement: str, resource: ResourceType) -> bool:
+    normalized = " ".join(statement.split()).lower()
+    return (
+        normalized.startswith("select ")
+        and f" from {resource} " in f" {normalized} "
+        and not normalized.startswith("select max(")
+    )
+
+
+def _required_statement(captured_statement: _CapturedStatement) -> str:
+    if captured_statement.statement is None:
+        raise RuntimeError("inventory list SELECT was not captured for EXPLAIN")
+    return captured_statement.statement
 
 
 def _build_report(
@@ -459,106 +472,16 @@ def _hypervisor_filter_values(engine: Engine) -> dict[str, str]:
     }
 
 
-def _instance_explain_statement(
-    *,
-    filters: InstanceFilters,
-    sort: InventorySort,
-    limit: int,
-) -> sa.Select[Any]:
-    conditions = [
-        schema.instances.c.cloud_id == filters.cloud_id,
-        schema.instances.c.region_id == filters.region_id,
-        schema.instances.c.deleted_at.is_(None),
-    ]
-    if filters.project_id is not None:
-        conditions.append(schema.instances.c.project_id == filters.project_id)
-    if filters.status is not None:
-        conditions.append(schema.instances.c.status == filters.status)
-    if filters.host_name is not None:
-        conditions.append(schema.instances.c.host_name == filters.host_name)
-
-    sort_column = _instance_sort_column(sort.field)
-    return (
-        sa.select(schema.instances)
-        .where(*conditions)
-        .order_by(*_order_by(sort, sort_column, schema.instances.c.instance_id, "instance_id"))
-        .limit(limit + 1)
-    )
-
-
-def _hypervisor_explain_statement(
-    *,
-    filters: HypervisorFilters,
-    sort: InventorySort,
-    limit: int,
-) -> sa.Select[Any]:
-    conditions = [
-        schema.hypervisors.c.cloud_id == filters.cloud_id,
-        schema.hypervisors.c.region_id == filters.region_id,
-        schema.hypervisors.c.deleted_at.is_(None),
-    ]
-    if filters.service_status is not None:
-        conditions.append(schema.hypervisors.c.service_status == filters.service_status)
-    if filters.availability_zone is not None:
-        conditions.append(schema.hypervisors.c.availability_zone == filters.availability_zone)
-
-    sort_column = _hypervisor_sort_column(sort.field)
-    return (
-        sa.select(schema.hypervisors)
-        .where(*conditions)
-        .order_by(
-            *_order_by(sort, sort_column, schema.hypervisors.c.hypervisor_id, "hypervisor_id")
-        )
-        .limit(limit + 1)
-    )
-
-
-def _instance_sort_column(field: str) -> sa.Column[Any]:
-    columns = {
-        "instance_id": schema.instances.c.instance_id,
-        "name": schema.instances.c.name,
-        "project_id": schema.instances.c.project_id,
-        "status": schema.instances.c.status,
-        "host_name": schema.instances.c.host_name,
-        "availability_zone": schema.instances.c.availability_zone,
-        "source_updated_at": schema.instances.c.source_updated_at,
-        "observed_at": schema.instances.c.observed_at,
-    }
-    return columns[field]
-
-
-def _hypervisor_sort_column(field: str) -> sa.Column[Any]:
-    columns = {
-        "hypervisor_id": schema.hypervisors.c.hypervisor_id,
-        "host_name": schema.hypervisors.c.host_name,
-        "service_status": schema.hypervisors.c.service_status,
-        "service_state": schema.hypervisors.c.service_state,
-        "availability_zone": schema.hypervisors.c.availability_zone,
-        "observed_at": schema.hypervisors.c.observed_at,
-    }
-    return columns[field]
-
-
-def _order_by(
-    sort: InventorySort,
-    sort_column: sa.Column[Any],
-    id_column: sa.Column[Any],
-    id_field: str,
-) -> list[sa.ColumnElement[Any]]:
-    direction = sort_column.asc if sort.direction == "asc" else sort_column.desc
-    if sort.field == id_field:
-        return [direction()]
-    id_direction = id_column.asc if sort.direction == "asc" else id_column.desc
-    return [direction(), id_direction()]
-
-
-def _explain_summary(engine: Engine, statement: sa.Select[Any]) -> tuple[str, ...]:
-    compiled = statement.compile(
-        dialect=engine.dialect,
-        compile_kwargs={"literal_binds": True},
-    )
+def _explain_summary(
+    engine: Engine,
+    captured_statement: _CapturedStatement,
+) -> tuple[str, ...]:
+    statement = _required_statement(captured_statement)
     with engine.connect() as connection:
-        rows = connection.exec_driver_sql(f"EXPLAIN QUERY PLAN {compiled}").all()
+        rows = connection.exec_driver_sql(
+            f"EXPLAIN QUERY PLAN {statement}",
+            captured_statement.parameters,
+        ).all()
     details = [str(row[-1]) for row in rows]
     return tuple(details[:4])
 

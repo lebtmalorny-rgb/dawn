@@ -61,6 +61,27 @@ def test_scale_report_contains_explain_summaries() -> None:
     )
 
 
+def test_explain_uses_actual_measured_repository_select() -> None:
+    from cloud_ui.inventory.scale_report import ScaleProfile, generate_scale_report
+
+    report = generate_scale_report(
+        ScaleProfile(
+            instance_count=30,
+            hypervisor_count=5,
+            page_size=5,
+            max_page_size=20,
+            sample_iterations=2,
+        )
+    )
+    scenarios = {scenario.name: scenario for scenario in report.scenarios}
+
+    assert "CASE WHEN" in scenarios["instances_default_page"].explained_sql
+    assert "instances.name IS NULL" in scenarios["instances_default_page"].explained_sql
+    assert "CASE WHEN" in scenarios["hypervisors_default_page"].explained_sql
+    assert "hypervisors.host_name IS NULL" in scenarios["hypervisors_default_page"].explained_sql
+    assert all(scenario.explain_summary for scenario in report.scenarios)
+
+
 def test_markdown_report_is_sanitized_and_marks_scope(tmp_path: Path) -> None:
     from cloud_ui.inventory.scale_report import ScaleProfile, generate_scale_report
 
