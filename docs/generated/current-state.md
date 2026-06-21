@@ -175,6 +175,7 @@ Post-baseline Kolla update on 2026-06-19:
 
 - `enable_mistral`, `enable_watcher`, `enable_masakari`, `enable_redis`, `kolla_enable_tls_internal`, `kolla_enable_tls_external`, `kolla_copy_ca_into_containers`, `openstack_cacert` and `kolla_admin_openrc_cacert` were enabled in `/etc/kolla/globals.yml`.
 - Masakari API/engine are enabled. Masakari instance and host monitors remain disabled in this all-in-one lab because enabling them would also enable HA cluster/Pacemaker/Corosync roles.
+- User-provided update on 2026-06-21: Consul is deployed and under R&D outside the current test node; the current test node does not have Consul. Intended use is network health checks that feed a decision about evacuation. Research decision: prefer Masakari hostmonitor Consul driver and `matrix.yaml` rather than portal-side recovery from Consul Events.
 - `kolla-ansible prechecks -i /etc/kolla/all-in-one` completed with `failed=0`.
 - `kolla-ansible pull -i /etc/kolla/all-in-one` completed with `failed=0`.
 - `kolla-ansible reconfigure -i /etc/kolla/all-in-one` completed with `failed=0`.

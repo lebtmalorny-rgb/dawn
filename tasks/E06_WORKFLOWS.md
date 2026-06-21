@@ -42,9 +42,15 @@ Session/CSRF/capability/target/freshness/precondition/schema/idempotency. Соз
 
 Worker надежно запускает execution, сохраняет external ID, обновляет timeline и восстанавливается после crash. `unknown` не заменяется на failure без проверки.
 
-### E06.6. Watcher и Masakari vertical slice
+### E06.6. First-class Watcher и Masakari vertical slice
 
-Добавить минимальные read/status adapters и один утвержденный flow: например maintenance/recovery preparation либо безопасный test workflow. Точный сценарий из E00.
+Добавить first-class read/status adapters, UI routes and operation links:
+
+- Watcher: goals, strategies, audit templates, audits/continuous audits, action plans, actions, recommendations, telemetry freshness and automatic-apply risk markers;
+- Masakari: failover segments, segment hosts, notifications, recovery methods, monitor event timeline, hostmonitor Consul matrix coverage, conflicting Nova/Masakari state and approval gates;
+- один утвержденный safe flow: maintenance/recovery preparation, Watcher dry-run/precheck or another test workflow approved by owner.
+
+Точный сценарий из E00/E06 owner decision. Raw action plan execution, Nova evacuate/live migration, portal-side evacuation from Consul/Prometheus and automatic Watcher apply remain disabled unless represented by allowlisted workflow, capability, approval, audit, ADR and rollback/abort policy.
 
 ### E06.7. Frontend form/operation page
 
@@ -64,6 +70,10 @@ Same key/same body, same key/different body, worker crash before/after external 
 - Mistral external ID коррелируется;
 - worker restart безопасен;
 - UI показывает `unknown`/partial/cancel semantics;
+- Watcher/Masakari are visible as first-class modules, not only related links;
+- automatic Watcher apply is denied by default and tested;
+- Masakari recovery approval/conflict states and Consul hostmonitor matrix status are visible and tested;
+- processmonitor is shown as unsupported/diagnostic in Kolla/container context unless lab evidence enables it;
 - audit events redacted;
 - real test workflow проходит либо mock status явно помечен P0;
 - no production action.

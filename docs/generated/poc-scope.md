@@ -9,7 +9,7 @@
 |---|---|---|
 | P0 local functional PoC | Mock identity/OpenStack/SIEM, local DB/RabbitMQ, health, inventory, groups and mock workflow | Not DKB evidence |
 | P1 integrated read-only PoC | Test identity/federation or equivalent, HTTPS, server-side session, RBAC, read model against test OpenStack, portal audit | Evidence for portal-scoped P1 controls only |
-| P2 integrated mutating PoC | Allowlisted Mistral workflow in test project, idempotency, operation tracking, SIEM test delivery, redaction, negative authorization | Evidence for portal-scoped workflow/audit controls only |
+| P2 integrated mutating PoC | Allowlisted Mistral workflow in test project, first-class Mistral operation center, Watcher/Masakari read/status slices, idempotency, operation tracking, SIEM test delivery, redaction, negative authorization | Evidence for portal-scoped workflow/audit controls only |
 | P3 production pilot | Kolla deployment, PKI/SIEM/Vault(SecMan)/registry/network/HA/storage evidence, load/failover/rollback, approved gaps | Requires E08-E12 and human approval |
 
 ## P0 cutline
@@ -59,6 +59,9 @@ Excluded:
 Included:
 
 - one allowlisted Mistral workflow in isolated test scope;
+- first-class operation center for the approved workflow;
+- first-class Watcher read/status/recommendation projection with automatic apply denied by default;
+- first-class Masakari segment/host/notification/recovery timeline projection with monitor gaps explicit;
 - `Idempotency-Key`;
 - operation state machine and durable outbox;
 - target snapshot from explicit/group selection;
@@ -74,7 +77,7 @@ Proposed first workflow:
 - External effects: Mistral execution and portal operation/audit only unless a test owner approves a harmless OpenStack mutation.
 - Purpose: prove catalog/schema/auth/idempotency/status/audit before any risky operation.
 
-This workflow remains proposed until E00/E06 owners approve exact target and external effect. Current test cloud does not expose Mistral, Watcher or Masakari in the service catalog, so E06 real workflow integration is blocked unless Mistral is enabled or the PoC uses a strict P0 mock/test substitute.
+This workflow remains proposed until E00/E06 owners approve exact target and external effect. Current lab service catalog exposes Mistral, Watcher and Masakari after the 2026-06-19 Kolla update, so E06 discovery can use real service endpoints. Service-specific contract tests, least-privilege test credentials, Masakari monitor/HA-cluster scope and safe external effects remain blockers for any production or destructive claim.
 
 ## Three primary user scenarios
 

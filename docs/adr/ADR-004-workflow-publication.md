@@ -15,7 +15,7 @@ Prefer GitOps publication for production: reviewed workflow definition, reviewed
 ## Blockers
 
 - First P2 workflow not approved.
-- Mistral test endpoint is absent from the current service catalog on `192.168.10.250`.
+- Mistral test endpoint is present in the lab service catalog after the 2026-06-19 Kolla update, but least-privilege test credential, workflow contract and safe external effect are not approved.
 - Approval and rollback owner unknown.
 - Whether high-risk operations need four-eyes approval is unknown.
 

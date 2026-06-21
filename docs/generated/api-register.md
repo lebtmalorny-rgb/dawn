@@ -23,6 +23,14 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | `POST /instances/{...}/refresh` | targeted refresh | frontend | session+CSRF+capability | E04 | admin refresh | capability `instance.refresh` |
 | `GET /hypervisors` | paged hypervisor list | frontend | session+capability | E04 | aggregate inventory read policy | capability `hypervisor.read` |
 | `GET /hypervisors/{cloud_id}/{region_id}/{hypervisor_id}` | hypervisor detail | frontend | session+capability+scope | E04 | protected access policy | capability `hypervisor.read` |
+| `GET /compute-services` | paged Nova compute service health | frontend | session+capability | E04+ | aggregate health read policy | capability `service-health.read` |
+| `GET /network-agents` | paged Neutron agent health | frontend | session+capability | E04+ | aggregate health read policy | capability `service-health.read` |
+| `GET /volume-services` | paged Cinder service health | frontend | session+capability | E04+ | aggregate health read policy | capability `service-health.read` |
+| `GET /image-tasks` | paged Glance image task status | frontend | session+capability | E04+ | protected access policy | capability `image-task.read` |
+| `GET /topology` | bounded topology/dependency graph page | frontend | session+capability+scope | E04+/E10 | protected access policy | capability `topology.read` |
+| `GET /capacity/summary` | aggregated capacity dashboard data | frontend | session+capability+scope | E04+/E10 | aggregate read policy | capability `capacity.read` |
+| `GET /capacity/timeseries` | downsampled metric series | frontend | session+capability+scope | E10 | aggregate read policy | capability `capacity.read` |
+| `GET /search` | global capability-aware search | frontend | session+capability+scope | E04+/E10 | protected access policy | capability `search.read` |
 | `GET /resource-groups` | group list | frontend | session+capability | E05 | group read policy | capability `group.read` |
 | `POST /resource-groups` | create group | frontend | session+CSRF+capability | E05 | group create | capability `group.manage` |
 | `GET /resource-groups/{group_id}` | group detail | frontend | session+capability+scope | E05 | group read | capability `group.read` |
@@ -39,6 +47,20 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | `GET /operations/{operation_id}` | operation status | frontend | session+capability+scope | E06 | protected access policy | capability `operation.read` |
 | `POST /operations/{operation_id}/cancel` | cancel operation | frontend | session+CSRF+capability | E06 | cancel request | capability `operation.cancel` |
 | `POST /operations/{operation_id}/retry` | retry operation | frontend | session+CSRF+capability | E06 | retry request | capability `operation.retry` |
+| `GET /events/stream` | SSE live event stream | frontend | session+capability+scope | E06+/E10 | stream subscribe/denial | capability `realtime.stream.read` |
+| `GET /events` | polling fallback for live events | frontend | session+capability+scope | E06+/E10 | protected access policy | capability `realtime.stream.read` |
+| `GET /operations/{operation_id}/events` | operation timeline events | frontend | session+capability+scope | E06 | protected access policy | capability `operation.read` |
+| `GET /watcher/goals` | Watcher goals | frontend | session+capability | E06+ | protected access policy | capability `watcher.read` |
+| `GET /watcher/strategies` | Watcher strategies | frontend | session+capability | E06+ | protected access policy | capability `watcher.read` |
+| `GET /watcher/audit-templates` | Watcher audit templates | frontend | session+capability | E06+ | protected access policy | capability `watcher.read` |
+| `GET /watcher/audits` | Watcher audits and continuous audits | frontend | session+capability+scope | E06+ | protected access policy | capability `watcher.read` |
+| `GET /watcher/action-plans` | Watcher action plans | frontend | session+capability+scope | E06+ | protected access policy | capability `watcher.read` |
+| `GET /watcher/actions` | Watcher actions | frontend | session+capability+scope | E06+ | protected access policy | capability `watcher.read` |
+| `GET /watcher/recommendations` | Watcher recommendations with risk/conflict markers | frontend | session+capability+scope | E06+ | protected access policy | capability `watcher.read` |
+| `GET /masakari/segments` | Masakari failover segments | frontend | session+capability+scope | E06+ | protected access policy | capability `masakari.read` |
+| `GET /masakari/segments/{segment_id}/hosts` | Masakari segment hosts | frontend | session+capability+scope | E06+ | protected access policy | capability `masakari.read` |
+| `GET /masakari/notifications` | Masakari notifications | frontend | session+capability+scope | E06+ | protected access policy | capability `masakari.read` |
+| `GET /masakari/recovery-timeline` | HA recovery timeline | frontend | session+capability+scope | E06+ | protected access policy | capability `masakari.read` |
 | `GET /audit/events` | audit search | frontend | session+capability+scope | E07 | audit access audited | capability `audit.read` |
 | `GET /audit/events/{event_id}` | audit event detail | frontend | session+capability+scope | E07 | audit access audited | capability `audit.read` |
 
@@ -50,8 +72,9 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | Nova API | instances, hypervisors, services, aggregates | microversion pending | E03/E04 | reachable via HTTPS service catalog | microversion smoke, contract fixtures |
 | Placement API | resource provider capacity | microversion pending | E03/E04 | reachable via HTTPS service catalog | contract fixtures |
 | Mistral API v2 | workflow execution | endpoint `/v2` | E06 | enabled; internal/public endpoint `https://192.168.10.250:8989/v2` | idempotency/lost response tests |
-| Watcher API v1 | audit templates/audits/results | endpoint observed | E06+ | enabled; internal/public endpoint `https://192.168.10.250:9322` | contract fixtures |
-| Masakari API | segments/hosts/notifications | endpoint observed | E06+ | enabled; internal/public endpoint `https://192.168.10.250:15868` | contract fixtures; monitor/HA-cluster scope decision |
+| Watcher API v1 | goals/strategies/audit templates/audits/continuous audits/action plans/actions/recommendations | endpoint observed | E06+ | enabled; internal/public endpoint `https://192.168.10.250:9322` | contract fixtures; telemetry datasource freshness tests |
+| Masakari API | segments/hosts/notifications/recovery state | endpoint observed | E06+ | enabled; internal/public endpoint `https://192.168.10.250:15868`; Consul-backed hostmonitor path selected but not deployed on current test node | contract fixtures; hostmonitor Consul matrix fixtures; Nova conflict tests |
+| Telemetry datasource APIs | metrics for capacity, health, Watcher recommendations and Masakari corroboration | Prometheus exporter-backed path first; Ceilometer/Gnocchi/Aetos pending | E10/P3 | Prometheus endpoints/coverage pending; selected exporters are `openstack-exporter` and `node_exporter` | adapter contracts, freshness/coverage/cardinality tests |
 | Heat API | optional stack operations | endpoint observed | optional | reachable via HTTPS service catalog | ADR if included before pilot |
 | SIEM API/syslog | audit delivery | ADR-008 | E07 | pending | delivery/heartbeat/failure tests |
 | Vault API (SecMan) | secret lifecycle | ADR-009 | E08 | product identified; endpoint/auth/path policy pending | contract, rotation runbook |
@@ -59,6 +82,8 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 ## DKB-77 position
 
 This file is only documentation evidence. ДКБ-77 also requires technical blocking: Kolla service enablement, firewall/ACL, HAProxy routing, OpenStack policy deny and disabled unused endpoints. Those controls are E08/E09/E12 evidence.
+
+Inventory API source of truth is the portal read model populated from OpenStack APIs and reconciliation. Telemetry APIs are enrichment sources and must not be used as inventory authority.
 
 ## Current endpoint observations
 

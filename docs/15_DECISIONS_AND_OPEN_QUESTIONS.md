@@ -2,6 +2,8 @@
 
 Этот файл — исходный backlog решений. E00 должен преобразовать принятые решения в ADR и заменить допущения фактами. Codex не должен придумывать ответы для внешних систем.
 
+Актуальный рабочий реестр рисков ведется в `docs/generated/risk-register.md`. Этот файл остается backlog решений и вопросов; риск считается сниженным только после evidence в соответствующем ExecPlan.
+
 ## Зафиксированные решения
 
 | ID | Решение |
@@ -18,6 +20,17 @@
 | D-010 | Workflow только allowlisted и versioned. |
 | D-011 | Production audit authoritative в SIEM; портал хранит operational projection. |
 | D-012 | P0/P1/P2/P3 имеют разные security gates; P0 не считается соответствием ДКБ. |
+| D-013 | Первый telemetry datasource path — Prometheus exporter stack: `openstack-exporter` для OpenStack API metrics и `node_exporter` для host metrics. Ceilometer/Gnocchi/Aetos остаются pluggable integrations. |
+| D-014 | Consul используется через штатный Masakari hostmonitor `monitoring_driver=consul` and `matrix.yaml`; портал не принимает самостоятельное решение об эвакуации по Consul Events. |
+| D-015 | `processmonitor` для Kolla/container deployment остается R&D/diagnostic до lab proof; first recovery slice должен опираться на hostmonitor/Consul и Masakari notification state. |
+
+## Research evidence 2026-06-21
+
+- Masakari hostmonitor supports Consul driver and matrix-based `recovery` action: <https://docs.openstack.org/masakari-monitors/latest/hostmonitor.html>
+- Masakari recovery is processed through Masakari API/engine and Nova correlation: <https://docs.openstack.org/masakari/latest/user/architecture.html>
+- Masakari processmonitor warns about container/pod deployments: <https://docs.openstack.org/masakari-monitors/latest/processmonitor.html>
+- Consul Events API is gossip-based and not a durable ordered recovery transport: <https://developer.hashicorp.com/consul/api-docs/event>
+- Prometheus exporters selected for first path: <https://github.com/openstack-exporter/openstack-exporter> and <https://github.com/prometheus/node_exporter>
 
 ## Решения E00, которые обязательны до кода интеграции
 
@@ -65,7 +78,12 @@ Allowlisted fields/operators, versioning, complexity limit, explain and security
 
 - Какие функции Horizon должны остаться доступными как fallback?
 - Какие действия требуются в первом mutating workflow?
+- Какие Watcher goals/strategies/templates должны быть first-class в первом P2 slice?
+- Разрешается ли automatic Watcher apply вообще, и если да, какие approval gates, max scope and rollback/abort policy обязательны?
+- Какие Masakari recovery workflows доступны оператору: только read/approval или также controlled evacuate/live migration через approved workflow?
+- Какой уровень детализации нужен для HA timeline: host, process, instance, Nova task, operator approval and external alert?
 - Нужен ли Heat в P2 или после pilot?
+- Какие модули из load balancers, DNS, secrets metadata and bare metal должны войти в первый real-time UX scope?
 - Требуются ли cross-project/system-scope views?
 - Кто может создавать dynamic groups?
 - Нужны ли shared groups между подразделениями?
@@ -85,6 +103,9 @@ Allowlisted fields/operators, versioning, complexity limit, explain and security
 - RPO/RTO.
 - Network latency к OpenStack endpoints.
 - Rate limits и DB connection limits.
+- Live event subscriber count and burst rate.
+- Topology graph node/edge limits and layout latency budget.
+- Telemetry metric cardinality, retention and downsampling policy.
 
 ## Открытые вопросы инфраструктуры
 
@@ -94,6 +115,10 @@ Allowlisted fields/operators, versioning, complexity limit, explain and security
 - Existing HAProxy/TLS topology.
 - Internal TLS status.
 - RabbitMQ notification transport.
+- SSE support through target HAProxy/proxy chain and need for WebSocket ADR.
+- Prometheus datasource endpoint, retention/downsampling, label cardinality and tenant/scope filtering; Ceilometer/Gnocchi/Aetos ownership remains later decision.
+- Masakari hostmonitor Consul deployment outside all-in-one: Kolla config override path, Consul ACL/TLS/token ownership, `matrix.yaml` owner, and lab evidence.
+- Whether `processmonitor` is excluded from production, kept diagnostic-only, or accepted after Kolla/container lab proof.
 - MariaDB backup/failover.
 - Corporate CA/SCEP/NDES flow.
 - SIEM/Vault endpoints.

@@ -10,7 +10,7 @@
 | User/external | browser access to portal VIP | observed `192.168.10.250` over HTTPS with Kolla CA in lab |
 | Management/API | HAProxy, frontend, backend API | observed on all-in-one host/VIP; detailed ACL unknown |
 | DB/messaging backend | MariaDB and RabbitMQ | unknown |
-| OpenStack internal API | Keystone/Nova/Placement/Mistral/Watcher/Masakari/etc | unknown |
+| OpenStack internal API | Keystone/Nova/Placement/Mistral/Watcher/Masakari/telemetry/etc | unknown |
 | Audit/security | SIEM, Vault (SecMan), PKI | Vault product identified; endpoint/auth/path policy unknown |
 | Registry/supply chain | image registry/scanner/signing | unknown |
 | Storage/backup | storage and backup control plane | unknown |
@@ -30,6 +30,9 @@
 | Worker | Mistral | HTTPS | workflow execution | E06 | allowlist, external correlation, no blind retry | pending |
 | Worker/API | Watcher | HTTPS | audit/action status | E06+ | role/capability, contract tests | pending |
 | Worker/API | Masakari | HTTPS | segments/notifications | E06+ | role/capability, contract tests | pending |
+| Masakari hostmonitor | Consul | HTTPS/TCP by Consul deployment | network health checks for recovery matrix | E10/P3 | Consul ACL/TLS, monitor coverage, matrix review | pending; Consul not on current test node |
+| Worker/API | Prometheus datasource | HTTPS | metrics for capacity/health/Watcher datasource/Masakari corroboration | E10/P3 | role/capability, contract tests, freshness and rate limits | pending |
+| Prometheus | `openstack-exporter`/`node_exporter` | HTTP/HTTPS by deployment | scrape OpenStack and host metrics | E10/P3 | exporter auth/TLS/network ACL, scrape interval, cardinality limits | pending |
 | Audit worker | SIEM/test sink | TLS/mTLS by matrix | audit delivery | E07/E08 | delivery ack, heartbeat, retry/DLQ | pending |
 | API/deploy | Vault (SecMan) | TLS/mTLS by matrix | secret retrieval/lifecycle | E08 | no secrets in Git/image/log, rotation runbook | pending |
 | Deploy | Registry | TLS/mTLS by policy | image push/pull | E08/E09 | digest, SBOM, scan, signature | pending |
@@ -43,6 +46,7 @@
 - Portal consumers -> OpenStack RabbitMQ RPC exchanges as wildcard consumer.
 - Frontend image/assets -> production endpoints or credentials.
 - API -> user-supplied external URL without allowlist and SSRF controls.
+- Portal -> Consul Events or Prometheus alerts as direct evacuation authority.
 
 ## Current observations
 

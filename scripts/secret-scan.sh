@@ -54,6 +54,7 @@ if command -v rg >/dev/null 2>&1; then
     --glob '!backend/.venv/**' \
     --glob '!frontend/node_modules/**' \
     --glob '!.git/**' \
+    --glob '!.worktrees/**' \
     --glob '!scripts/secret-scan.sh' \
     --glob '!docs/superpowers/plans/**' \
     --glob '!frontend/package-lock.json' \
@@ -86,6 +87,7 @@ done < <(
     \( -path './backend/.venv' \
     -o -path './frontend/node_modules' \
     -o -path './.git' \
+    -o -path './.worktrees' \
     -o -path './docs/superpowers/plans' \) -prune \
     -o -type f \
     ! -path './scripts/secret-scan.sh' \

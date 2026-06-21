@@ -80,20 +80,44 @@ Operation хранит snapshot идентификаторов и критиче
 
 UI показывает partial failures, а не только общий красный статус.
 
+## Mistral operation center
+
+Раздел операций показывает Mistral как first-class runtime:
+
+- опубликованные workflow definitions and versions;
+- текущие executions, task states, progress, correlation ID and external IDs;
+- operation history, attempts, child executions and safe retry lookup;
+- cancel/abort semantics from the definition and current Mistral state;
+- health of Mistral API/engine/executor/event-engine as dependency status.
+
+Browser still cannot submit arbitrary Mistral names, YAML, task graph, Python/Jinja or shell input. Every execution starts from a portal workflow definition.
+
 ## Watcher
 
-Примеры allowlisted функций:
+Watcher workflows are first-class optimization/recommendation flows. Examples:
 
 - создать audit по утвержденному template;
+- создать или обновить continuous audit по утвержденному template and scope;
 - запустить action plan;
 - получить actions/results;
 - связать action plan с operation.
 
 Не предоставлять raw strategy parameters без schema и role review.
 
+Перед запуском Watcher action plan backend checks:
+
+- strategy, goal and template are allowlisted and match the portal definition checksum;
+- telemetry datasource coverage/freshness is acceptable for the requested scope;
+- affected resources are visible and authorized for the actor;
+- recommendation confidence/impact/risk are shown in preview;
+- conflicting recommendations or stale read model are resolved or explicitly acknowledged;
+- automatic apply is disabled unless a production-only policy enables it with approval, max scope, rollback/abort and SIEM evidence.
+
+Rollback/abort is allowed only when the Watcher action and wrapped workflow define it. If rollback is not available, UI must label the operation irreversible or best-effort before confirmation.
+
 ## Masakari
 
-Примеры:
+Masakari workflows are first-class HA/recovery flows. Examples:
 
 - перевести host в maintenance через утвержденный flow;
 - создать/подтвердить notification;
@@ -101,6 +125,20 @@ UI показывает partial failures, а не только общий кра
 - связать segment/host/notification с hypervisor.
 
 Опасные действия требуют elevated capability и полного аудита.
+Network-health-driven evacuation is modeled through Masakari hostmonitor Consul driver and `matrix.yaml` producing Masakari notification/recovery state. Portal does not start recovery directly from Consul Events or Prometheus metrics.
+
+Preconditions include:
+
+- failover segment and segment host exist and are visible to the actor;
+- recovery method is known and supported in the current cloud;
+- hostmonitor source is trusted or clearly marked as partial; Consul matrix policy and monitor coverage are visible when `monitoring_driver=consul` is enabled;
+- processmonitor is disabled, diagnostic-only or explicitly proven in a Kolla/container lab before it can participate in recovery approval;
+- instancemonitor source is trusted or marked partial;
+- Nova compute service, hypervisor, instance task state and migration/evacuation state do not conflict;
+- operator approval gate is satisfied for recovery workflows that can evacuate, stop, restart or migrate instances;
+- duplicate/stale notifications are detected and reconciled before action.
+
+Связь с Nova evacuate/live migration фиксируется в operation timeline. Masakari recommendation or notification never bypasses Nova policy; a Nova 403/409 becomes a safe failed or blocked child status with audit.
 
 ## Heat
 
@@ -147,6 +185,7 @@ Heat stack operation использует тот же каталог и operatio
 - preview: targets, preconditions, estimated impact, required role;
 - explicit confirmation для risk level high;
 - operation link появляется сразу;
-- live update через polling; SSE добавляется после доказанной необходимости;
+- live update через SSE when available, with polling fallback and adaptive backoff;
+- operation timeline shows task correlation, event source, partial result, stale/unknown state and operator approval gates;
 - correlation ID виден оператору;
 - error message безопасен, подробности доступны в защищенных logs/SIEM.

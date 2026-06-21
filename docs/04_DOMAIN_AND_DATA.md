@@ -48,6 +48,57 @@
 - maintenance/disabled reason;
 - `observed_at`, `sync_status`, `deleted_at`.
 
+### Service health projections
+
+Для real-time health и неполных прав нужны отдельные проекции статуса сервисов:
+
+- `compute_services`: Nova compute/scheduler/conductor service state, status, disabled reason, host/AZ;
+- `network_agents`: Neutron agent type, host, alive/admin state, configurations summary;
+- `volume_services`: Cinder service state, cluster/host, replication/availability status where exposed;
+- `image_tasks`: Glance task/image operation status and safe error summary;
+- `orchestration_stacks`: Heat stack status, resource count and operation correlation if module enabled;
+- `load_balancers`, `dns_zones`, `secret_metadata`, `baremetal_nodes`: module-specific projections only when Octavia/Designate/Barbican/Ironic are enabled and authorized.
+
+Каждая projection имеет `observed_at`, `source_updated_at`, `sync_status`, `source` and `visibility_scope`. Protected names/counts can be redacted while preserving aggregate partial-state semantics.
+
+### Watcher projection
+
+Watcher хранится как projection, не как источник истины:
+
+- goals and strategies with supported parameters, datasource requirements and enabled status;
+- audit templates with JSON Schema-like parameter contract, risk level and required capability;
+- audits, including one-shot and continuous audits, status, trigger, target scope, telemetry freshness and history;
+- action plans, actions and recommendations with impact, confidence, affected resources, dependency links and conflict markers;
+- execution correlation: portal `operation_id`, Mistral `execution_id` if used, Watcher audit/action IDs, rollback/abort availability and final verification state;
+- risk metadata for automatic apply: disabled by default, approval mode, maximum scope, canary/dry-run requirement and audit mapping.
+
+Telemetry datasource references are explicit: Ceilometer, Gnocchi, Prometheus and Aetos are separate integration records with coverage/freshness/gap status.
+Prometheus exporter path starts with `openstack-exporter` and `node_exporter`; these metrics are telemetry/corroboration signals, not direct Watcher/Masakari automation authority.
+
+### Masakari projection
+
+Masakari projection covers:
+
+- failover segments, recovery method, segment hosts and monitor coverage/config status;
+- host/instance/process notifications, source monitor, generated time, status, duplicate marker and recovery state;
+- hostmonitor events normalized into a recovery timeline, including Consul-driven network health matrix signals when Masakari hostmonitor uses `monitoring_driver=consul`;
+- processmonitor and instancemonitor events with explicit coverage state; `processmonitor` remains R&D/diagnostic for Kolla/container deployments until tested in a representative lab;
+- relation to hypervisor, Nova compute service, instance state, migration/evacuation task and availability zone;
+- operator approval gates and pending/approved/rejected state for portal-driven recovery workflows;
+- conflicting states: maintenance, disabled service, already migrating, stale monitor, partial monitor coverage, repeated notification or Nova policy denial.
+
+Nova evacuate/live migration remains an OpenStack operation with Nova policy enforcement. Masakari UI shows correlation and preconditions; it does not bypass Nova.
+Consul Events, Prometheus alerts and exporter metrics can enrich confidence and diagnostics, but the authoritative recovery state is Masakari/Nova state plus reconciliation.
+
+### Topology and dependency graph projection
+
+Topology queries use graph-shaped projections built from read model tables, not live fan-out:
+
+- nodes: VM, port, network, subnet, router, floating IP, security group, volume, image, hypervisor, aggregate, availability zone, resource group and enabled service module entities;
+- edges: attachment, boot source, placement, route, membership, dependency, operation impact and HA/recovery relation;
+- every node/edge has `visibility_scope`, `freshness`, `partial` and optional redaction reason;
+- graph layout stores only UI preferences/cache, not source-of-truth relationships.
+
 ### Resource group
 
 - `group_id`;
@@ -87,6 +138,11 @@ Permission names версионируются как `resource.action`, напр
     hypervisor.read
     group.manage
     workflow.execute.maintenance-host
+    watcher.read
+    watcher.recommendation.apply
+    masakari.read
+    masakari.recovery.approve
+    realtime.stream.read
     audit.read
     role.manage
 
@@ -138,6 +194,8 @@ Browser получает только opaque cookie. Idle timeout проверя
 
 Append-only timeline: accepted, queued, dispatched, started, progress, completed, failed, cancel requested, cancelled. Payload versioned и sanitized.
 
+Operation events are also the canonical input for live task/progress UI. The browser receives filtered projections through SSE or polling fallback, never raw worker or OpenStack messages. WebSocket is only allowed after ADR and load/backpressure evidence.
+
 ### Audit event
 
 Портал хранит прикладной оперативный индекс и delivery state. Долговременный authoritative audit находится во внешней системе.
@@ -152,6 +210,10 @@ Append-only timeline: accepted, queued, dispatched, started, progress, completed
 
 `outbox_events` создаются в той же транзакции, что и операция/изменение. Worker публикует событие и помечает delivery. Повторная публикация безопасна.
 
+### Event stream cursor
+
+`event_stream_offsets` или эквивалентная таблица хранит resume cursor per subject/session/channel when required. Cursor подписывается backend, scopes events by actor/capability and can be invalidated on policy revision. It is not an audit store and can be rebuilt from operation/audit/read-model projections.
+
 ## Индексы
 
 Минимальные индексы для instance list:
@@ -164,6 +226,8 @@ Append-only timeline: accepted, queued, dispatched, started, progress, completed
 - normalized tag/member lookup.
 
 Фактические composite indexes определяются query telemetry и `EXPLAIN`, а не предположением.
+
+Watcher/Masakari/topology indexes are introduced with the modules that query them. Required query cases include audit/action plan by status, recommendation by affected resource, segment host by host, notification by recovery status and graph edge lookup by node.
 
 ## Пагинация
 

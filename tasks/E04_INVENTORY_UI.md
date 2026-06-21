@@ -53,6 +53,8 @@ Worker выполняет chunked full sync с generation, cursor, retry и tomb
 - loading/empty/error/partial/stale states;
 - linked navigation;
 - no full inventory client load;
+- table virtualization only for visible page/window, not as replacement for server pagination;
+- saved-view-ready state model for filters/sort/columns/density;
 - accessibility;
 - capability-aware columns/actions.
 
@@ -64,16 +66,23 @@ Worker выполняет chunked full sync с generation, cursor, retry и tomb
 
 При доступности test cloud выполнить reconciliation и сравнить выборочно read model с Nova. Не использовать production.
 
+### E04.8. Service health and visualization extension points
+
+Описать и протестировать contract placeholders for compute services, Neutron agents, Cinder services, image tasks, topology graph and capacity summary without enabling modules that lack adapters. Disabled modules must appear as explicit capability/feature flags, not broken links.
+
 ## Acceptance
 
 - таблица 10 000 synthetic instances работает через server pagination;
 - page size ограничен;
 - cursor tampering rejected;
 - фильтры/sort дают стабильный результат;
+- large-table UX does not fetch full inventory into browser;
+- saved view state can round-trip through URL/local user preference model without storing result rows;
 - full sync можно повторить;
 - пропущенное событие исправляется reconciliation;
 - stale/partial visible;
 - list request не делает fan-out по всем resources;
+- service health/topology placeholders are feature-flagged and capability-aware;
 - p95 соответствует provisional budget либо есть finding;
 - audit фиксирует protected refresh/admin actions;
 - DKB/API docs обновлены.

@@ -27,11 +27,11 @@
 
 ### E10.2. Read workload
 
-Instances/hypervisors/group/audit list under concurrency, reconciliation in background, filter/sort/page correctness, p95/p99, DB plans.
+Instances/hypervisors/service-health/group/audit list under concurrency, reconciliation in background, filter/sort/page correctness, p95/p99, DB plans. Include large-table UX model, saved views, global search and bounded topology/dependency graph expansion.
 
 ### E10.3. Mutating workload
 
-Operation submit/idempotent retry/status polling/partial results без destructive production effects.
+Operation submit/idempotent retry/status polling/SSE progress/polling fallback/partial results без destructive production effects. Include Watcher dry-run/recommendation projection and Masakari recovery timeline projection where enabled. For HA research include Consul-backed Masakari hostmonitor matrix fixtures; do not create a portal-side evacuation controller from Consul Events or Prometheus alerts.
 
 ### E10.4. Process failover
 
@@ -39,11 +39,15 @@ Kill/restart API, worker, events и entire node. Проверить session cont
 
 ### E10.5. Dependency failures
 
-RabbitMQ outage/recovery, MariaDB failover, Nova/Placement/Mistral timeout, SIEM outage, expired token.
+RabbitMQ outage/recovery, MariaDB failover, Nova/Placement/Mistral/Watcher/Masakari/Prometheus timeout, Consul unavailable for Masakari hostmonitor lab, SIEM outage, expired token.
 
 ### E10.6. Event consistency
 
 Drop, duplicate, reorder events; reconciliation restores correct projection. Measure stale age.
+
+### E10.6a. Real-time backpressure
+
+SSE disconnect/reconnect, slow consumer, event burst aggregation, polling fallback, adaptive polling and circuit breaker behavior. Verify no uncontrolled OpenStack API amplification.
 
 ### E10.7. Rolling upgrade
 
@@ -61,6 +65,8 @@ Compatible frontend/backend versions, expand migration, rollback, queued/running
 - one node failure tolerated;
 - worker crash does not duplicate Mistral execution;
 - event loss corrected;
+- SSE/polling fallback preserves user-visible progress without raw notification leakage;
+- adaptive polling/backpressure/circuit breakers prevent OpenStack API overload;
 - SIEM outage does not silently drop;
 - DB/RabbitMQ recovery observed;
 - rolling update/rollback works;

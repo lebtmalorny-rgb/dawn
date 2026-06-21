@@ -110,6 +110,9 @@ Mock, комментарий или скрытая UI-кнопка не явля
 | Secret leakage | redaction, no debug, canary tests, Vault references |
 | Audit tampering/loss | outbox, protected external sink, heartbeat, FIM |
 | Event poisoning | dedicated credentials/queues, schema validation, idempotency |
+| Real-time stream data leakage | server-side session auth, scope/capability filtering, field redaction, resumable cursors tied to policy revision |
+| Unsafe automatic optimization/recovery | automatic Watcher apply disabled by default, Masakari recovery via authoritative notification/workflow path, approval gates, risk level, bounded target scope, rollback/abort policy, full audit |
+| HA recovery conflicts | Masakari/Nova state reconciliation, operator approval for evacuation/recovery, conflict markers, no bypass of Nova policy |
 | SQL injection | ORM/bound parameters, filter allowlist |
 | Supply-chain compromise | lockfiles, SBOM, scan, registry/signing |
 | Container breakout | non-root, drop caps, SELinux, read-only FS, no socket |

@@ -41,6 +41,9 @@
 - group create/update/delete/member change;
 - workflow definition publication/enable/disable;
 - operation accepted/dispatched/completed/failed/cancelled;
+- Watcher audit/template/action-plan/recommendation view and approved execution/abort/rollback request;
+- Masakari segment/host/notification view, recovery approval decision and evacuation/recovery workflow request;
+- real-time stream subscription, denied channel and forced disconnect when protected/audit channels are accessed;
 - access to audit search/export;
 - configuration change;
 - secret integration failure без secret value;
@@ -91,6 +94,7 @@ Redaction выполняется до сериализации события. �
 - Keystone notifications;
 - Nova/Neutron/Glance/Cinder notifications;
 - Mistral/Watcher/Masakari события;
+- telemetry datasource events and freshness gaps from Ceilometer/Gnocchi/Prometheus/Aetos where enabled;
 - HAProxy/API access logs;
 - Kolla/container runtime events;
 - systemd, sudo, PAM и auditd;

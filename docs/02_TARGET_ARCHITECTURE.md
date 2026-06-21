@@ -13,15 +13,23 @@ flowchart LR
     API --> DB[(MariaDB cloud_ui)]
     API --> MQ[(RabbitMQ /cloud-ui)]
     API --> OSAPI[OpenStack service APIs]
+    API --> WATCHER[Watcher]
+    API --> MASAKARI[Masakari]
+    API --> TELEMETRY[Telemetry: Ceilometer/Gnocchi/Prometheus/Aetos]
     API --> SIEM[SIEM adapter]
     API --> VAULT[Vault (SecMan) adapter]
+    CONSUL[Consul health checks] --> MASAKARI_MON[Masakari hostmonitor]
+    MASAKARI_MON --> MASAKARI
 
     WORKER[Background worker replicas] --> DB
     WORKER --> MQ
     WORKER --> OSAPI
     WORKER --> MISTRAL[Mistral]
-    MISTRAL --> WATCHER[Watcher]
-    MISTRAL --> MASAKARI[Masakari]
+    WORKER --> WATCHER
+    WORKER --> MASAKARI
+    WORKER --> TELEMETRY
+    MISTRAL --> WATCHER
+    MISTRAL --> MASAKARI
     MISTRAL --> HEAT[Heat, опционально]
 
     EVENTS[Event consumer replicas] --> MQ
@@ -43,6 +51,10 @@ Backend является BFF: он объединяет неоднородные
 3. событиями OpenStack, если они доступны и надежно изолированы;
 4. точечным refresh после пользовательской операции.
 
+Mistral, Watcher и Masakari являются first-class product modules. Mistral остается источником истины длительного execution, но Watcher и Masakari имеют собственные read/status adapters, read model projections, capability checks, audit mappings and UI routes. Workflow через Mistral используется для утвержденных действий, а не как замена доменной модели Watcher/Masakari.
+
+Для network-health-driven evacuation целевой путь — штатный Masakari hostmonitor с Consul driver and `matrix.yaml`. Портал не строит собственный recovery controller поверх Consul Events или Prometheus metrics: он отображает Masakari notification/recovery workflow, correlates Nova/telemetry state and records audit.
+
 ## Runtime-компоненты
 
 ### Frontend
@@ -60,6 +72,12 @@ Backend является BFF: он объединяет неоднородные
 ### Event consumer
 
 Получает только специально опубликованные notifications или сообщения собственного exchange. Нормализует события, выполняет idempotent upsert read model и сохраняет cursor/offset.
+
+### Real-time gateway
+
+Browser получает события только от backend API/BFF. Базовый транспорт для server-to-browser updates — SSE endpoint с authenticated session, scope/capability filtering, heartbeat and resume cursor. WebSocket допускается только после ADR, если появится bidirectional UX, который нельзя безопасно и проще реализовать через SSE + HTTP commands. Для клиентов или proxy без stream support используется polling fallback.
+
+Real-time gateway не читает raw OpenStack RPC queues и не раздает raw notifications. Он публикует агрегированные portal events из read model, operation timeline, health projections and audit tail with field-level restrictions.
 
 ### Migration job
 
@@ -88,6 +106,7 @@ Backend является BFF: он объединяет неоднородные
     backend/src/cloud_ui/integrations/mistral/
     backend/src/cloud_ui/integrations/watcher/
     backend/src/cloud_ui/integrations/masakari/
+    backend/src/cloud_ui/integrations/telemetry/
     backend/src/cloud_ui/integrations/heat/
     backend/src/cloud_ui/integrations/siem/
     backend/src/cloud_ui/integrations/vault/
@@ -143,6 +162,9 @@ sequenceDiagram
 - Источник истины ресурсов — OpenStack.
 - Источник истины прикладных групп, ролей и каталога workflow — MariaDB портала.
 - Источник истины выполнения длительной операции — Mistral; портал хранит проекцию и correlation.
+- Источник истины Watcher entities — Watcher API; портал хранит projection goals/strategies/audits/action plans/actions/recommendations and execution correlations.
+- Источник истины Masakari entities — Masakari API, Masakari notifications/recovery workflow and Nova state; Consul health checks and matrix policy are handled by Masakari hostmonitor, not by a portal-side recovery controller.
+- Источник истины telemetry metrics — утвержденный datasource per metric family; first Prometheus path is exporter-backed telemetry, and портал хранит агрегированные series/cache only with freshness metadata.
 - Источник истины долговременного централизованного аудита — SIEM.
 - Read model допускает eventual consistency, но всегда показывает freshness.
 - Изменение группы и создание операции используют транзакцию.
@@ -154,8 +176,10 @@ sequenceDiagram
 - Повторная обработка сообщения безопасна.
 - Недоступность OpenStack API не блокирует чтение последней read model, но возвращает warning о stale data.
 - Недоступность Mistral не создает дублирующий execution при retry.
+- Недоступность Watcher/Masakari/telemetry не блокирует базовый inventory, но соответствующие modules показывают dependency warning and partial freshness.
 - Недоступность SIEM не приводит к silent loss: событие остается в outbox/dead-letter и формируется alert.
 - Reconciliation обнаруживает расхождения между OpenStack и read model.
+- Real-time stream degradation switches clients to adaptive polling without increasing OpenStack API pressure.
 
 ## Что запрещено
 
@@ -165,6 +189,9 @@ sequenceDiagram
 - хранение токена в frontend;
 - выполнение произвольного workflow по строковому имени от клиента;
 - использование RabbitMQ RPC queues OpenStack;
+- прямая browser-подписка на OpenStack notifications или telemetry endpoints;
+- автоматическое применение Watcher recommendations без отдельного утвержденного workflow, capability, audit and rollback/abort policy;
+- самостоятельная эвакуация из портала по Consul Events, Prometheus alerts or exporter metrics without Masakari workflow/notification, ADR and failover evidence;
 - хранение бизнес-состояния в etcd;
 - локальная очередь в памяти API;
 - автоматическая миграция при старте каждой API-реплики.

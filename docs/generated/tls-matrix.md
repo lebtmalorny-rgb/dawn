@@ -15,6 +15,9 @@
 | API/worker -> Mistral | TLS 1.2 | decision pending | OpenStack/internal CA | endpoint hostname | E06/E08 | contract smoke and TLS scan |
 | API/worker -> Watcher | TLS 1.2 | decision pending | OpenStack/internal CA | endpoint hostname | E06/E08 | contract smoke and TLS scan |
 | API/worker -> Masakari | TLS 1.2 | decision pending | OpenStack/internal CA | endpoint hostname | E06/E08 | contract smoke and TLS scan |
+| Masakari hostmonitor -> Consul | TLS 1.2 if Consul TLS enabled | decision pending | corporate/internal CA | Consul server identity | E10/P3/E08 | Consul ACL/TLS smoke and matrix recovery test |
+| API/worker -> Prometheus datasource | TLS 1.2 | decision pending | OpenStack/internal or corporate CA | endpoint hostname | E10/P3/E08 | contract smoke, freshness test and TLS scan |
+| Prometheus -> `openstack-exporter`/`node_exporter` | deployment decision | decision pending | internal or corporate CA | exporter endpoint identity | E10/P3/E08 | scrape auth/TLS smoke and cardinality review |
 | Portal -> MariaDB | TLS if supported by Kolla baseline | optional/client cert decision pending | internal CA | DB endpoint | E09 | DB TLS config and negative test if mTLS |
 | Portal -> RabbitMQ | TLS in production | optional/client cert decision pending | internal CA | broker endpoint | E09 | broker TLS config and negative test if mTLS |
 | Audit worker -> SIEM | TLS 1.2 | likely yes, pending SIEM contract | corporate PKI | SIEM endpoint + client identity | E07/E08 | delivery test and cert rejection |

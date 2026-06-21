@@ -12,8 +12,9 @@
 | Nova | instances, hypervisors, services, aggregates | worker/API -> Nova | E03/E04 | reachable via HTTPS service catalog | OpenStack owner |
 | Placement | resource provider inventory/usage | worker/API -> Placement | E03/E04 | reachable via HTTPS service catalog | OpenStack owner |
 | Mistral | long-running workflow execution | worker -> Mistral | E06 | enabled; endpoint `https://192.168.10.250:8989/v2` | Workflow/platform owner |
-| Watcher | optimization audit/action state | worker/API -> Watcher or via Mistral | E06+ | enabled; endpoint `https://192.168.10.250:9322` | OpenStack owner |
-| Masakari | segments, hosts, notifications | worker/API -> Masakari or via Mistral | E06+ | API/engine enabled; endpoint `https://192.168.10.250:15868`; monitors disabled for AIO lab | OpenStack owner |
+| Watcher | goals, strategies, audits, continuous audits, action plans, actions, recommendations and optimization risk state | worker/API -> Watcher; operations may execute via Mistral | E06+ | enabled; endpoint `https://192.168.10.250:9322`; Prometheus exporter datasource selected first, contract pending | OpenStack owner |
+| Masakari | failover segments, segment hosts, notifications, monitor events and recovery timeline | worker/API -> Masakari; recovery actions may execute via Mistral/Nova workflow; Masakari hostmonitor -> Consul for network health where enabled | E06+ | API/engine enabled; endpoint `https://192.168.10.250:15868`; monitors disabled for AIO lab; Consul not on current test node | OpenStack owner |
+| Telemetry datasource | capacity/health metrics, Watcher datasource freshness and Masakari incident corroboration | worker/API -> Prometheus query API first; exporters `openstack-exporter` and `node_exporter`; Ceilometer/Gnocchi/Aetos later | E10/P3 | Prometheus exporter path selected; endpoints, retention and coverage pending | Monitoring owner |
 | Heat | optional stacks/workflow module | worker/API -> Heat or via Mistral | after decision | reachable via HTTPS service catalog | Product owner |
 | RabbitMQ `/cloud-ui` | jobs, outbox, events | API/worker/events -> RabbitMQ | E01+ | planned | Messaging owner |
 | OpenStack notifications | read model acceleration | notification transport -> event consumer | E04/E07 | unknown | Messaging/OpenStack owner |

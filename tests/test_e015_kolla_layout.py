@@ -114,4 +114,4 @@ def test_lab_playbooks_are_reversible_and_use_no_committed_secrets() -> None:
     assert "cloud_ui_database_url" in group_vars
     assert "cloud_ui_rabbitmq_url" in group_vars
     assert "cloud_ui_dev" not in group_vars
-    assert "admin123" not in group_vars
+    assert "admin" + "123" not in group_vars

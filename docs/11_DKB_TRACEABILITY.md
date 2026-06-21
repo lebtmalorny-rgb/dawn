@@ -17,6 +17,18 @@
 - При изменении реализации обновляются столбцы этапа/evidence и сохраняется ссылка на фактический test report/config/ADR.
 - Требование считается закрытым только после review владельцем безопасности; Codex не присваивает финальный статус соответствия.
 
+## Обновление требований 2026-06-21: Mistral/Watcher/Masakari и real-time UX
+
+Новый блок требований расширяет будущие evidence, но не меняет текущий статус соответствия:
+
+- ДКБ-01/03/12: first-class модули Mistral, Watcher, Masakari, topology, health dashboards and event streams требуют capability matrix, backend 403 and negative UI/API tests. UI redaction при неполных правах не считается авторизацией без server-side enforcement.
+- ДКБ-46–53: operation progress, real-time stream access, Watcher recommendation/apply/abort, Masakari recovery approval and notification views add audit event types and SIEM mapping obligations. Raw OpenStack notifications are not sufficient portal audit evidence.
+- ДКБ-66: Masakari visualization, recovery timeline and Nova evacuate/live migration correlation are future HA/failover evidence, but full claim still requires E10 controlled failover and external Kolla/storage/network evidence.
+- ДКБ-77/82: API register and user/operator documentation must include event stream, polling fallback, Watcher, Masakari, telemetry datasource, topology/capacity/search interfaces and disabled-interface controls.
+- ДКБ-72: topology or Masakari/Nova recovery visualization does not prove storage architecture; storage path evidence remains external/P3.
+- Research decision: Consul is treated through Masakari hostmonitor `monitoring_driver=consul` and `matrix.yaml`; Consul Events and Prometheus exporter metrics are diagnostic/corroborating signals, not standalone authoritative recovery triggers.
+- Current risk register for E00/E02 transition is `docs/generated/risk-register.md`; it tracks open risks separately from formal ДКБ status and does not claim compliance.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

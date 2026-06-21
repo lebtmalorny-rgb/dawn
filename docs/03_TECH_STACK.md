@@ -12,6 +12,8 @@
 - PatternFly для enterprise shell, форм, accessibility и согласованного UI.
 - OpenAPI-generated TypeScript types/client.
 - React Hook Form и JSON Schema renderer для workflow forms.
+- EventSource/SSE for baseline live updates; WebSocket only after ADR and load evidence.
+- Charting/topology libraries are selected per module after prototype and performance check; they must support virtualization/windowing or bounded rendering for large data.
 - Vitest и React Testing Library.
 - Playwright для end-to-end.
 - pnpm и lockfile.
@@ -21,6 +23,7 @@
 - browser state не дублирует authoritative server state;
 - page/filter/sort находятся в URL;
 - таблицы используют virtualization только как дополнение к server-side pagination;
+- topology, dashboard and graph components request bounded server-side aggregates/expansions rather than full inventory dumps;
 - capability checks приходят из backend;
 - токены и секреты отсутствуют в JS;
 - пользовательская ошибка содержит безопасный текст и correlation ID.
