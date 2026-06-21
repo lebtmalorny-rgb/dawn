@@ -80,6 +80,7 @@ def test_cursor_tampering_returns_safe_400() -> None:
 def test_instance_refresh_requires_csrf_and_records_audit() -> None:
     client, security = _client()
     csrf = _login(client, "operator", "operator-code")
+    idempotency_key = "refresh-key-secret-canary"
 
     csrf_missing_response = client.post(
         "/api/v1/instances/synthetic/RegionOne/instance-0001/refresh",
@@ -89,26 +90,60 @@ def test_instance_refresh_requires_csrf_and_records_audit() -> None:
     assert csrf_missing_response.status_code == 403
     assert csrf_missing_response.json()["error"]["code"] == "csrf_failed"
 
+    missing_idempotency_response = client.post(
+        "/api/v1/instances/synthetic/RegionOne/instance-0001/refresh",
+        headers={"x-request-id": "refresh-without-idempotency", "x-csrf-token": csrf},
+    )
+
+    assert missing_idempotency_response.status_code == 400
+    assert missing_idempotency_response.json()["error"]["code"] == "idempotency_key_required"
+    assert (
+        missing_idempotency_response.json()["error"]["request_id"]
+        == "refresh-without-idempotency"
+    )
+
     accepted_response = client.post(
         "/api/v1/instances/synthetic/RegionOne/instance-0001/refresh",
-        headers={"x-request-id": "refresh-accepted", "x-csrf-token": csrf},
+        headers={
+            "x-request-id": "refresh-accepted",
+            "x-csrf-token": csrf,
+            "idempotency-key": idempotency_key,
+        },
+    )
+    repeated_response = client.post(
+        "/api/v1/instances/synthetic/RegionOne/instance-0001/refresh",
+        headers={
+            "x-request-id": "refresh-repeated",
+            "x-csrf-token": csrf,
+            "idempotency-key": idempotency_key,
+        },
     )
 
     assert accepted_response.status_code == 200
-    assert accepted_response.json() == {
+    assert repeated_response.status_code == 200
+    accepted_payload = accepted_response.json()
+    repeated_payload = repeated_response.json()
+    assert accepted_payload == {
         "status": "accepted",
+        "operation_id": accepted_payload["operation_id"],
         "target": {
             "cloud_id": "synthetic",
             "region_id": "RegionOne",
             "instance_id": "instance-0001",
         },
     }
-    assert any(
-        event.action == "instance.refresh.requested"
+    assert accepted_payload["operation_id"]
+    assert repeated_payload["operation_id"] == accepted_payload["operation_id"]
+    audit_events = [
+        event
+        for event in security.audit_sink.events
+        if event.action == "instance.refresh.requested"
         and event.actor_id == "mock-user-operator"
         and event.target_id == "synthetic/RegionOne/instance-0001"
-        for event in security.audit_sink.events
-    )
+    ]
+    assert audit_events
+    assert audit_events[-1].metadata["operation_id"] == accepted_payload["operation_id"]
+    assert idempotency_key not in repr(audit_events[-1].metadata)
 
 
 def test_instance_refresh_denies_viewer_without_refresh_capability() -> None:

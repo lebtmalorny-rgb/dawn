@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 from uuid import uuid4
@@ -33,6 +34,7 @@ DEFAULT_CLOUD_ID = "synthetic"
 DEFAULT_REGION_ID = "RegionOne"
 DEFAULT_INSTANCE_SORT = "name.asc"
 DEFAULT_HYPERVISOR_SORT = "host_name.asc"
+IDEMPOTENCY_KEY_HEADER_NAME = "idempotency-key"
 
 INSTANCE_FILTER_PARAMS = frozenset(
     {
@@ -120,6 +122,7 @@ class InstanceRefreshResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     status: Literal["accepted"]
+    operation_id: str
     target: InstanceRefreshTarget
 
 
@@ -291,11 +294,20 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         )
         if denied is not None:
             return denied
+        idempotency_key = _require_idempotency_key(request)
+        if isinstance(idempotency_key, JSONResponse):
+            return idempotency_key
         unavailable = _require_inventory_available(services, request)
         if unavailable is not None:
             return unavailable
 
         target_id = _instance_target_id(cloud_id, region_id, instance_id)
+        operation_id = _refresh_operation_id(
+            cloud_id=cloud_id,
+            region_id=region_id,
+            instance_id=instance_id,
+            idempotency_key=idempotency_key,
+        )
         _record_audit(
             security,
             request,
@@ -306,10 +318,11 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
             target_id=target_id,
             subject=session.subject,
             session_reference=session.session_id,
-            metadata={},
+            metadata={"operation_id": operation_id},
         )
         return InstanceRefreshResponse(
             status="accepted",
+            operation_id=operation_id,
             target=InstanceRefreshTarget(
                 cloud_id=cloud_id,
                 region_id=region_id,
@@ -460,6 +473,18 @@ def _inventory_unavailable(request: Request) -> JSONResponse:
         "Inventory API временно недоступен",
         _request_id(request),
     )
+
+
+def _require_idempotency_key(request: Request) -> str | JSONResponse:
+    raw_key = request.headers.get(IDEMPOTENCY_KEY_HEADER_NAME)
+    if raw_key is None or raw_key.strip() == "":
+        return _error(
+            400,
+            "idempotency_key_required",
+            "Требуется Idempotency-Key",
+            _request_id(request),
+        )
+    return raw_key.strip()
 
 
 def _reject_unsupported_query(request: Request, *, allowed: frozenset[str]) -> JSONResponse | None:
@@ -722,3 +747,15 @@ def _instance_target_id(cloud_id: str, region_id: str, instance_id: str) -> str:
 
 def _hypervisor_target_id(cloud_id: str, region_id: str, hypervisor_id: str) -> str:
     return f"{cloud_id}/{region_id}/{hypervisor_id}"
+
+
+def _refresh_operation_id(
+    *,
+    cloud_id: str,
+    region_id: str,
+    instance_id: str,
+    idempotency_key: str,
+) -> str:
+    payload = "\x1f".join((cloud_id, region_id, instance_id, idempotency_key))
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return f"inventory-refresh-{digest[:32]}"
