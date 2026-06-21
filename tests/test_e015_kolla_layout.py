@@ -92,6 +92,24 @@ def test_backend_template_keeps_one_backend_image_for_all_commands() -> None:
         assert forbidden not in template
 
 
+def test_backend_runtime_dependencies_follow_kolla_constraints() -> None:
+    pyproject = read_text("backend/pyproject.toml")
+
+    for expected in [
+        '"alembic==1.14.1"',
+        '"python-json-logger==3.2.1"',
+        '"sqlalchemy==2.0.38"',
+    ]:
+        assert expected in pyproject
+
+    for forbidden in [
+        '"alembic==1.16.2"',
+        '"python-json-logger==3.3.0"',
+        '"sqlalchemy==2.0.41"',
+    ]:
+        assert forbidden not in pyproject
+
+
 def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
     template = read_text("deploy/kolla/docker/cloud-ui-frontend/Dockerfile.j2")
 
