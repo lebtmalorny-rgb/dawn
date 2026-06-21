@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy as sa
 from fastapi import FastAPI
@@ -52,10 +52,46 @@ def test_instance_list_returns_page_freshness_and_cursor() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert [item["name"] for item in payload["items"]] == ["vm-a"]
+    assert payload["limit"] == 1
+    assert payload["sort"] == "name.asc"
     assert payload["next_cursor"]
     assert payload["partial"] is False
     assert payload["freshness"]["observed_at"] == "2026-06-21T10:00:00Z"
     assert payload["freshness"]["last_successful_sync_at"] == "2026-06-21T10:00:00Z"
+
+
+def test_instance_list_repository_failure_returns_safe_503_json() -> None:
+    repository = cast(InventoryRepository, FailingInventoryRepository())
+    client, _security = _client(repository=repository, raise_server_exceptions=False)
+    _login(client, "viewer", "viewer-code")
+
+    response = client.get("/api/v1/instances", headers={"x-request-id": "repo-failure"})
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": {
+            "code": "inventory_unavailable",
+            "message": "Inventory API временно недоступен",
+            "request_id": "repo-failure",
+        }
+    }
+    assert "raw database failure" not in response.text
+
+
+def test_instance_detail_repository_failure_returns_safe_503_json() -> None:
+    repository = cast(InventoryRepository, FailingInventoryRepository())
+    client, _security = _client(repository=repository, raise_server_exceptions=False)
+    _login(client, "viewer", "viewer-code")
+
+    response = client.get(
+        "/api/v1/instances/synthetic/RegionOne/instance-0001",
+        headers={"x-request-id": "repo-detail-failure"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "inventory_unavailable"
+    assert response.json()["error"]["request_id"] == "repo-detail-failure"
+    assert "raw database failure" not in response.text
 
 
 def test_cursor_tampering_returns_safe_400() -> None:
@@ -75,6 +111,39 @@ def test_cursor_tampering_returns_safe_400() -> None:
             "request_id": "tampered-cursor",
         }
     }
+
+
+def test_instance_list_accepts_q_query_parameter_as_design_contract() -> None:
+    client, _security = _client()
+    _login(client, "viewer", "viewer-code")
+
+    response = client.get("/api/v1/instances?q=vm&limit=1")
+
+    assert response.status_code == 200
+
+
+def test_hypervisor_list_accepts_q_query_parameter_as_design_contract() -> None:
+    client, _security = _client()
+    _login(client, "viewer", "viewer-code")
+
+    response = client.get("/api/v1/hypervisors?q=compute&limit=1")
+
+    assert response.status_code == 200
+
+
+def test_instance_list_supports_source_updated_at_sort() -> None:
+    client, _security = _client()
+    _login(client, "viewer", "viewer-code")
+
+    response = client.get("/api/v1/instances?limit=2&sort=source_updated_at.asc")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sort"] == "source_updated_at.asc"
+    assert [item["instance_id"] for item in payload["items"]] == [
+        "instance-0002",
+        "instance-0001",
+    ]
 
 
 def test_instance_refresh_requires_csrf_and_records_audit() -> None:
@@ -175,7 +244,10 @@ def test_hypervisor_list_and_detail_require_hypervisor_read() -> None:
     detail_response = client.get("/api/v1/hypervisors/synthetic/RegionOne/hypervisor-0001")
 
     assert list_response.status_code == 200
-    assert [item["host_name"] for item in list_response.json()["items"]] == ["compute-a"]
+    list_payload = list_response.json()
+    assert [item["host_name"] for item in list_payload["items"]] == ["compute-a"]
+    assert list_payload["limit"] == 1
+    assert list_payload["sort"] == "host_name.asc"
     assert detail_response.status_code == 200
     assert detail_response.json()["hypervisor_id"] == "hypervisor-0001"
 
@@ -219,6 +291,53 @@ def test_openapi_contains_inventory_paths() -> None:
 
     assert "/api/v1/instances" in openapi_schema["paths"]
     assert "/api/v1/hypervisors" in openapi_schema["paths"]
+    instance_parameters = {
+        parameter["name"]: parameter
+        for parameter in openapi_schema["paths"]["/api/v1/instances"]["get"]["parameters"]
+    }
+    hypervisor_parameters = {
+        parameter["name"]: parameter
+        for parameter in openapi_schema["paths"]["/api/v1/hypervisors"]["get"]["parameters"]
+    }
+    assert instance_parameters["limit"]["schema"]["type"] == "integer"
+    assert instance_parameters["limit"]["schema"]["minimum"] == 1
+    assert hypervisor_parameters["limit"]["schema"]["type"] == "integer"
+    assert hypervisor_parameters["limit"]["schema"]["minimum"] == 1
+    instance_response = openapi_schema["components"]["schemas"]["InstanceListResponse"][
+        "properties"
+    ]
+    hypervisor_response = openapi_schema["components"]["schemas"]["HypervisorListResponse"][
+        "properties"
+    ]
+    assert instance_response["limit"]["type"] == "integer"
+    assert instance_response["sort"]["type"] == "string"
+    assert hypervisor_response["limit"]["type"] == "integer"
+    assert hypervisor_response["sort"]["type"] == "string"
+
+
+def test_inventory_disabled_module_descriptors_include_future_contract() -> None:
+    client, _security = _client()
+    _login(client, "viewer", "viewer-code")
+
+    response = client.get("/api/v1/inventory/modules")
+
+    assert response.status_code == 200
+    modules = {module["key"]: module for module in response.json()["modules"]}
+    disabled_contracts = {
+        "compute_services": ("compute_service.read", "/api/v1/compute-services"),
+        "network_agents": ("network_agent.read", "/api/v1/network-agents"),
+        "volume_services": ("volume_service.read", "/api/v1/volume-services"),
+        "image_tasks": ("image_task.read", "/api/v1/image-tasks"),
+        "topology": ("topology.read", "/api/v1/topology"),
+        "capacity": ("capacity.read", "/api/v1/capacity"),
+    }
+    for key, (required_capability, path) in disabled_contracts.items():
+        descriptor = modules[key]
+        assert descriptor["enabled"] is False
+        assert descriptor["status"] == "disabled"
+        assert descriptor["reason"] == "module_not_implemented"
+        assert descriptor["required_capability"] == required_capability
+        assert descriptor["path"] == path
 
 
 def test_inventory_routes_do_not_import_openstack_http_transport() -> None:
@@ -230,12 +349,30 @@ def test_inventory_routes_do_not_import_openstack_http_transport() -> None:
     assert "OpenStackHttpClient" not in routes_text
 
 
-def _client() -> tuple[TestClient, SecurityServices]:
-    app, security = _app()
-    return TestClient(app), security
+class FailingInventoryRepository:
+    def list_instances(self, **_kwargs: Any) -> Any:
+        raise RuntimeError("raw database failure should not leak")
+
+    def get_instance(self, *_args: Any) -> Any:
+        raise RuntimeError("raw database failure should not leak")
+
+    def list_hypervisors(self, **_kwargs: Any) -> Any:
+        raise RuntimeError("raw database failure should not leak")
+
+    def get_hypervisor(self, *_args: Any) -> Any:
+        raise RuntimeError("raw database failure should not leak")
 
 
-def _app() -> tuple[FastAPI, SecurityServices]:
+def _client(
+    *,
+    repository: InventoryRepository | None = None,
+    raise_server_exceptions: bool = True,
+) -> tuple[TestClient, SecurityServices]:
+    app, security = _app(repository=repository)
+    return TestClient(app, raise_server_exceptions=raise_server_exceptions), security
+
+
+def _app(*, repository: InventoryRepository | None = None) -> tuple[FastAPI, SecurityServices]:
     def check() -> HealthReport:
         return HealthReport(status="ok", dependencies={})
 
@@ -243,7 +380,7 @@ def _app() -> tuple[FastAPI, SecurityServices]:
     app = create_app(
         readiness_check=check,
         security_services=security,
-        inventory_services=InventoryServices(repository=_repository(_engine())),
+        inventory_services=InventoryServices(repository=repository or _repository(_engine())),
     )
     return app, security
 
@@ -310,7 +447,12 @@ def _seed_inventory(engine: Engine) -> None:
             schema.instances.insert(),
             [
                 _instance_row(now=now, instance_id="instance-0001", name="vm-a"),
-                _instance_row(now=now, instance_id="instance-0002", name="vm-c"),
+                _instance_row(
+                    now=now,
+                    instance_id="instance-0002",
+                    name="vm-c",
+                    source_updated_at=now - timedelta(hours=1),
+                ),
                 _instance_row(
                     now=now,
                     instance_id="instance-0003",
@@ -342,6 +484,7 @@ def _instance_row(
     instance_id: str,
     name: str,
     status: str = "ACTIVE",
+    source_updated_at: datetime | None = None,
 ) -> dict[str, Any]:
     return {
         "cloud_id": "synthetic",
@@ -365,7 +508,7 @@ def _instance_row(
         "boot_volume_id": None,
         "addresses_json": {"private": ["10.0.0.10"]},
         "source_created_at": now - timedelta(days=1),
-        "source_updated_at": now,
+        "source_updated_at": source_updated_at or now,
         "observed_at": now,
         "sync_generation": 1,
         "sync_status": "ok",

@@ -454,6 +454,7 @@ def _instance_sort_column(field: str) -> sa.Column[Any]:
         "status": schema.instances.c.status,
         "host_name": schema.instances.c.host_name,
         "availability_zone": schema.instances.c.availability_zone,
+        "source_updated_at": schema.instances.c.source_updated_at,
         "observed_at": schema.instances.c.observed_at,
     }
     return _allowed_sort_column(field, allowed)

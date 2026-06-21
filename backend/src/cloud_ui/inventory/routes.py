@@ -32,12 +32,15 @@ from cloud_ui.security.sessions import SessionExpired, SessionNotFound, SessionR
 
 DEFAULT_CLOUD_ID = "synthetic"
 DEFAULT_REGION_ID = "RegionOne"
+DEFAULT_LIST_LIMIT = 50
+MAX_LIST_LIMIT = 200
 DEFAULT_INSTANCE_SORT = "name.asc"
 DEFAULT_HYPERVISOR_SORT = "host_name.asc"
 IDEMPOTENCY_KEY_HEADER_NAME = "idempotency-key"
 
 INSTANCE_FILTER_PARAMS = frozenset(
     {
+        "q",
         "project_id",
         "status",
         "host_name",
@@ -47,6 +50,7 @@ INSTANCE_FILTER_PARAMS = frozenset(
 )
 HYPERVISOR_FILTER_PARAMS = frozenset(
     {
+        "q",
         "service_status",
         "service_state",
         "host_name",
@@ -63,6 +67,7 @@ INSTANCE_SORT_FIELDS = frozenset(
         "status",
         "host_name",
         "availability_zone",
+        "source_updated_at",
         "observed_at",
     }
 )
@@ -95,6 +100,8 @@ class InstanceListResponse(BaseModel):
 
     items: list[InstanceItem]
     next_cursor: str | None
+    limit: int
+    sort: str
     partial: bool
     warnings: list[InventoryWarning]
     freshness: InventoryFreshness | None
@@ -105,6 +112,8 @@ class HypervisorListResponse(BaseModel):
 
     items: list[HypervisorItem]
     next_cursor: str | None
+    limit: int
+    sort: str
     partial: bool
     warnings: list[InventoryWarning]
     freshness: InventoryFreshness | None
@@ -168,9 +177,10 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         request: Request,
         cloud_id: str = DEFAULT_CLOUD_ID,
         region_id: str = DEFAULT_REGION_ID,
-        limit: str | None = Query(default=None),
+        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1),
         cursor: str | None = Query(default=None),
         sort: str = DEFAULT_INSTANCE_SORT,
+        q: str | None = Query(default=None),
         project_id: str | None = Query(default=None),
         status: str | None = Query(default=None),
         host_name: str | None = Query(default=None),
@@ -200,9 +210,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         )
         if query_error is not None:
             return query_error
-        parsed_limit = _parse_limit(limit, request)
-        if isinstance(parsed_limit, JSONResponse):
-            return parsed_limit
+        effective_limit = _effective_limit(limit)
         parsed_sort = _parse_sort(sort, allowed_fields=INSTANCE_SORT_FIELDS, request=request)
         if isinstance(parsed_sort, JSONResponse):
             return parsed_sort
@@ -219,15 +227,19 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
                     availability_zone=availability_zone,
                 ),
                 sort=parsed_sort,
-                limit=parsed_limit,
+                limit=effective_limit,
                 cursor=cursor,
             )
         except CursorTampered:
             return _error(400, "cursor_tampered", "Некорректный cursor", _request_id(request))
+        except Exception:
+            return _inventory_unavailable(request)
 
         return InstanceListResponse(
             items=page.items,
             next_cursor=page.next_cursor,
+            limit=effective_limit,
+            sort=_sort_key(parsed_sort),
             partial=page.partial,
             warnings=page.warnings,
             freshness=page.freshness,
@@ -260,7 +272,10 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         if isinstance(repository, JSONResponse):
             return repository
 
-        item = repository.get_instance(cloud_id, region_id, instance_id)
+        try:
+            item = repository.get_instance(cloud_id, region_id, instance_id)
+        except Exception:
+            return _inventory_unavailable(request)
         if item is None:
             return _error(404, "instance_not_found", "Инстанс не найден", _request_id(request))
         return item
@@ -335,9 +350,10 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         request: Request,
         cloud_id: str = DEFAULT_CLOUD_ID,
         region_id: str = DEFAULT_REGION_ID,
-        limit: str | None = Query(default=None),
+        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1),
         cursor: str | None = Query(default=None),
         sort: str = DEFAULT_HYPERVISOR_SORT,
+        q: str | None = Query(default=None),
         service_status: str | None = Query(default=None),
         service_state: str | None = Query(default=None),
         host_name: str | None = Query(default=None),
@@ -367,9 +383,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         )
         if query_error is not None:
             return query_error
-        parsed_limit = _parse_limit(limit, request)
-        if isinstance(parsed_limit, JSONResponse):
-            return parsed_limit
+        effective_limit = _effective_limit(limit)
         parsed_sort = _parse_sort(sort, allowed_fields=HYPERVISOR_SORT_FIELDS, request=request)
         if isinstance(parsed_sort, JSONResponse):
             return parsed_sort
@@ -386,15 +400,19 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
                     maintenance_status=maintenance_status,
                 ),
                 sort=parsed_sort,
-                limit=parsed_limit,
+                limit=effective_limit,
                 cursor=cursor,
             )
         except CursorTampered:
             return _error(400, "cursor_tampered", "Некорректный cursor", _request_id(request))
+        except Exception:
+            return _inventory_unavailable(request)
 
         return HypervisorListResponse(
             items=page.items,
             next_cursor=page.next_cursor,
+            limit=effective_limit,
+            sort=_sort_key(parsed_sort),
             partial=page.partial,
             warnings=page.warnings,
             freshness=page.freshness,
@@ -427,7 +445,10 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         if isinstance(repository, JSONResponse):
             return repository
 
-        item = repository.get_hypervisor(cloud_id, region_id, hypervisor_id)
+        try:
+            item = repository.get_hypervisor(cloud_id, region_id, hypervisor_id)
+        except Exception:
+            return _inventory_unavailable(request)
         if item is None:
             return _error(
                 404,
@@ -499,16 +520,8 @@ def _reject_unsupported_query(request: Request, *, allowed: frozenset[str]) -> J
     )
 
 
-def _parse_limit(raw_limit: str | None, request: Request) -> int | None | JSONResponse:
-    if raw_limit is None:
-        return None
-    try:
-        limit = int(raw_limit)
-    except ValueError:
-        return _error(400, "invalid_limit", "Некорректный limit", _request_id(request))
-    if limit < 1:
-        return _error(400, "invalid_limit", "Некорректный limit", _request_id(request))
-    return limit
+def _effective_limit(raw_limit: int) -> int:
+    return max(1, min(raw_limit, MAX_LIST_LIMIT))
 
 
 def _parse_sort(
@@ -524,6 +537,10 @@ def _parse_sort(
     if field not in allowed_fields or direction not in {"asc", "desc"}:
         return _error(400, "unsupported_sort", "Неподдерживаемая сортировка", _request_id(request))
     return InventorySort(field=field, direction=cast(SortDirection, direction))
+
+
+def _sort_key(sort: InventorySort) -> str:
+    return f"{sort.field}.{sort.direction}"
 
 
 def _require_session(services: SecurityServices, request: Request) -> SessionRecord | JSONResponse:
@@ -680,12 +697,21 @@ def _capability_module(
 
 
 def _disabled_module(key: str, title: str) -> InventoryModuleDescriptor:
+    contracts = {
+        "compute_services": ("compute_service.read", "/api/v1/compute-services"),
+        "network_agents": ("network_agent.read", "/api/v1/network-agents"),
+        "volume_services": ("volume_service.read", "/api/v1/volume-services"),
+        "image_tasks": ("image_task.read", "/api/v1/image-tasks"),
+        "topology": ("topology.read", "/api/v1/topology"),
+        "capacity": ("capacity.read", "/api/v1/capacity"),
+    }
+    required_capability, path = contracts[key]
     return InventoryModuleDescriptor(
         key=key,
         title=title,
-        path=None,
+        path=path,
         enabled=False,
-        required_capability=None,
+        required_capability=required_capability,
         status="disabled",
         reason="module_not_implemented",
     )
