@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
@@ -404,6 +404,40 @@ test("instances page fetches server-side page from BFF with URL filters", async 
       "/api/v1/instances?limit=50&status=ACTIVE&sort=name.asc"
     );
   });
+});
+
+test("inventory navigation and table render outside constrained status layout", async () => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["instance.read", "hypervisor.read"]));
+    }
+    if (url === "/api/v1/instances?limit=50") {
+      return jsonResponse(inventoryPage([instanceItem({ name: "vm-wide-screen" })]));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  const table = await screen.findByRole("table", { name: "Таблица ВМ" });
+  const inventorySection = table.closest("section[aria-label='Инвентарь']");
+
+  expect(inventorySection).not.toBeNull();
+  expect(inventorySection?.closest(".cloud-ui-layout")).toBeNull();
+  expect(
+    within(inventorySection as HTMLElement).getByRole("link", { name: "ВМ" })
+  ).toBeInTheDocument();
+  expect(
+    within(inventorySection as HTMLElement).getByRole("link", { name: "Гипервизоры" })
+  ).toBeInTheDocument();
 });
 
 test("hypervisors page renders partial and stale state", async () => {

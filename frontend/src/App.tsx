@@ -219,139 +219,119 @@ export function App() {
   return (
     <Page>
       <PageSection className="cloud-ui-page">
-        <div className="cloud-ui-layout">
-          <Title headingLevel="h1" size="xl">
-            Портал OpenStack
-          </Title>
+        <div className="cloud-ui-shell">
+          <div className="cloud-ui-layout">
+            <Title headingLevel="h1" size="xl">
+              Портал OpenStack
+            </Title>
 
-          <div className="cloud-ui-status-grid">
-            <Card className="cloud-ui-status-card">
-              <CardTitle>Сессия</CardTitle>
-              <CardBody>
-                {authState.type === "loading" && (
-                  <Bullseye className="cloud-ui-loading">
-                    <Spinner aria-label="Загрузка сессии" />
-                  </Bullseye>
-                )}
+            <div className="cloud-ui-status-grid">
+              <Card className="cloud-ui-status-card">
+                <CardTitle>Сессия</CardTitle>
+                <CardBody>
+                  {authState.type === "loading" && (
+                    <Bullseye className="cloud-ui-loading">
+                      <Spinner aria-label="Загрузка сессии" />
+                    </Bullseye>
+                  )}
 
-                {authState.type === "anonymous" && (
-                  <form className="cloud-ui-login-form" onSubmit={handleLogin}>
-                    <label>
-                      <span>Логин</span>
-                      <input
-                        autoComplete="username"
-                        onChange={(event) => setLoginName(event.target.value)}
-                        type="text"
-                        value={loginName}
+                  {authState.type === "anonymous" && (
+                    <form className="cloud-ui-login-form" onSubmit={handleLogin}>
+                      <label>
+                        <span>Логин</span>
+                        <input
+                          autoComplete="username"
+                          onChange={(event) => setLoginName(event.target.value)}
+                          type="text"
+                          value={loginName}
+                        />
+                      </label>
+                      <label>
+                        <span>Код доступа</span>
+                        <input
+                          autoComplete="current-password"
+                          onChange={(event) => setCredential(event.target.value)}
+                          type="password"
+                          value={credential}
+                        />
+                      </label>
+                      <Button type="submit" variant="primary">
+                        Войти
+                      </Button>
+                    </form>
+                  )}
+
+                  {authState.type === "error" && (
+                    <Alert variant="danger" title={authState.message} />
+                  )}
+
+                  {authState.type === "authenticated" && (
+                    <div className="cloud-ui-session">
+                      <Alert variant="success" title={authState.subject.display_name} />
+                      {authState.capabilities === null ? (
+                        <Bullseye className="cloud-ui-compact-loading">
+                          <Spinner aria-label="Загрузка прав" size="md" />
+                        </Bullseye>
+                      ) : (
+                        hasSessionNavigation(authState.capabilities) && (
+                          <nav aria-label="Разделы портала" className="cloud-ui-nav">
+                            {authState.capabilities.capabilities.includes("operation.read") && (
+                              <span className="cloud-ui-nav-item">Операции</span>
+                            )}
+                            {authState.capabilities.capabilities.includes("role.manage") && (
+                              <span className="cloud-ui-nav-item">Управление ролями</span>
+                            )}
+                          </nav>
+                        )
+                      )}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+
+              <Card className="cloud-ui-status-card">
+                <CardTitle>Статус сервиса</CardTitle>
+                <CardBody>
+                  {state.type === "loading" && (
+                    <Bullseye className="cloud-ui-loading">
+                      <Spinner aria-label="Загрузка готовности API" />
+                    </Bullseye>
+                  )}
+
+                  {state.type === "error" && <Alert variant="danger" title={state.message} />}
+
+                  {state.type === "ready" && (
+                    <div className="cloud-ui-status-content">
+                      <Alert
+                        variant={state.readiness.status === "ok" ? "success" : "warning"}
+                        title={`Готовность API: ${state.readiness.status}`}
                       />
-                    </label>
-                    <label>
-                      <span>Код доступа</span>
-                      <input
-                        autoComplete="current-password"
-                        onChange={(event) => setCredential(event.target.value)}
-                        type="password"
-                        value={credential}
-                      />
-                    </label>
-                    <Button type="submit" variant="primary">
-                      Войти
-                    </Button>
-                  </form>
-                )}
 
-                {authState.type === "error" && <Alert variant="danger" title={authState.message} />}
-
-                {authState.type === "authenticated" && (
-                  <div className="cloud-ui-session">
-                    <Alert variant="success" title={authState.subject.display_name} />
-                    {authState.capabilities === null ? (
-                      <Bullseye className="cloud-ui-compact-loading">
-                        <Spinner aria-label="Загрузка прав" size="md" />
-                      </Bullseye>
-                    ) : (
-                      <nav aria-label="Разделы портала" className="cloud-ui-nav">
-                        {authState.capabilities.capabilities.includes("instance.read") && (
-                          <a
-                            aria-current={
-                              activeInventoryView === "instances" ? "page" : undefined
-                            }
-                            className="cloud-ui-nav-item"
-                            href={inventoryViewHref("instances", locationSearch)}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              handleInventoryViewSelect("instances");
-                            }}
-                          >
-                            ВМ
-                          </a>
+                      <dl className="cloud-ui-dependencies" aria-label="Зависимости сервиса">
+                        {Object.entries(state.readiness.dependencies).map(
+                          ([name, dependency]) => (
+                            <div className="cloud-ui-dependency-row" key={name}>
+                              <dt>{name}</dt>
+                              <dd>
+                                {dependency.status} - {dependency.detail}
+                              </dd>
+                            </div>
+                          )
                         )}
-                        {authState.capabilities.capabilities.includes("hypervisor.read") && (
-                          <a
-                            aria-current={
-                              activeInventoryView === "hypervisors" ? "page" : undefined
-                            }
-                            className="cloud-ui-nav-item"
-                            href={inventoryViewHref("hypervisors", locationSearch)}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              handleInventoryViewSelect("hypervisors");
-                            }}
-                          >
-                            Гипервизоры
-                          </a>
-                        )}
-                        {authState.capabilities.capabilities.includes("operation.read") && (
-                          <span className="cloud-ui-nav-item">Операции</span>
-                        )}
-                        {authState.capabilities.capabilities.includes("role.manage") && (
-                          <span className="cloud-ui-nav-item">Управление ролями</span>
-                        )}
-                      </nav>
-                    )}
-                  </div>
-                )}
-              </CardBody>
-            </Card>
-
-            <Card className="cloud-ui-status-card">
-              <CardTitle>Статус сервиса</CardTitle>
-              <CardBody>
-                {state.type === "loading" && (
-                  <Bullseye className="cloud-ui-loading">
-                    <Spinner aria-label="Загрузка готовности API" />
-                  </Bullseye>
-                )}
-
-                {state.type === "error" && <Alert variant="danger" title={state.message} />}
-
-                {state.type === "ready" && (
-                  <div className="cloud-ui-status-content">
-                    <Alert
-                      variant={state.readiness.status === "ok" ? "success" : "warning"}
-                      title={`Готовность API: ${state.readiness.status}`}
-                    />
-
-                    <dl className="cloud-ui-dependencies" aria-label="Зависимости сервиса">
-                      {Object.entries(state.readiness.dependencies).map(([name, dependency]) => (
-                        <div className="cloud-ui-dependency-row" key={name}>
-                          <dt>{name}</dt>
-                          <dd>
-                            {dependency.status} - {dependency.detail}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                )}
-              </CardBody>
-            </Card>
+                      </dl>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            </div>
           </div>
 
           {authState.type === "authenticated" && (
             <InventoryWorkArea
               activeView={activeInventoryView}
               capabilities={authState.capabilities}
+              locationSearch={locationSearch}
+              onInventoryViewSelect={handleInventoryViewSelect}
               state={inventoryState}
             />
           )}
@@ -392,13 +372,24 @@ function inventoryViewHref(view: InventoryView, locationSearch: string): string 
   return `?${params.toString()}`;
 }
 
+function hasSessionNavigation(capabilities: Capabilities): boolean {
+  return (
+    capabilities.capabilities.includes("operation.read") ||
+    capabilities.capabilities.includes("role.manage")
+  );
+}
+
 function InventoryWorkArea({
   activeView,
   capabilities,
+  locationSearch,
+  onInventoryViewSelect,
   state
 }: {
   activeView: InventoryView | null;
   capabilities: Capabilities | null;
+  locationSearch: string;
+  onInventoryViewSelect: (view: InventoryView) => void;
   state: InventoryState;
 }) {
   if (capabilities === null) {
@@ -425,6 +416,12 @@ function InventoryWorkArea({
   return (
     <section aria-label="Инвентарь" className="cloud-ui-workarea">
       <div className="cloud-ui-workarea-header">
+        <InventoryNavigation
+          activeView={activeView}
+          capabilities={capabilities}
+          locationSearch={locationSearch}
+          onInventoryViewSelect={onInventoryViewSelect}
+        />
         <Title headingLevel="h2" size="lg">
           {activeView === "instances" ? "Виртуальные машины" : "Список гипервизоров"}
         </Title>
@@ -450,6 +447,49 @@ function InventoryWorkArea({
         activeView === "hypervisors" &&
         renderHypervisorsPage(state.page)}
     </section>
+  );
+}
+
+function InventoryNavigation({
+  activeView,
+  capabilities,
+  locationSearch,
+  onInventoryViewSelect
+}: {
+  activeView: InventoryView;
+  capabilities: Capabilities;
+  locationSearch: string;
+  onInventoryViewSelect: (view: InventoryView) => void;
+}) {
+  return (
+    <nav aria-label="Разделы инвентаря" className="cloud-ui-nav">
+      {capabilities.capabilities.includes("instance.read") && (
+        <a
+          aria-current={activeView === "instances" ? "page" : undefined}
+          className="cloud-ui-nav-item"
+          href={inventoryViewHref("instances", locationSearch)}
+          onClick={(event) => {
+            event.preventDefault();
+            onInventoryViewSelect("instances");
+          }}
+        >
+          ВМ
+        </a>
+      )}
+      {capabilities.capabilities.includes("hypervisor.read") && (
+        <a
+          aria-current={activeView === "hypervisors" ? "page" : undefined}
+          className="cloud-ui-nav-item"
+          href={inventoryViewHref("hypervisors", locationSearch)}
+          onClick={(event) => {
+            event.preventDefault();
+            onInventoryViewSelect("hypervisors");
+          }}
+        >
+          Гипервизоры
+        </a>
+      )}
+    </nav>
   );
 }
 

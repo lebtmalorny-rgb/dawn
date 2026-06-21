@@ -7,6 +7,12 @@ body {
   background: #f5f7fa;
 }
 
+.cloud-ui-shell {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+}
+
 .cloud-ui-layout {
   display: grid;
   gap: 1rem;
@@ -122,6 +128,7 @@ body {
   gap: 0.875rem;
   min-width: 0;
   padding: 1rem 0 0;
+  width: 100%;
 }
 
 .cloud-ui-workarea-header {
