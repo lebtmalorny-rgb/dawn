@@ -130,6 +130,7 @@ def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
         "FROM {{ namespace }}/{{ image_prefix }}base:{{ tag }}",
         "ADD cloud-ui-frontend-archive /cloud-ui-frontend-source",
         "/cloud-ui-frontend-source/source/frontend/dist",
+        "/var/lib/nginx",
         "nginx",
     ]:
         assert expected in template

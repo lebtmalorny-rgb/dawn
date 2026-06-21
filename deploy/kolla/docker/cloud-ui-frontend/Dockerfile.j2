@@ -16,11 +16,11 @@ LABEL org.opencontainers.image.description="Dawn static frontend served by nginx
 
 ADD cloud-ui-frontend-archive /cloud-ui-frontend-source
 
-RUN mkdir -p /usr/share/nginx/html /var/cache/nginx /var/log/nginx /run \
+RUN mkdir -p /usr/share/nginx/html /var/cache/nginx /var/lib/nginx/tmp /var/log/nginx /run \
     && cp -a /cloud-ui-frontend-source/source/frontend/dist/. /usr/share/nginx/html/ \
     && cp /cloud-ui-frontend-source/source/frontend/nginx.conf /etc/nginx/nginx.conf \
-    && chown -R cloudui: /usr/share/nginx/html /var/cache/nginx /var/log/nginx /run \
-    && chmod -R g=u /var/cache/nginx /var/log/nginx /run \
+    && chown -R cloudui: /usr/share/nginx/html /var/cache/nginx /var/lib/nginx /var/log/nginx /run \
+    && chmod -R g=u /var/cache/nginx /var/lib/nginx /var/log/nginx /run \
     && rm -rf /cloud-ui-frontend-source
 
 USER cloudui
