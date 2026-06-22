@@ -129,6 +129,11 @@ class GroupRepository:
                 raise GroupRevisionConflict(
                     f"group revision conflict: expected {expected_revision}, got {current_revision}"
                 )
+            if (
+                str(current["name"]) == name
+                and _optional_string(current["description"]) == description
+            ):
+                return _group_from_mapping(current)
 
             next_revision = current_revision + 1
             result = connection.execute(

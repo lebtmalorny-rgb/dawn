@@ -61,6 +61,36 @@ def test_group_crud_soft_delete_and_revision_conflict(repository: GroupRepositor
     assert repository.get_group(created.group_id) is None
 
 
+def test_group_update_noop_keeps_revision_and_history(
+    repository: GroupRepository,
+    engine: Engine,
+) -> None:
+    created = repository.create_group(
+        actor_id="mock-user-operator",
+        scope_type="project",
+        scope_id="project-a",
+        name="prod-vms",
+        description="Production VMs",
+        resource_type="vm",
+        membership_mode="explicit",
+    )
+
+    returned = repository.update_group(
+        group_id=created.group_id,
+        actor_id="mock-user-operator",
+        expected_revision=created.revision,
+        name=created.name,
+        description=created.description,
+    )
+    stored = repository.get_group(created.group_id)
+    rows = _revision_rows(engine, created.group_id)
+
+    assert returned.revision == created.revision
+    assert stored is not None
+    assert stored.revision == created.revision
+    assert [row["change_type"] for row in rows] == ["group.created"]
+
+
 def test_membership_add_remove_is_idempotent(repository: GroupRepository) -> None:
     group = repository.create_group(
         actor_id="mock-user-operator",
