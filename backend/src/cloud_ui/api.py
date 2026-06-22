@@ -3,10 +3,11 @@ from uuid import uuid4
 from fastapi import APIRouter, FastAPI, Request, Response
 from starlette.middleware.base import RequestResponseEndpoint
 
-from cloud_ui.config import get_settings
+from cloud_ui.config import DEV_OPERATION_CURSOR_SIGNING_KEY, get_settings
 from cloud_ui.groups.repository import GroupRepository
 from cloud_ui.groups.routes import GroupServices, build_group_router
 from cloud_ui.health import HealthReport, ReadinessCheck, build_readiness_check
+from cloud_ui.inventory.cursor import CursorCodec
 from cloud_ui.inventory.routes import (
     InventoryServices,
     build_inventory_router_with_groups,
@@ -88,6 +89,13 @@ def create_app(
             inventory_repository=inventory.repository,
             group_repository=groups.repository,
             catalog=build_builtin_workflow_catalog(environment=environment),
+            cursor_codec=CursorCodec(
+                signing_key=(
+                    settings.operation_cursor_signing_key
+                    if settings is not None
+                    else DEV_OPERATION_CURSOR_SIGNING_KEY
+                )
+            ),
         )
 
     app = FastAPI(title="Cloud UI API", version="0.1.0")

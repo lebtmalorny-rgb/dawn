@@ -195,6 +195,60 @@ def test_operation_detail_returns_timeline_for_authorized_actor() -> None:
     assert payload["external_execution_id"] is None
 
 
+def test_operation_list_is_paginated_and_actor_scoped() -> None:
+    client, _security, _repository = _client()
+    csrf = _login(client, "operator", "operator-code")
+    first = _submit_precheck(client, csrf, idempotency_key="list-key-1").json()
+    second = _submit_precheck(client, csrf, idempotency_key="list-key-2").json()
+
+    first_page = client.get(
+        "/api/v1/operations?limit=1",
+        headers={"x-request-id": "operation-list-1"},
+    )
+    first_payload = first_page.json()
+    next_cursor = first_payload["next_cursor"]
+    second_page = client.get(
+        f"/api/v1/operations?limit=1&cursor={next_cursor}",
+        headers={"x-request-id": "operation-list-2"},
+    )
+    second_payload = second_page.json()
+
+    assert first_page.status_code == 200
+    assert first_payload["limit"] == 1
+    assert first_payload["sort"] == "updated_at.desc"
+    assert len(first_payload["items"]) == 1
+    assert next_cursor is not None
+    assert second_page.status_code == 200
+    assert len(second_payload["items"]) == 1
+    assert second_payload["next_cursor"] is None
+    assert {
+        first_payload["items"][0]["operation_id"],
+        second_payload["items"][0]["operation_id"],
+    } == {first["operation_id"], second["operation_id"]}
+
+    _login(client, "auditor", "auditor-code")
+    auditor_response = client.get(
+        "/api/v1/operations?limit=50",
+        headers={"x-request-id": "operation-list-auditor"},
+    )
+
+    assert auditor_response.status_code == 200
+    assert auditor_response.json()["items"] == []
+
+
+def test_operation_list_rejects_tampered_cursor() -> None:
+    client, _security, _repository = _client()
+    _login(client, "operator", "operator-code")
+
+    response = client.get(
+        "/api/v1/operations?cursor=tampered",
+        headers={"x-request-id": "operation-list-tampered-cursor"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "cursor_tampered"
+
+
 def test_submit_group_target_expands_and_freezes_member_snapshot() -> None:
     client, security, repository = _client()
     group_repository = _group_repository_from_state(security)

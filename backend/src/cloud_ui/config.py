@@ -9,6 +9,7 @@ IdentityProviderName = Literal["mock", "external"]
 SessionLimitPolicyName = Literal["deny", "disconnect_oldest"]
 SameSiteName = Literal["lax", "strict"]
 DEV_INVENTORY_CURSOR_SIGNING_KEY = "dev-inventory-cursor-key"
+DEV_OPERATION_CURSOR_SIGNING_KEY = "dev-operation-cursor-key"
 
 
 class Settings(BaseSettings):
@@ -43,6 +44,10 @@ class Settings(BaseSettings):
         default=DEV_INVENTORY_CURSOR_SIGNING_KEY,
         min_length=16,
     )
+    operation_cursor_signing_key: str = Field(
+        default=DEV_OPERATION_CURSOR_SIGNING_KEY,
+        min_length=16,
+    )
     inventory_stale_after_seconds: int = Field(default=900, ge=60)
     inventory_synthetic_instance_count: int = Field(default=10_000, ge=1)
     inventory_synthetic_hypervisor_count: int = Field(default=1_000, ge=1)
@@ -58,6 +63,11 @@ class Settings(BaseSettings):
             and self.inventory_cursor_signing_key == DEV_INVENTORY_CURSOR_SIGNING_KEY
         ):
             raise ValueError("Production cannot use the development inventory cursor signing key")
+        if (
+            self.environment == "production"
+            and self.operation_cursor_signing_key == DEV_OPERATION_CURSOR_SIGNING_KEY
+        ):
+            raise ValueError("Production cannot use the development operation cursor signing key")
         return self
 
 

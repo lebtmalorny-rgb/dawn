@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 from uuid import uuid4
@@ -12,8 +12,10 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import JSONResponse
 
+from cloud_ui.config import DEV_OPERATION_CURSOR_SIGNING_KEY
 from cloud_ui.groups.models import GroupNotFound, ResourceGroup
 from cloud_ui.groups.repository import GroupRepository
+from cloud_ui.inventory.cursor import CursorCodec, CursorTampered
 from cloud_ui.inventory.repository import InventoryRepository
 from cloud_ui.operations.catalog import (
     WorkflowCatalog,
@@ -24,6 +26,7 @@ from cloud_ui.operations.input_validation import InputValidationError, validate_
 from cloud_ui.operations.models import Operation, OperationEvent, OperationTargetCreate
 from cloud_ui.operations.repository import (
     OperationIdempotencyConflict,
+    OperationListCursor,
     OperationRepository,
 )
 from cloud_ui.security.audit import AuditEvent, AuditOutcome
@@ -47,6 +50,9 @@ class OperationServices:
     inventory_repository: InventoryRepository | None
     group_repository: GroupRepository | None
     catalog: WorkflowCatalog
+    cursor_codec: CursorCodec = field(
+        default_factory=lambda: CursorCodec(signing_key=DEV_OPERATION_CURSOR_SIGNING_KEY)
+    )
 
     @property
     def available(self) -> bool:
@@ -100,6 +106,28 @@ class OperationSubmitResponse(BaseModel):
 
     operation_id: str
     status: str
+
+
+class OperationListItem(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    operation_id: str
+    workflow_key: str
+    workflow_version: str
+    status: str
+    correlation_id: str
+    external_execution_id: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OperationListResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    items: list[OperationListItem]
+    next_cursor: str | None
+    limit: int
+    sort: str
 
 
 class OperationEventResponse(BaseModel):
@@ -285,6 +313,46 @@ def build_operation_router(services: OperationServices, security: SecurityServic
             status=operation.status,
         )
 
+    @router.get("/operations", response_model=OperationListResponse)
+    def list_operations(
+        request: Request,
+        limit: int = Query(default=DEFAULT_OPERATION_LIST_LIMIT, ge=1),
+        cursor: str | None = Query(default=None),
+    ) -> OperationListResponse | JSONResponse:
+        session = _require_session(security, request)
+        if isinstance(session, JSONResponse):
+            return session
+        denied = _require_capability(
+            security,
+            request,
+            session,
+            "operation.read",
+            target_type="operation",
+            target_id=None,
+        )
+        if denied is not None:
+            return denied
+        repository = _require_repository(services, request)
+        if isinstance(repository, JSONResponse):
+            return repository
+        operation_cursor = _decode_operation_cursor(services.cursor_codec, cursor, request)
+        if isinstance(operation_cursor, JSONResponse):
+            return operation_cursor
+        effective_limit = min(max(1, limit), MAX_OPERATION_LIST_LIMIT)
+        page = repository.list_operations(
+            actor_subject_id=session.subject.subject_id,
+            scope_type=session.subject.scope_type,
+            scope_id=session.subject.scope_id,
+            limit=effective_limit,
+            cursor=operation_cursor,
+        )
+        return OperationListResponse(
+            items=[_operation_list_item(operation) for operation in page.items],
+            next_cursor=_encode_operation_cursor(services.cursor_codec, page.next_cursor),
+            limit=effective_limit,
+            sort="updated_at.desc",
+        )
+
     @router.get("/operations/{operation_id}", response_model=OperationDetailResponse)
     def get_operation(
         operation_id: str,
@@ -365,6 +433,46 @@ def _definition_or_error(
             "Workflow definition не найден",
             _request_id(request),
         )
+
+
+def _decode_operation_cursor(
+    codec: CursorCodec,
+    cursor: str | None,
+    request: Request,
+) -> OperationListCursor | None | JSONResponse:
+    if cursor is None:
+        return None
+    try:
+        payload = codec.decode(cursor)
+    except CursorTampered:
+        return _error(400, "cursor_tampered", "Некорректный cursor", _request_id(request))
+
+    if payload.get("sort") != "updated_at.desc":
+        return _error(400, "cursor_tampered", "Некорректный cursor", _request_id(request))
+    updated_at = payload.get("updated_at")
+    operation_id = payload.get("operation_id")
+    if not isinstance(updated_at, str) or not isinstance(operation_id, str):
+        return _error(400, "cursor_tampered", "Некорректный cursor", _request_id(request))
+    try:
+        parsed_updated_at = datetime.fromisoformat(updated_at)
+    except ValueError:
+        return _error(400, "cursor_tampered", "Некорректный cursor", _request_id(request))
+    return OperationListCursor(updated_at=parsed_updated_at, operation_id=operation_id)
+
+
+def _encode_operation_cursor(
+    codec: CursorCodec,
+    cursor: OperationListCursor | None,
+) -> str | None:
+    if cursor is None:
+        return None
+    return codec.encode(
+        {
+            "sort": "updated_at.desc",
+            "updated_at": cursor.updated_at.isoformat(),
+            "operation_id": cursor.operation_id,
+        }
+    )
 
 
 def _operation_targets(
@@ -528,6 +636,19 @@ def _can_access_group(subject: Subject, group: ResourceGroup) -> bool:
         group.owner_subject_id == subject.subject_id
         and group.scope_type == subject.scope_type
         and group.scope_id == subject.scope_id
+    )
+
+
+def _operation_list_item(operation: Operation) -> OperationListItem:
+    return OperationListItem(
+        operation_id=operation.operation_id,
+        workflow_key=operation.workflow_key,
+        workflow_version=operation.workflow_version,
+        status=operation.status,
+        correlation_id=operation.correlation_id,
+        external_execution_id=operation.external_execution_id,
+        created_at=operation.created_at,
+        updated_at=operation.updated_at,
     )
 
 

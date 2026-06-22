@@ -29,6 +29,7 @@ _CLOUD_UI_ENVIRONMENT_NAMES = {
     "CLOUD_UI_INVENTORY_DEFAULT_LIMIT",
     "CLOUD_UI_INVENTORY_MAX_LIMIT",
     "CLOUD_UI_INVENTORY_CURSOR_SIGNING_KEY",
+    "CLOUD_UI_OPERATION_CURSOR_SIGNING_KEY",
     "CLOUD_UI_INVENTORY_STALE_AFTER_SECONDS",
     "CLOUD_UI_INVENTORY_SYNTHETIC_INSTANCE_COUNT",
     "CLOUD_UI_INVENTORY_SYNTHETIC_HYPERVISOR_COUNT",
@@ -71,6 +72,7 @@ def test_settings_accept_dummy_dev_values() -> None:
     assert settings.inventory_default_limit == 50
     assert settings.inventory_max_limit == 200
     assert settings.inventory_cursor_signing_key == "dev-inventory-cursor-key"
+    assert settings.operation_cursor_signing_key == "dev-operation-cursor-key"
     assert settings.inventory_stale_after_seconds == 900
     assert settings.inventory_synthetic_instance_count == 10_000
     assert settings.inventory_synthetic_hypervisor_count == 1_000
@@ -87,6 +89,18 @@ def test_settings_reject_dev_inventory_cursor_key_in_production() -> None:
         )
 
 
+def test_settings_reject_dev_operation_cursor_key_in_production() -> None:
+    with pytest.raises(ValidationError, match="development operation cursor signing key"):
+        Settings(
+            database_url="mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui",
+            rabbitmq_url="amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui",
+            environment="production",
+            identity_provider="external",
+            mock_identity_enabled=False,
+            inventory_cursor_signing_key="production-inventory-cursor-key",
+        )
+
+
 def test_settings_still_reject_mock_identity_in_production() -> None:
     with pytest.raises(ValidationError, match="Mock identity provider"):
         Settings(
@@ -94,4 +108,5 @@ def test_settings_still_reject_mock_identity_in_production() -> None:
             rabbitmq_url="amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui",
             environment="production",
             inventory_cursor_signing_key="production-inventory-cursor-key",
+            operation_cursor_signing_key="production-operation-cursor-key",
         )

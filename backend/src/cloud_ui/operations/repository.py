@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -38,6 +39,18 @@ class OperationIdempotencyConflict(OperationRepositoryError):
 
 class OutboxItemNotFound(OperationRepositoryError):
     code = "operation_outbox_not_found"
+
+
+@dataclass(frozen=True)
+class OperationListCursor:
+    updated_at: datetime
+    operation_id: str
+
+
+@dataclass(frozen=True)
+class OperationListPage:
+    items: list[Operation]
+    next_cursor: OperationListCursor | None
 
 
 class OperationRepository:
@@ -175,6 +188,50 @@ class OperationRepository:
         if row is None:
             return None
         return _operation_from_mapping(row)
+
+    def list_operations(
+        self,
+        *,
+        actor_subject_id: str,
+        scope_type: str,
+        scope_id: str | None,
+        limit: int,
+        cursor: OperationListCursor | None = None,
+    ) -> OperationListPage:
+        effective_limit = max(1, limit)
+        statement = sa.select(schema.operations).where(
+            schema.operations.c.actor_subject_id == actor_subject_id,
+            schema.operations.c.scope_type == scope_type,
+            _scope_id_filter(scope_id),
+        )
+        if cursor is not None:
+            cursor_updated_at = _as_utc(cursor.updated_at)
+            statement = statement.where(
+                sa.or_(
+                    schema.operations.c.updated_at < cursor_updated_at,
+                    sa.and_(
+                        schema.operations.c.updated_at == cursor_updated_at,
+                        schema.operations.c.operation_id < cursor.operation_id,
+                    ),
+                )
+            )
+        statement = statement.order_by(
+            schema.operations.c.updated_at.desc(),
+            schema.operations.c.operation_id.desc(),
+        ).limit(effective_limit + 1)
+        with self._engine.connect() as connection:
+            rows = list(connection.execute(statement).mappings())
+
+        page_rows = rows[:effective_limit]
+        items = [_operation_from_mapping(row) for row in page_rows]
+        next_cursor = None
+        if len(rows) > effective_limit and items:
+            last = items[-1]
+            next_cursor = OperationListCursor(
+                updated_at=last.updated_at,
+                operation_id=last.operation_id,
+            )
+        return OperationListPage(items=items, next_cursor=next_cursor)
 
     def list_events(self, operation_id: str, *, limit: int) -> list[OperationEvent]:
         statement = (
@@ -438,6 +495,12 @@ def _outbox_id(operation_id: str) -> str:
 
 def _scope_hash(*, scope_type: str, scope_id: str | None) -> str:
     return f"{scope_type}:{scope_id or ''}"
+
+
+def _scope_id_filter(scope_id: str | None) -> Any:
+    if scope_id is None:
+        return schema.operations.c.scope_id.is_(None)
+    return schema.operations.c.scope_id == scope_id
 
 
 def _operation_from_mapping(row: RowMapping | dict[str, Any]) -> Operation:

@@ -176,6 +176,12 @@ semantics, operation timeline или frontend operation page. Единствен
   `21 passed, 1 skipped`; `cd backend && .venv/bin/python -m ruff check
   tests/integrations/test_mistral_live_smoke.py` -> all checks passed; `git diff --check` ->
   success.
+- [x] 2026-06-22: Paginated operation list API added to close the E06 scope gap. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/operations tests/test_config.py -q` ->
+  `83 passed`; `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations
+  src/cloud_ui/config.py src/cloud_ui/api.py tests/operations/test_operation_api.py
+  tests/test_config.py` -> all checks passed; `cd backend && .venv/bin/python -m mypy src` ->
+  success; `git diff --check` -> success.
 - [ ] 2026-06-22: Documentation/registers/final verification.
 
 ## Неожиданные открытия
@@ -212,9 +218,9 @@ semantics, operation timeline или frontend operation page. Единствен
   so the submit button is disabled until login refreshes CSRF in memory. This preserves the current
   session contract but leaves reload-after-login mutation ergonomics for a later session contract
   improvement.
-- The frontend milestone uses `POST /api/v1/operations` and `GET /api/v1/operations/{id}`. A
-  paginated `GET /api/v1/operations` list endpoint remains unimplemented despite being listed in the
-  original E06 scope and must be resolved before final closeout or explicitly carried as a risk.
+- The paginated `GET /api/v1/operations` list endpoint was added after the frontend milestone exposed
+  the original E06 scope gap. It uses a signed cursor, `updated_at.desc` stable sort and actor/scope
+  filtering.
 - The P2 Mistral smoke intentionally uses only `GET /v2/workflows/{workflow_name}`. It proves endpoint
   reachability and allowlisted workflow visibility for the explicitly configured all-in-one test
   project; it does not create a Mistral execution and does not prove mutating workflow safety.
