@@ -1,7 +1,7 @@
 # E08 Vault SecMan Lab Design
 
 Дата: 2026-06-22
-Статус: design approved, written-spec review pending
+Статус: spec approved, implementation planning
 Ветка/worktree: `e08-vault-secman-design` / `.worktrees/e08-vault-secman-design`
 
 ## Цель
