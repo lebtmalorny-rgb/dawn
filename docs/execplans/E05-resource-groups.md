@@ -146,7 +146,11 @@
   tests/inventory/test_repository.py tests/inventory/test_inventory_api.py` -> `57 passed`;
   scoped Ruff passed; `mypy src` passed; spec/quality re-review approved with no
   Critical/Important/Minor findings.
-- [ ] Frontend group UX implemented and tested.
+- [x] 2026-06-22: Frontend group UX implemented and tested. Evidence: commit
+  `48dec63 feat: add resource group frontend`; RED observed with 6 new failing group UX tests before
+  implementation; `cd frontend && npm test -- --run src/App.test.tsx` -> `28 passed`;
+  `cd frontend && npm run typecheck` -> success; `cd frontend && npm run lint` -> success;
+  `git diff --check` -> success.
 - [ ] Documentation, DKB evidence and final verification completed.
 
 ## Неожиданные открытия
@@ -190,6 +194,14 @@
   `group.read` gate before completion.
 - Task 6 uses an `EXISTS` predicate against `resource_group_members` instead of joining into the main
   inventory page query, preserving stable pagination and preventing duplicate inventory rows.
+- Task 7 keeps the group UI in the BFF-only frontend path: `view=groups` selects the group work area,
+  `group_id` remains a server-side inventory filter in URL state, and the member picker reuses the
+  paginated inventory helpers with the default bounded `limit=50` instead of loading full inventory.
+- Task 7 adds typed frontend wrappers for create/update/member mutations with `x-csrf-token` and
+  `idempotency-key` where the backend requires them, but the visible P0 UI exposes list/detail,
+  member search, dynamic preview and group-filtered inventory. Create/update/add/remove controls
+  remain blocked on an explicit CSRF lifecycle for restored sessions, because `/api/v1/session` does
+  not return a CSRF value.
 - `make test` runs backend tests from `backend/` and frontend Vitest. A root-level `pytest` also
   collects `tests/test_e015_kolla_layout.py`, which expects future Kolla files and is not part of the
   current project gate.
@@ -218,6 +230,10 @@
   lists. Reason: server-side SQL keeps pagination/filtering stable and avoids loading whole group
   membership into the API handler. Consequence: inventory repository now imports the group schema
   table metadata but does not own group authorization decisions.
+- 2026-06-22: Use `view=groups` plus optional `group_id` for frontend group navigation. Alternative:
+  introduce a separate router dependency. Reason: existing app already uses URL search params for
+  inventory views and tests, and no permanent frontend routing dependency is needed for P0.
+  Consequence: group/inventory transitions preserve browser history without adding a client router.
 
 ## Детальный план реализации
 
@@ -327,9 +343,9 @@ evidence with an explicit E05 finding.
 
 ## Итог и остаточные риски
 
-Current state has backend scope, group schema/repository/rule compiler and group API completed.
-Remaining E05 work is inventory `group_id` filters, frontend UX, documentation/register evidence and
-final gates. Known residual risks:
+Current state has backend scope, group schema/repository/rule compiler, group API, inventory
+`group_id` filters and frontend read/search/preview UX completed. Remaining E05 work is
+documentation/register evidence and final gates. Known residual risks:
 
 - P0 mock project scope is not production IAM evidence.
 - Host group semantics need strict tests because hypervisors are not project-owned.
@@ -337,5 +353,7 @@ final gates. Known residual risks:
 - E05 member idempotency binds keys and rejects same-key/different-payload mutations, but same-key
   same-payload replay is not served from a stored response snapshot. Do not reuse that model for
   future destructive workflow operations without stored-result semantics.
+- Frontend P0 exposes mutation API wrappers but not create/update/add/remove controls until restored
+  sessions have an explicit CSRF refresh path; backend APIs remain the verified mutation surface.
 - Browser-level evidence is limited to Vitest unless a Playwright command is introduced in a later
   stage.
