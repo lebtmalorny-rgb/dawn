@@ -319,6 +319,92 @@ def test_same_idempotency_key_with_different_member_does_not_mutate_second_targe
     assert [item["resource_id"] for item in members.json()["items"]] == ["instance-project-a"]
 
 
+def test_idempotency_key_is_bound_when_add_is_already_a_noop() -> None:
+    client, security = _client()
+    csrf = _login(client, "operator", "operator-code")
+    group_id = _create_group(client, csrf)["group_id"]
+    repository = _group_repository_from_state(security)
+    repository.add_member(
+        group_id=group_id,
+        resource_type="vm",
+        cloud_id="synthetic",
+        region_id="RegionOne",
+        resource_id="instance-project-a",
+        source="explicit",
+        actor_id="mock-user-operator",
+    )
+    headers = {
+        "x-request-id": "member-add-noop-idempotency",
+        "x-csrf-token": csrf,
+        "idempotency-key": "add-noop-key-secret",
+    }
+
+    first = client.post(
+        f"/api/v1/groups/{group_id}/members",
+        json={
+            "resource_type": "vm",
+            "cloud_id": "synthetic",
+            "region_id": "RegionOne",
+            "resource_id": "instance-project-a",
+        },
+        headers=headers,
+    )
+    second = client.post(
+        f"/api/v1/groups/{group_id}/members",
+        json={
+            "resource_type": "vm",
+            "cloud_id": "synthetic",
+            "region_id": "RegionOne",
+            "resource_id": "instance-project-a-2",
+        },
+        headers=headers,
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert second.json()["error"]["code"] == "idempotency_key_conflict"
+    assert [
+        member.resource_id for member in repository.list_members(group_id, limit=50)
+    ] == ["instance-project-a"]
+
+
+def test_idempotency_key_is_bound_when_remove_is_already_a_noop() -> None:
+    client, security = _client()
+    csrf = _login(client, "operator", "operator-code")
+    group_id = _create_group(client, csrf)["group_id"]
+    repository = _group_repository_from_state(security)
+    headers = {
+        "x-request-id": "member-remove-noop-idempotency",
+        "x-csrf-token": csrf,
+        "idempotency-key": "remove-noop-key-secret",
+    }
+
+    first = client.delete(
+        f"/api/v1/groups/{group_id}/members/vm/synthetic/RegionOne/instance-project-a",
+        headers=headers,
+    )
+    repository.add_member(
+        group_id=group_id,
+        resource_type="vm",
+        cloud_id="synthetic",
+        region_id="RegionOne",
+        resource_id="instance-project-a-2",
+        source="explicit",
+        actor_id="mock-user-operator",
+    )
+    second = client.delete(
+        f"/api/v1/groups/{group_id}/members/vm/synthetic/RegionOne/instance-project-a-2",
+        headers=headers,
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert second.json()["error"]["code"] == "idempotency_key_conflict"
+    assert [
+        member.resource_id for member in repository.list_members(group_id, limit=50)
+    ] == ["instance-project-a-2"]
+
+
 def test_non_admin_cannot_remove_host_member_from_preexisting_group() -> None:
     client, security = _client()
     csrf = _login(client, "operator", "operator-code")

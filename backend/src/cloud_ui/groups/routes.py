@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.engine import RowMapping
+from sqlalchemy.exc import IntegrityError
 from starlette.responses import JSONResponse
 
 from cloud_ui.groups import schema as group_schema
@@ -446,16 +447,6 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
             member=body,
             idempotency_key=idempotency_key,
         )
-        record = _find_member_idempotency_record(
-            repository=repository,
-            actor_id=session.subject.subject_id,
-            group_id=group.group_id,
-            action="member.added",
-            key_hash=idempotency.key_hash,
-        )
-        conflict = _idempotency_conflict(record, idempotency, request)
-        if conflict is not None:
-            return conflict
         target_error = _validate_member_target(
             services=services,
             security=security,
@@ -466,6 +457,16 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
         )
         if target_error is not None:
             return target_error
+        idempotency_error = _reserve_member_idempotency_key(
+            repository=repository,
+            actor_id=session.subject.subject_id,
+            group_id=group.group_id,
+            action="group.member.add",
+            context=idempotency,
+            request=request,
+        )
+        if idempotency_error is not None:
+            return idempotency_error
 
         try:
             member = repository.add_member(
@@ -565,16 +566,16 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
             member=target,
             idempotency_key=idempotency_key,
         )
-        record = _find_member_idempotency_record(
+        idempotency_error = _reserve_member_idempotency_key(
             repository=repository,
             actor_id=session.subject.subject_id,
             group_id=group.group_id,
-            action="member.removed",
-            key_hash=idempotency.key_hash,
+            action="group.member.remove",
+            context=idempotency,
+            request=request,
         )
-        conflict = _idempotency_conflict(record, idempotency, request)
-        if conflict is not None:
-            return conflict
+        if idempotency_error is not None:
+            return idempotency_error
         try:
             repository.remove_member(
                 group_id=group.group_id,
@@ -1290,7 +1291,53 @@ def _member_idempotency_context(
     )
 
 
-def _find_member_idempotency_record(
+def _reserve_member_idempotency_key(
+    *,
+    repository: GroupRepository,
+    actor_id: str,
+    group_id: str,
+    action: str,
+    context: _MemberIdempotencyContext,
+    request: Request,
+) -> JSONResponse | None:
+    existing = _get_member_idempotency_record(
+        repository=repository,
+        actor_id=actor_id,
+        group_id=group_id,
+        action=action,
+        key_hash=context.key_hash,
+    )
+    if existing is not None:
+        return _idempotency_conflict(existing, context, request)
+
+    try:
+        with repository.engine.begin() as connection:
+            connection.execute(
+                group_schema.resource_group_idempotency_keys.insert().values(
+                    group_id=group_id,
+                    actor_id=actor_id,
+                    action=action,
+                    key_hash=context.key_hash,
+                    request_hash=context.request_hash,
+                    operation_id=context.operation_id,
+                    created_at=datetime.now(UTC),
+                )
+            )
+    except IntegrityError:
+        existing_after_race = _get_member_idempotency_record(
+            repository=repository,
+            actor_id=actor_id,
+            group_id=group_id,
+            action=action,
+            key_hash=context.key_hash,
+        )
+        if existing_after_race is None:
+            raise
+        return _idempotency_conflict(existing_after_race, context, request)
+    return None
+
+
+def _get_member_idempotency_record(
     *,
     repository: GroupRepository,
     actor_id: str,
@@ -1299,29 +1346,25 @@ def _find_member_idempotency_record(
     key_hash: str,
 ) -> _MemberIdempotencyRecord | None:
     statement = (
-        sa.select(group_schema.resource_group_revisions.c.change_json)
-        .where(
-            group_schema.resource_group_revisions.c.group_id == group_id,
-            group_schema.resource_group_revisions.c.actor_id == actor_id,
-            group_schema.resource_group_revisions.c.change_type == action,
+        sa.select(
+            group_schema.resource_group_idempotency_keys.c.request_hash,
+            group_schema.resource_group_idempotency_keys.c.operation_id,
         )
-        .order_by(group_schema.resource_group_revisions.c.created_at.asc())
+        .where(
+            group_schema.resource_group_idempotency_keys.c.group_id == group_id,
+            group_schema.resource_group_idempotency_keys.c.actor_id == actor_id,
+            group_schema.resource_group_idempotency_keys.c.action == action,
+            group_schema.resource_group_idempotency_keys.c.key_hash == key_hash,
+        )
     )
     with repository.engine.connect() as connection:
-        rows = list(connection.execute(statement).scalars())
-    for raw_change in rows:
-        if not isinstance(raw_change, dict):
-            continue
-        if raw_change.get("idempotency_key_hash") != key_hash:
-            continue
-        request_hash = raw_change.get("request_hash")
-        operation_id = raw_change.get("operation_id")
-        if isinstance(request_hash, str) and isinstance(operation_id, str):
-            return _MemberIdempotencyRecord(
-                request_hash=request_hash,
-                operation_id=operation_id,
-            )
-    return None
+        row = connection.execute(statement).mappings().one_or_none()
+    if row is None:
+        return None
+    return _MemberIdempotencyRecord(
+        request_hash=str(row["request_hash"]),
+        operation_id=str(row["operation_id"]),
+    )
 
 
 def _idempotency_conflict(

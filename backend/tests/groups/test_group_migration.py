@@ -76,6 +76,15 @@ EXPECTED_NULLABILITY = {
         "change_json": False,
         "created_at": False,
     },
+    "resource_group_idempotency_keys": {
+        "group_id": False,
+        "actor_id": False,
+        "action": False,
+        "key_hash": False,
+        "request_hash": False,
+        "operation_id": False,
+        "created_at": False,
+    },
 }
 
 EXPECTED_PRIMARY_KEYS = {
@@ -88,6 +97,7 @@ EXPECTED_PRIMARY_KEYS = {
         "resource_id",
     ),
     "resource_group_revisions": ("revision_id",),
+    "resource_group_idempotency_keys": ("group_id", "actor_id", "action", "key_hash"),
 }
 
 EXPECTED_INDEXES = {
@@ -111,9 +121,15 @@ EXPECTED_INDEXES = {
         ("group_id", "revision"),
         True,
     ),
+    "ix_resource_group_idempotency_created": (
+        "resource_group_idempotency_keys",
+        ("created_at", "group_id"),
+        False,
+    ),
 }
 
 EXPECTED_DROP_INDEX_OPERATIONS = [
+    ("drop_index", "ix_resource_group_idempotency_created"),
     ("drop_index", "ux_resource_group_revisions_group_revision"),
     ("drop_index", "ix_resource_group_members_resource_lookup"),
     ("drop_index", "ix_resource_group_members_group_page"),
@@ -167,6 +183,7 @@ def _runtime_index_specs(schema: Any) -> dict[str, tuple[str, tuple[str, ...], b
         schema.resource_groups,
         schema.resource_group_members,
         schema.resource_group_revisions,
+        schema.resource_group_idempotency_keys,
     ]
 
     return {
@@ -204,8 +221,10 @@ def test_group_migration_creates_tables_indexes_and_reversible_order(
         "resource_groups",
         "resource_group_members",
         "resource_group_revisions",
+        "resource_group_idempotency_keys",
     ]
     assert fake_op.dropped_tables == [
+        "resource_group_idempotency_keys",
         "resource_group_revisions",
         "resource_group_members",
         "resource_groups",
@@ -228,10 +247,16 @@ def test_group_migration_creates_tables_indexes_and_reversible_order(
     assert isinstance(revision_columns["change_json"].type, sa.JSON)
     _assert_datetime_timezone(revision_columns["created_at"])
 
+    idempotency_columns = _table_columns(fake_op, "resource_group_idempotency_keys")
+    _assert_datetime_timezone(idempotency_columns["created_at"])
+
     assert _foreign_key_specs(fake_op, "resource_group_members") == [
         (("group_id",), ("resource_groups.group_id",), "CASCADE")
     ]
     assert _foreign_key_specs(fake_op, "resource_group_revisions") == [
+        (("group_id",), ("resource_groups.group_id",), "CASCADE")
+    ]
+    assert _foreign_key_specs(fake_op, "resource_group_idempotency_keys") == [
         (("group_id",), ("resource_groups.group_id",), "CASCADE")
     ]
 
@@ -242,6 +267,9 @@ def test_group_migration_creates_tables_indexes_and_reversible_order(
     assert [
         operation for operation in fake_op.operations if operation[0] == "drop_index"
     ] == EXPECTED_DROP_INDEX_OPERATIONS
+    assert fake_op.operations.index(
+        ("drop_index", "ix_resource_group_idempotency_created")
+    ) < fake_op.operations.index(("drop_table", "resource_group_idempotency_keys"))
     assert fake_op.operations.index(
         ("drop_index", "ux_resource_group_revisions_group_revision")
     ) < fake_op.operations.index(("drop_table", "resource_group_revisions"))
@@ -269,3 +297,6 @@ def test_group_schema_requires_project_scope_id() -> None:
     assert _runtime_nullability(schema, "resource_group_revisions") == EXPECTED_NULLABILITY[
         "resource_group_revisions"
     ]
+    assert _runtime_nullability(schema, "resource_group_idempotency_keys") == (
+        EXPECTED_NULLABILITY["resource_group_idempotency_keys"]
+    )

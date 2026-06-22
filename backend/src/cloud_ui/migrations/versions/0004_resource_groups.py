@@ -89,9 +89,35 @@ def upgrade() -> None:
         ["group_id", "revision"],
         unique=True,
     )
+    op.create_table(
+        "resource_group_idempotency_keys",
+        sa.Column("group_id", sa.String(length=128), nullable=False),
+        sa.Column("actor_id", sa.String(length=128), nullable=False),
+        sa.Column("action", sa.String(length=64), nullable=False),
+        sa.Column("key_hash", sa.String(length=128), nullable=False),
+        sa.Column("request_hash", sa.String(length=128), nullable=False),
+        sa.Column("operation_id", sa.String(length=128), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("group_id", "actor_id", "action", "key_hash"),
+        sa.ForeignKeyConstraint(
+            ["group_id"],
+            ["resource_groups.group_id"],
+            ondelete="CASCADE",
+        ),
+    )
+    op.create_index(
+        "ix_resource_group_idempotency_created",
+        "resource_group_idempotency_keys",
+        ["created_at", "group_id"],
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(
+        "ix_resource_group_idempotency_created",
+        table_name="resource_group_idempotency_keys",
+    )
+    op.drop_table("resource_group_idempotency_keys")
     op.drop_index(
         "ux_resource_group_revisions_group_revision",
         table_name="resource_group_revisions",

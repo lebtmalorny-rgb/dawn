@@ -99,3 +99,26 @@ resource_group_revisions = sa.Table(
         unique=True,
     ),
 )
+
+resource_group_idempotency_keys = sa.Table(
+    "resource_group_idempotency_keys",
+    metadata,
+    sa.Column("group_id", sa.String(length=128), nullable=False),
+    sa.Column("actor_id", sa.String(length=128), nullable=False),
+    sa.Column("action", sa.String(length=64), nullable=False),
+    sa.Column("key_hash", sa.String(length=128), nullable=False),
+    sa.Column("request_hash", sa.String(length=128), nullable=False),
+    sa.Column("operation_id", sa.String(length=128), nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+    sa.PrimaryKeyConstraint("group_id", "actor_id", "action", "key_hash"),
+    sa.ForeignKeyConstraint(
+        ["group_id"],
+        ["resource_groups.group_id"],
+        ondelete="CASCADE",
+    ),
+    sa.Index(
+        "ix_resource_group_idempotency_created",
+        "created_at",
+        "group_id",
+    ),
+)
