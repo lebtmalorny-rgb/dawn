@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.engine import RowMapping
 from starlette.responses import JSONResponse
 
+from cloud_ui.groups import schema as group_schema
 from cloud_ui.groups.models import (
     GroupMember,
     GroupNotFound,
@@ -251,6 +252,13 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
                 target_id=None,
                 metadata={"reason": "host_group_requires_admin"},
             )
+        if body.resource_type == "mixed" and body.membership_mode == "dynamic":
+            return _error(
+                400,
+                "unsupported_group_mode",
+                "Для mixed group dynamic preview пока не определен",
+                _request_id(request),
+            )
 
         try:
             group = repository.create_group(
@@ -431,6 +439,23 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
         repository = _require_repository(services, request)
         if isinstance(repository, JSONResponse):
             return repository
+        idempotency = _member_idempotency_context(
+            action="group.member.add",
+            actor_id=session.subject.subject_id,
+            group_id=group.group_id,
+            member=body,
+            idempotency_key=idempotency_key,
+        )
+        record = _find_member_idempotency_record(
+            repository=repository,
+            actor_id=session.subject.subject_id,
+            group_id=group.group_id,
+            action="member.added",
+            key_hash=idempotency.key_hash,
+        )
+        conflict = _idempotency_conflict(record, idempotency, request)
+        if conflict is not None:
+            return conflict
         target_error = _validate_member_target(
             services=services,
             security=security,
@@ -451,6 +476,9 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
                 resource_id=body.resource_id,
                 source="explicit",
                 actor_id=session.subject.subject_id,
+                idempotency_key_hash=idempotency.key_hash,
+                request_hash=idempotency.request_hash,
+                operation_id=idempotency.operation_id,
             )
         except GroupRevisionConflict:
             return _error(
@@ -462,13 +490,6 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
         except GroupNotFound:
             return _group_not_found(request)
 
-        operation_id = _member_operation_id(
-            action="add",
-            actor_id=session.subject.subject_id,
-            group_id=group.group_id,
-            member=body,
-            idempotency_key=idempotency_key,
-        )
         _record_audit(
             security,
             request,
@@ -479,9 +500,12 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
             target_id=_member_target_id(body),
             subject=session.subject,
             session_reference=session.session_id,
-            metadata={"group_id": group.group_id, "operation_id": operation_id},
+            metadata={"group_id": group.group_id, "operation_id": idempotency.operation_id},
         )
-        return GroupMemberResponse(member=_member_item(member), operation_id=operation_id)
+        return GroupMemberResponse(
+            member=_member_item(member),
+            operation_id=idempotency.operation_id,
+        )
 
     @router.delete(
         "/groups/{group_id}/members/{resource_type}/{cloud_id}/{region_id}/{resource_id}",
@@ -525,6 +549,32 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
                 "Тип ресурса не соответствует группе",
                 _request_id(request),
             )
+        if resource_type == "host" and not _is_portal_admin(session.subject):
+            return _authorization_denied(
+                security,
+                request,
+                session,
+                target_type="host",
+                target_id=_member_target_id(target),
+                metadata={"reason": "host_member_requires_admin", "group_id": group.group_id},
+            )
+        idempotency = _member_idempotency_context(
+            action="group.member.remove",
+            actor_id=session.subject.subject_id,
+            group_id=group.group_id,
+            member=target,
+            idempotency_key=idempotency_key,
+        )
+        record = _find_member_idempotency_record(
+            repository=repository,
+            actor_id=session.subject.subject_id,
+            group_id=group.group_id,
+            action="member.removed",
+            key_hash=idempotency.key_hash,
+        )
+        conflict = _idempotency_conflict(record, idempotency, request)
+        if conflict is not None:
+            return conflict
         try:
             repository.remove_member(
                 group_id=group.group_id,
@@ -533,6 +583,9 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
                 region_id=region_id,
                 resource_id=resource_id,
                 actor_id=session.subject.subject_id,
+                idempotency_key_hash=idempotency.key_hash,
+                request_hash=idempotency.request_hash,
+                operation_id=idempotency.operation_id,
             )
         except GroupRevisionConflict:
             return _error(
@@ -543,13 +596,6 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
             )
         except GroupNotFound:
             return _group_not_found(request)
-        operation_id = _member_operation_id(
-            action="remove",
-            actor_id=session.subject.subject_id,
-            group_id=group.group_id,
-            member=target,
-            idempotency_key=idempotency_key,
-        )
         _record_audit(
             security,
             request,
@@ -560,7 +606,7 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
             target_id=_member_target_id(target),
             subject=session.subject,
             session_reference=session.session_id,
-            metadata={"group_id": group.group_id, "operation_id": operation_id},
+            metadata={"group_id": group.group_id, "operation_id": idempotency.operation_id},
         )
         return GroupDeleteResponse(status="deleted")
 
@@ -609,6 +655,24 @@ def build_group_router(services: GroupServices, security: SecurityServices) -> A
         if isinstance(loaded, JSONResponse):
             return loaded
         group, session = loaded
+        inventory_capability = _preview_inventory_capability(group.resource_type)
+        if inventory_capability is None:
+            return _error(
+                400,
+                "unknown_resource_type",
+                "Тип группы не поддерживает preview",
+                _request_id(request),
+            )
+        denied = _require_capability(
+            security,
+            request,
+            session,
+            inventory_capability,
+            target_type="group",
+            target_id=group.group_id,
+        )
+        if denied is not None:
+            return denied
         inventory_repository = _require_inventory_repository(services, request)
         if isinstance(inventory_repository, JSONResponse):
             return inventory_repository
@@ -668,6 +732,19 @@ class _PreviewResult:
     items: list[InstanceItem | HypervisorItem]
     count_estimate: int
     truncated: bool
+
+
+@dataclass(frozen=True)
+class _MemberIdempotencyContext:
+    key_hash: str
+    request_hash: str
+    operation_id: str
+
+
+@dataclass(frozen=True)
+class _MemberIdempotencyRecord:
+    request_hash: str
+    operation_id: str
 
 
 def _load_accessible_group(
@@ -971,6 +1048,14 @@ def _group_accepts_member_type(group: ResourceGroup, resource_type: str) -> bool
     return group.resource_type == resource_type or group.resource_type == "mixed"
 
 
+def _preview_inventory_capability(resource_type: str) -> str | None:
+    if resource_type == "vm":
+        return "instance.read"
+    if resource_type == "host":
+        return "hypervisor.read"
+    return None
+
+
 def _is_portal_admin(subject: Subject) -> bool:
     return "portal_admin" in subject.roles
 
@@ -1179,31 +1264,145 @@ def _member_item(member: GroupMember) -> GroupMemberItem:
     )
 
 
-def _member_operation_id(
+def _member_idempotency_context(
     *,
     action: str,
     actor_id: str,
     group_id: str,
     member: GroupMemberRequest,
     idempotency_key: str,
+) -> _MemberIdempotencyContext:
+    key_hash = _idempotency_key_hash(
+        action=action,
+        actor_id=actor_id,
+        group_id=group_id,
+        idempotency_key=idempotency_key,
+    )
+    return _MemberIdempotencyContext(
+        key_hash=key_hash,
+        request_hash=_member_request_hash(action=action, group_id=group_id, member=member),
+        operation_id=_member_operation_id(
+            action=action,
+            actor_id=actor_id,
+            group_id=group_id,
+            key_hash=key_hash,
+        ),
+    )
+
+
+def _find_member_idempotency_record(
+    *,
+    repository: GroupRepository,
+    actor_id: str,
+    group_id: str,
+    action: str,
+    key_hash: str,
+) -> _MemberIdempotencyRecord | None:
+    statement = (
+        sa.select(group_schema.resource_group_revisions.c.change_json)
+        .where(
+            group_schema.resource_group_revisions.c.group_id == group_id,
+            group_schema.resource_group_revisions.c.actor_id == actor_id,
+            group_schema.resource_group_revisions.c.change_type == action,
+        )
+        .order_by(group_schema.resource_group_revisions.c.created_at.asc())
+    )
+    with repository.engine.connect() as connection:
+        rows = list(connection.execute(statement).scalars())
+    for raw_change in rows:
+        if not isinstance(raw_change, dict):
+            continue
+        if raw_change.get("idempotency_key_hash") != key_hash:
+            continue
+        request_hash = raw_change.get("request_hash")
+        operation_id = raw_change.get("operation_id")
+        if isinstance(request_hash, str) and isinstance(operation_id, str):
+            return _MemberIdempotencyRecord(
+                request_hash=request_hash,
+                operation_id=operation_id,
+            )
+    return None
+
+
+def _idempotency_conflict(
+    record: _MemberIdempotencyRecord | None,
+    context: _MemberIdempotencyContext,
+    request: Request,
+) -> JSONResponse | None:
+    if record is None or record.request_hash == context.request_hash:
+        return None
+    return _error(
+        409,
+        "idempotency_key_conflict",
+        "Idempotency-Key уже использован для другого запроса",
+        _request_id(request),
+    )
+
+
+def _idempotency_key_hash(
+    *,
+    action: str,
+    actor_id: str,
+    group_id: str,
+    idempotency_key: str,
 ) -> str:
-    payload = json.dumps(
+    return _hash_payload(
         {
             "action": action,
             "actor_id": actor_id,
-            "cloud_id": member.cloud_id,
             "group_id": group_id,
             "idempotency_key": idempotency_key,
+        },
+        key=b"resource-group-idempotency-key",
+    )
+
+
+def _member_request_hash(
+    *,
+    action: str,
+    group_id: str,
+    member: GroupMemberRequest,
+) -> str:
+    return _hash_payload(
+        {
+            "action": action,
+            "cloud_id": member.cloud_id,
+            "group_id": group_id,
             "region_id": member.region_id,
             "resource_id": member.resource_id,
             "resource_type": member.resource_type,
         },
+        key=b"resource-group-idempotency-request",
+    )
+
+
+def _member_operation_id(
+    *,
+    action: str,
+    actor_id: str,
+    group_id: str,
+    key_hash: str,
+) -> str:
+    digest = _hash_payload(
+        {
+            "action": action,
+            "actor_id": actor_id,
+            "group_id": group_id,
+            "idempotency_key_hash": key_hash,
+        },
+        key=b"resource-group-membership-operation",
+    )
+    return f"group-member-{digest[:32]}"
+
+
+def _hash_payload(payload: dict[str, Any], *, key: bytes) -> str:
+    raw_payload = json.dumps(
+        payload,
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,
     ).encode("utf-8")
-    digest = hmac.new(b"resource-group-membership", payload, hashlib.sha256).hexdigest()
-    return f"group-member-{digest[:32]}"
+    return hmac.new(key, raw_payload, hashlib.sha256).hexdigest()
 
 
 def _member_target_id(member: GroupMemberRequest) -> str:

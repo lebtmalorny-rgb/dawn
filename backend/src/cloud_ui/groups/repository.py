@@ -208,6 +208,9 @@ class GroupRepository:
         resource_id: str,
         source: str,
         actor_id: str,
+        idempotency_key_hash: str | None = None,
+        request_hash: str | None = None,
+        operation_id: str | None = None,
     ) -> GroupMember:
         now = _now()
         with self._engine.begin() as connection:
@@ -267,7 +270,12 @@ class GroupRepository:
                 revision=next_revision,
                 actor_id=actor_id,
                 change_type="member.added",
-                change_json=_member_key_json(member),
+                change_json=_member_change_json(
+                    member,
+                    idempotency_key_hash=idempotency_key_hash,
+                    request_hash=request_hash,
+                    operation_id=operation_id,
+                ),
                 created_at=now,
             )
 
@@ -282,6 +290,9 @@ class GroupRepository:
         region_id: str,
         resource_id: str,
         actor_id: str,
+        idempotency_key_hash: str | None = None,
+        request_hash: str | None = None,
+        operation_id: str | None = None,
     ) -> None:
         now = _now()
         with self._engine.begin() as connection:
@@ -316,12 +327,17 @@ class GroupRepository:
                 revision=next_revision,
                 actor_id=actor_id,
                 change_type="member.removed",
-                change_json={
-                    "resource_type": resource_type,
-                    "cloud_id": cloud_id,
-                    "region_id": region_id,
-                    "resource_id": resource_id,
-                },
+                change_json=_member_change_json(
+                    {
+                        "resource_type": resource_type,
+                        "cloud_id": cloud_id,
+                        "region_id": region_id,
+                        "resource_id": resource_id,
+                    },
+                    idempotency_key_hash=idempotency_key_hash,
+                    request_hash=request_hash,
+                    operation_id=operation_id,
+                ),
                 created_at=now,
             )
 
@@ -474,6 +490,30 @@ def _member_key_json(row: RowMapping | dict[str, Any]) -> dict[str, Any]:
         "resource_id": str(row["resource_id"]),
         "source": str(row["source"]),
     }
+
+
+def _member_change_json(
+    row: RowMapping | dict[str, Any],
+    *,
+    idempotency_key_hash: str | None,
+    request_hash: str | None,
+    operation_id: str | None,
+) -> dict[str, Any]:
+    payload = {
+        "resource_type": str(row["resource_type"]),
+        "cloud_id": str(row["cloud_id"]),
+        "region_id": str(row["region_id"]),
+        "resource_id": str(row["resource_id"]),
+    }
+    if "source" in row:
+        payload["source"] = str(row["source"])
+    if idempotency_key_hash is not None:
+        payload["idempotency_key_hash"] = idempotency_key_hash
+    if request_hash is not None:
+        payload["request_hash"] = request_hash
+    if operation_id is not None:
+        payload["operation_id"] = operation_id
+    return payload
 
 
 def _optional_string(value: Any) -> str | None:

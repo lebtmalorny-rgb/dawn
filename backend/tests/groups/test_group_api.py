@@ -18,7 +18,12 @@ from cloud_ui.inventory import schema as inventory_schema
 from cloud_ui.inventory.cursor import CursorCodec
 from cloud_ui.inventory.repository import InventoryRepository
 from cloud_ui.inventory.routes import InventoryServices
+from cloud_ui.security.audit import InMemoryAuditSink
+from cloud_ui.security.clock import ManualClock
 from cloud_ui.security.dependencies import SecurityServices, build_security_services
+from cloud_ui.security.identity import LoginRequest, LoginResult, Subject
+from cloud_ui.security.rbac import PolicyService
+from cloud_ui.security.sessions import SessionManager
 
 
 def test_operator_creates_vm_group_with_initial_revision() -> None:
@@ -238,19 +243,148 @@ def test_rule_validate_rejects_arbitrary_field_and_operator() -> None:
     assert operator_response.json()["error"]["code"] == "unknown_operator"
 
 
-def _client() -> tuple[TestClient, SecurityServices]:
-    app, security = _app()
+def test_preview_requires_matching_inventory_read_capability() -> None:
+    client, security = _client(
+        subject=Subject(
+            subject_id="mock-user-group-only",
+            display_name="Group Only",
+            subject_type="human",
+            scope_type="project",
+            scope_id="project-a",
+            roles=frozenset({"group_reader"}),
+            capabilities=frozenset({"group.read"}),
+        )
+    )
+    csrf = _login(client, "custom", "custom-code")
+    group_id = _repository_create_group(
+        security,
+        resource_type="vm",
+        actor_id="mock-user-group-only",
+    )
+
+    response = client.post(
+        f"/api/v1/groups/{group_id}/preview",
+        json={"rule": {"field": "status", "op": "eq", "value": "ACTIVE"}},
+        headers={"x-request-id": "preview-without-instance-read", "x-csrf-token": csrf},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden"
+    assert any(
+        event.action == "authorization.denied"
+        and event.actor_id == "mock-user-group-only"
+        and event.metadata["capability"] == "instance.read"
+        for event in security.audit_sink.events
+    )
+
+
+def test_same_idempotency_key_with_different_member_does_not_mutate_second_target() -> None:
+    client, _security = _client()
+    csrf = _login(client, "operator", "operator-code")
+    group_id = _create_group(client, csrf)["group_id"]
+    headers = {
+        "x-request-id": "member-idempotency-conflict",
+        "x-csrf-token": csrf,
+        "idempotency-key": "same-key-conflict-secret",
+    }
+
+    first = client.post(
+        f"/api/v1/groups/{group_id}/members",
+        json={
+            "resource_type": "vm",
+            "cloud_id": "synthetic",
+            "region_id": "RegionOne",
+            "resource_id": "instance-project-a",
+        },
+        headers=headers,
+    )
+    second = client.post(
+        f"/api/v1/groups/{group_id}/members",
+        json={
+            "resource_type": "vm",
+            "cloud_id": "synthetic",
+            "region_id": "RegionOne",
+            "resource_id": "instance-project-a-2",
+        },
+        headers=headers,
+    )
+    members = client.get(
+        f"/api/v1/groups/{group_id}/members",
+        headers={"x-request-id": "members-after-conflict"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert second.json()["error"]["code"] == "idempotency_key_conflict"
+    assert [item["resource_id"] for item in members.json()["items"]] == ["instance-project-a"]
+
+
+def test_non_admin_cannot_remove_host_member_from_preexisting_group() -> None:
+    client, security = _client()
+    csrf = _login(client, "operator", "operator-code")
+    group_id = _repository_create_group(
+        security,
+        resource_type="host",
+        actor_id="mock-user-operator",
+    )
+    repository = _group_repository_from_state(security)
+    repository.add_member(
+        group_id=group_id,
+        resource_type="host",
+        cloud_id="synthetic",
+        region_id="RegionOne",
+        resource_id="hypervisor-0001",
+        source="explicit",
+        actor_id="mock-user-admin",
+    )
+
+    response = client.delete(
+        f"/api/v1/groups/{group_id}/members/host/synthetic/RegionOne/hypervisor-0001",
+        headers={
+            "x-request-id": "host-remove-denied",
+            "x-csrf-token": csrf,
+            "idempotency-key": "host-remove-denied-key",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden"
+    assert repository.list_members(group_id, limit=50)[0].resource_id == "hypervisor-0001"
+
+
+def test_mixed_dynamic_group_is_rejected_until_rule_semantics_exist() -> None:
+    client, _security = _client()
+    csrf = _login(client, "admin", "admin-code")
+
+    response = client.post(
+        "/api/v1/groups",
+        json={
+            "name": "mixed-dynamic",
+            "resource_type": "mixed",
+            "membership_mode": "dynamic",
+            "scope_id": "project-a",
+        },
+        headers={"x-request-id": "mixed-dynamic", "x-csrf-token": csrf},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "unsupported_group_mode"
+
+
+def _client(subject: Subject | None = None) -> tuple[TestClient, SecurityServices]:
+    app, security = _app(subject=subject)
     return TestClient(app), security
 
 
-def _app() -> tuple[FastAPI, SecurityServices]:
+def _app(subject: Subject | None = None) -> tuple[FastAPI, SecurityServices]:
     def check() -> HealthReport:
         return HealthReport(status="ok", dependencies={})
 
-    security = build_security_services()
+    security = _custom_security(subject) if subject is not None else build_security_services()
     engine = _engine()
     inventory_repository = _inventory_repository(engine)
     group_repository = GroupRepository(engine=engine)
+    security.audit_sink.test_engine = engine
     app = create_app(
         readiness_check=check,
         security_services=security,
@@ -281,6 +415,55 @@ def _create_group(client: TestClient, csrf: str) -> dict[str, Any]:
     )
     assert response.status_code == 201
     return dict(response.json())
+
+
+def _repository_create_group(
+    security: SecurityServices,
+    *,
+    resource_type: str,
+    actor_id: str,
+) -> str:
+    repository = _group_repository_from_state(security)
+    group = repository.create_group(
+        actor_id=actor_id,
+        scope_type="project",
+        scope_id="project-a",
+        name=f"{resource_type}-group",
+        description=None,
+        resource_type=resource_type,
+        membership_mode="explicit",
+    )
+    return group.group_id
+
+
+def _group_repository_from_state(security: SecurityServices) -> GroupRepository:
+    engine = security.audit_sink.test_engine
+    assert isinstance(engine, Engine)
+    return GroupRepository(engine=engine)
+
+
+class _CustomIdentityProvider:
+    def __init__(self, subject: Subject) -> None:
+        self._subject = subject
+
+    def authenticate(self, request: LoginRequest) -> LoginResult:
+        assert request.login == "custom"
+        assert request.credential == "custom-code"
+        return LoginResult(subject=self._subject, authentication_method="mock")
+
+
+def _custom_security(subject: Subject) -> SecurityServices:
+    clock = ManualClock()
+    return SecurityServices(
+        identity_provider=_CustomIdentityProvider(subject),
+        session_manager=SessionManager(clock=clock),
+        audit_sink=InMemoryAuditSink(),
+        policy_service=PolicyService(),
+        clock=clock,
+        session_cookie_secure=False,
+        session_cookie_samesite="lax",
+        trusted_origins=frozenset({"http://localhost", "http://127.0.0.1", "http://testserver"}),
+    )
 
 
 def _engine() -> Engine:
