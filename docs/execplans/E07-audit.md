@@ -178,7 +178,11 @@ heartbeat and full audit source map do not exist.
   tests/security/test_mock_identity.py tests/test_config.py` -> all checks passed;
   `cd backend && .venv/bin/python -m mypy src` -> success;
   `git diff --check` -> success.
-- [ ] Frontend audit search UX implemented and tested.
+- [x] 2026-06-22: Frontend audit search UX implemented and tested. Evidence:
+  `cd frontend && npm test -- --run src/App.test.tsx` -> `34 passed`;
+  `cd frontend && npm run lint` -> success;
+  `cd frontend && npm run typecheck` -> success;
+  `git diff --check` -> success.
 - [ ] Documentation/evidence/lab runbook and final verification completed.
 
 ## Неожиданные открытия

@@ -169,6 +169,52 @@ function operationDetailPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function auditEventPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    event_id: "audit-event-1",
+    event_version: "1.0",
+    occurred_at: "2026-06-22T10:00:00Z",
+    actor: {
+      type: "human",
+      id: "mock-user-operator",
+      display: "Оператор облака",
+      authentication_method: "mock",
+      session_reference: "session-operator",
+    },
+    action: "session.login",
+    event_type: "auth",
+    outcome: "success",
+    target: { type: "session", id: "session-operator" },
+    scope: {
+      cloud_id: null,
+      region_id: null,
+      project_id: null,
+      scope_type: "project",
+      scope_id: "project-a",
+    },
+    source: { ip: "192.0.2.10", trusted_proxy_chain: [] },
+    request_id: "request-1",
+    correlation_id: "correlation-1",
+    operation_id: null,
+    external_execution_id: null,
+    service: "cloud-ui-api",
+    component: "security",
+    safe_error_code: null,
+    delivery_state: "delivered",
+    metadata: { normal: "visible" },
+    ...overrides,
+  };
+}
+
+function auditListPayload(items: unknown[], nextCursor: string | null = null) {
+  return {
+    items,
+    next_cursor: nextCursor,
+    limit: 50,
+    sort: "occurred_at.desc,event_id.desc",
+  };
+}
+
 function instanceItem(overrides: Record<string, unknown> = {}) {
   return {
     cloud_id: "synthetic",
@@ -598,6 +644,158 @@ test("renders operations catalog for operation read capability", async () => {
   expect(screen.getByText("workflow.execute.maintenance-host")).toBeInTheDocument();
   expect(screen.getByLabelText("Хост")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Запустить precheck" })).toBeDisabled();
+});
+
+test("audit view fetches a server-side page and follows next cursor", async () => {
+  window.history.replaceState({}, "", "/?view=audit&action=session.login");
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["audit.read"]));
+    }
+    if (url === "/api/v1/audit/events?limit=50&action=session.login") {
+      return jsonResponse(
+        auditListPayload(
+          [
+            auditEventPayload({
+              event_id: "audit-event-page-1",
+              metadata: { token: "***" },
+            }),
+          ],
+          "cursor-next",
+        ),
+      );
+    }
+    if (
+      url ===
+      "/api/v1/audit/events?limit=50&cursor=cursor-next&action=session.login"
+    ) {
+      return jsonResponse(
+        auditListPayload([
+          auditEventPayload({
+            event_id: "audit-event-page-2",
+            action: "audit.events.list",
+            target: { type: "audit_event", id: null },
+          }),
+        ]),
+      );
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<App />);
+
+  expect(await screen.findByRole("link", { name: "Аудит" })).toBeInTheDocument();
+  const auditTable = await screen.findByRole("table", {
+    name: "Таблица аудита",
+  });
+  expect(within(auditTable).getByText("audit-event-page-1")).toBeInTheDocument();
+  expect(within(auditTable).getByText("session.login")).toBeInTheDocument();
+  expect(within(auditTable).getByText("Оператор облака")).toBeInTheDocument();
+  expect(within(auditTable).getByText("delivered")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Запросить экспорт" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("DKB_CANARY_TOKEN")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Следующая страница" }));
+
+  expect(await screen.findByText("audit-event-page-2")).toBeInTheDocument();
+  expect(window.location.search).toBe(
+    "?view=audit&action=session.login&cursor=cursor-next",
+  );
+});
+
+test("audit navigation is hidden without audit read capability", async () => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["operation.read"]));
+    }
+    if (url === "/api/v1/workflow-definitions?limit=50") {
+      return jsonResponse(workflowDefinitionsPayload());
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(await screen.findByText("Host maintenance precheck")).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Аудит" })).not.toBeInTheDocument();
+});
+
+test("audit export is separated from audit read and uses csrf", async () => {
+  const user = userEvent.setup();
+  const fetchMock = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/v1/session") {
+        return jsonResponse(
+          {
+            error: { code: "not_authenticated", message: "Требуется вход" },
+          },
+          401,
+        );
+      }
+      if (url === "/api/v1/health/ready") {
+        return jsonResponse(readyPayload);
+      }
+      if (url === "/api/v1/session/login") {
+        return jsonResponse({
+          subject: operatorSessionPayload.subject,
+          csrf: "csrf-value",
+          expires_at: "2026-06-21T15:00:00Z",
+        });
+      }
+      if (url === "/api/v1/capabilities") {
+        return jsonResponse(capabilitiesPayload(["audit.read", "audit.export"]));
+      }
+      if (url === "/api/v1/audit/events?limit=50") {
+        return jsonResponse(auditListPayload([auditEventPayload()]));
+      }
+      if (url === "/api/v1/audit/export") {
+        const headers = init?.headers as Record<string, string>;
+        const body = JSON.parse(String(init?.body));
+        expect(init?.method).toBe("POST");
+        expect(headers["content-type"]).toBe("application/json");
+        expect(headers["x-csrf-token"]).toBe("csrf-value");
+        expect(body.limit).toBe(1000);
+        expect(body.from).toEqual(expect.any(String));
+        expect(body.to).toEqual(expect.any(String));
+        return jsonResponse(
+          { export_request_id: "audit-export-1", status: "accepted" },
+          202,
+        );
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    },
+  );
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  await user.type(await screen.findByLabelText("Логин"), "admin");
+  await user.type(screen.getByLabelText("Код доступа"), "admin-code");
+  await user.click(screen.getByRole("button", { name: "Войти" }));
+  expect(await screen.findByText("audit-event-1")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Запросить экспорт" }));
+
+  expect(await screen.findByText("Экспорт принят: audit-export-1")).toBeInTheDocument();
 });
 
 test("submits host precheck through BFF with csrf and idempotency key", async () => {

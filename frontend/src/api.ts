@@ -1,4 +1,11 @@
 import {
+  type AuditEventListResponse,
+  type AuditExportRequest,
+  type AuditExportResponse,
+  isAuditEventListResponse,
+  isAuditExportResponse,
+} from "./audit";
+import {
   type GroupDeleteResponse,
   type GroupListResponse,
   type GroupMember,
@@ -14,6 +21,13 @@ import {
   isGroupPreviewResponse,
   isResourceGroup,
 } from "./groups";
+
+export type {
+  AuditEvent,
+  AuditEventListResponse,
+  AuditExportRequest,
+  AuditExportResponse,
+} from "./audit";
 
 export type {
   GroupDeleteResponse,
@@ -553,6 +567,22 @@ const HYPERVISOR_SORT_CONFIG: SortConfig = {
   defaultSort: "host_name.asc",
 };
 
+const AUDIT_LIST_PARAMS = [
+  "cursor",
+  "from",
+  "to",
+  "action",
+  "outcome",
+  "actor_id",
+  "target_type",
+  "target_id",
+  "request_id",
+  "correlation_id",
+  "operation_id",
+  "delivery_state",
+  "safe_error_code",
+] as const;
+
 function boundedLimit(rawLimit: string | null): string {
   if (rawLimit === null) {
     return String(DEFAULT_LIST_LIMIT);
@@ -616,6 +646,17 @@ function listUrl(path: string, params: URLSearchParams): string {
   const query = new URLSearchParams();
   query.set("limit", boundedLimit(params.get("limit")));
   return `${path}?${query.toString()}`;
+}
+
+function auditUrl(params: URLSearchParams): string {
+  const query = new URLSearchParams();
+  query.set("limit", boundedLimit(params.get("limit")));
+  for (const key of AUDIT_LIST_PARAMS) {
+    for (const value of params.getAll(key)) {
+      query.append(key, value);
+    }
+  }
+  return `/api/v1/audit/events?${query.toString()}`;
 }
 
 function groupUrl(groupId: string, suffix = ""): string {
@@ -792,6 +833,41 @@ export async function fetchOperation(
   }
 
   throw new Error(errorMessage(payload, "Операция недоступна"));
+}
+
+export async function fetchAuditEvents(
+  params: URLSearchParams,
+  signal?: AbortSignal,
+): Promise<AuditEventListResponse> {
+  const response = await fetch(
+    auditUrl(params),
+    signal === undefined ? undefined : { signal },
+  );
+  const payload: unknown = await response.json();
+
+  if (response.ok && isAuditEventListResponse(payload)) {
+    return payload;
+  }
+
+  throw new Error(errorMessage(payload, "Журнал аудита недоступен"));
+}
+
+export async function requestAuditExport(
+  body: AuditExportRequest,
+  csrf: string,
+): Promise<AuditExportResponse> {
+  const response = await fetch("/api/v1/audit/export", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-csrf-token": csrf },
+    body: JSON.stringify(body),
+  });
+  const payload: unknown = await response.json();
+
+  if (response.ok && isAuditExportResponse(payload)) {
+    return payload;
+  }
+
+  throw new Error(errorMessage(payload, "Экспорт аудита не запрошен"));
 }
 
 export async function fetchGroups(

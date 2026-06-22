@@ -15,6 +15,8 @@ import {
 import { type FormEvent, useEffect, useState } from "react";
 
 import {
+  type AuditEvent,
+  type AuditEventListResponse,
   type Capabilities,
   type GroupMember,
   type GroupPreviewResponse,
@@ -29,6 +31,7 @@ import {
   type Readiness,
   type Subject,
   fetchCapabilities,
+  fetchAuditEvents,
   fetchCurrentSession,
   fetchGroup,
   fetchGroupMembers,
@@ -41,6 +44,7 @@ import {
   fetchWorkflowDefinitions,
   login,
   previewGroupRule,
+  requestAuditExport,
   submitOperation,
 } from "./api";
 import "./styles.css";
@@ -49,7 +53,7 @@ const READINESS_UNAVAILABLE_MESSAGE = "Готовность API недоступ
 const SESSION_UNAVAILABLE_MESSAGE = "Сессия недоступна";
 const CAPABILITIES_UNAVAILABLE_MESSAGE = "Список прав недоступен";
 
-type PortalView = "inventory" | "groups" | "operations";
+type PortalView = "inventory" | "groups" | "operations" | "audit";
 type InventoryView = "instances" | "hypervisors";
 type Density = "compact" | "comfortable";
 type InstanceColumnKey =
@@ -135,9 +139,22 @@ type OperationDetailState =
   | { type: "ready"; operation: OperationDetail }
   | { type: "error"; operationId: string; message: string };
 
+type AuditState =
+  | { type: "idle" }
+  | { type: "loading" }
+  | { type: "ready"; page: AuditEventListResponse }
+  | { type: "error"; message: string };
+
+type AuditExportState =
+  | { type: "idle" }
+  | { type: "submitting" }
+  | { type: "submitted"; exportRequestId: string }
+  | { type: "error"; message: string };
+
 const INVENTORY_MODULES_UNAVAILABLE_MESSAGE = "Модули inventory недоступны";
 const OPERATIONS_UNAVAILABLE_MESSAGE = "Каталог операций недоступен";
 const OPERATION_UNAVAILABLE_MESSAGE = "Операция недоступна";
+const AUDIT_UNAVAILABLE_MESSAGE = "Журнал аудита недоступен";
 
 const INSTANCE_COLUMN_KEYS = [
   "name",
@@ -228,6 +245,12 @@ export function App() {
     useState<OperationDetailState>({
       type: "idle",
     });
+  const [auditState, setAuditState] = useState<AuditState>({
+    type: "idle",
+  });
+  const [auditExportState, setAuditExportState] = useState<AuditExportState>({
+    type: "idle",
+  });
   const [locationSearch, setLocationSearch] = useState(
     () => window.location.search,
   );
@@ -592,6 +615,42 @@ export function App() {
     selectedOperationId,
   ]);
 
+  useEffect(() => {
+    if (
+      currentCapabilities === null ||
+      activePortalView !== "audit" ||
+      !hasAuditAccess(currentCapabilities.capabilities)
+    ) {
+      setAuditState({ type: "idle" });
+      return;
+    }
+
+    let mounted = true;
+    const abortController = new AbortController();
+    const params = new URLSearchParams(locationSearch);
+    setAuditState({ type: "loading" });
+
+    fetchAuditEvents(params, abortController.signal)
+      .then((page) => {
+        if (mounted) {
+          setAuditState({ type: "ready", page });
+        }
+      })
+      .catch((error: unknown) => {
+        if (mounted && !isAbortError(error)) {
+          setAuditState({
+            type: "error",
+            message: AUDIT_UNAVAILABLE_MESSAGE,
+          });
+        }
+      });
+
+    return () => {
+      mounted = false;
+      abortController.abort();
+    };
+  }, [activePortalView, capabilitySignature, currentCapabilities, locationSearch]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
@@ -693,6 +752,18 @@ export function App() {
     setLocationSearch(window.location.search);
   }
 
+  function handleAuditViewSelect() {
+    const params = new URLSearchParams(locationSearch);
+    params.set("view", "audit");
+    params.delete("cursor");
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
+    setLocationSearch(window.location.search);
+  }
+
   function handleOperationSubmitted(operationId: string) {
     const params = new URLSearchParams(locationSearch);
     params.set("view", "operations");
@@ -704,6 +775,53 @@ export function App() {
       `${window.location.pathname}?${params.toString()}`,
     );
     setLocationSearch(window.location.search);
+  }
+
+  function handleAuditNextPage(cursor: string) {
+    const params = new URLSearchParams(locationSearch);
+    params.set("view", "audit");
+    params.set("cursor", cursor);
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
+    setLocationSearch(window.location.search);
+  }
+
+  async function handleAuditExport() {
+    if (
+      authState.type !== "authenticated" ||
+      authState.csrf === null ||
+      authState.capabilities === null ||
+      !authState.capabilities.capabilities.includes("audit.export")
+    ) {
+      return;
+    }
+
+    const to = new Date();
+    const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+    setAuditExportState({ type: "submitting" });
+    try {
+      const response = await requestAuditExport(
+        {
+          from: from.toISOString(),
+          to: to.toISOString(),
+          limit: 1000,
+        },
+        authState.csrf,
+      );
+      setAuditExportState({
+        type: "submitted",
+        exportRequestId: response.export_request_id,
+      });
+    } catch (error: unknown) {
+      setAuditExportState({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Экспорт аудита не запрошен",
+      });
+    }
   }
 
   return (
@@ -815,6 +933,25 @@ export function App() {
                               </a>
                             )}
                             {authState.capabilities.capabilities.includes(
+                              "audit.read",
+                            ) && (
+                              <a
+                                aria-current={
+                                  activePortalView === "audit"
+                                    ? "page"
+                                    : undefined
+                                }
+                                className="cloud-ui-nav-item"
+                                href={auditViewHref(locationSearch)}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  handleAuditViewSelect();
+                                }}
+                              >
+                                Аудит
+                              </a>
+                            )}
+                            {authState.capabilities.capabilities.includes(
                               "role.manage",
                             ) && (
                               <span className="cloud-ui-nav-item">
@@ -900,8 +1037,21 @@ export function App() {
             )}
 
           {authState.type === "authenticated" &&
+            activePortalView === "audit" && (
+              <AuditWorkArea
+                capabilities={authState.capabilities}
+                csrf={authState.csrf}
+                exportState={auditExportState}
+                onAuditExport={handleAuditExport}
+                onAuditNextPage={handleAuditNextPage}
+                state={auditState}
+              />
+            )}
+
+          {authState.type === "authenticated" &&
             activePortalView !== "groups" &&
-            activePortalView !== "operations" && (
+            activePortalView !== "operations" &&
+            activePortalView !== "audit" && (
               <InventoryWorkArea
                 activeView={activeInventoryView}
                 capabilities={authState.capabilities}
@@ -926,12 +1076,16 @@ function resolveActivePortalView(
   const requestedView = new URLSearchParams(locationSearch).get("view");
   const canReadGroups = hasGroupsAccess(capabilities);
   const canReadOperations = hasOperationsAccess(capabilities);
+  const canReadAudit = hasAuditAccess(capabilities);
 
   if (requestedView === "groups" && canReadGroups) {
     return "groups";
   }
   if (requestedView === "operations" && canReadOperations) {
     return "operations";
+  }
+  if (requestedView === "audit" && canReadAudit) {
+    return "audit";
   }
   if (
     (requestedView === "instances" || requestedView === "hypervisors") &&
@@ -944,6 +1098,9 @@ function resolveActivePortalView(
   }
   if (canReadGroups) {
     return "groups";
+  }
+  if (canReadAudit) {
+    return "audit";
   }
   if (canReadOperations) {
     return "operations";
@@ -999,10 +1156,18 @@ function operationsViewHref(locationSearch: string): string {
   return `?${params.toString()}`;
 }
 
+function auditViewHref(locationSearch: string): string {
+  const params = new URLSearchParams(locationSearch);
+  params.set("view", "audit");
+  params.delete("cursor");
+  return `?${params.toString()}`;
+}
+
 function hasSessionNavigation(capabilities: Capabilities): boolean {
   return (
     capabilities.capabilities.includes("group.read") ||
     capabilities.capabilities.includes("operation.read") ||
+    capabilities.capabilities.includes("audit.read") ||
     capabilities.capabilities.includes("role.manage")
   );
 }
@@ -1015,11 +1180,169 @@ function hasOperationsAccess(capabilities: string[]): boolean {
   return capabilities.includes("operation.read");
 }
 
+function hasAuditAccess(capabilities: string[]): boolean {
+  return capabilities.includes("audit.read");
+}
+
 function hasInventoryAccess(capabilities: string[]): boolean {
   return (
     capabilities.includes("instance.read") ||
     capabilities.includes("hypervisor.read")
   );
+}
+
+function AuditWorkArea({
+  capabilities,
+  csrf,
+  exportState,
+  onAuditExport,
+  onAuditNextPage,
+  state,
+}: {
+  capabilities: Capabilities | null;
+  csrf: string | null;
+  exportState: AuditExportState;
+  onAuditExport: () => void;
+  onAuditNextPage: (cursor: string) => void;
+  state: AuditState;
+}) {
+  if (capabilities === null) {
+    return (
+      <section aria-label="Аудит" className="cloud-ui-workarea">
+        <Bullseye className="cloud-ui-loading">
+          <Spinner aria-label="Загрузка прав аудита" />
+        </Bullseye>
+      </section>
+    );
+  }
+
+  const canExport = capabilities.capabilities.includes("audit.export");
+
+  return (
+    <section aria-label="Аудит" className="cloud-ui-workarea">
+      <div className="cloud-ui-workarea-header cloud-ui-audit-header">
+        <Title headingLevel="h2" size="lg">
+          Аудит
+        </Title>
+        {canExport && (
+          <Button
+            isDisabled={csrf === null || exportState.type === "submitting"}
+            onClick={onAuditExport}
+            type="button"
+            variant="secondary"
+          >
+            {exportState.type === "submitting"
+              ? "Запрос экспорта..."
+              : "Запросить экспорт"}
+          </Button>
+        )}
+      </div>
+
+      {canExport && csrf === null && (
+        <Alert variant="warning" title="CSRF недоступен для экспорта аудита" />
+      )}
+      {exportState.type === "error" && (
+        <Alert variant="danger" title={exportState.message} />
+      )}
+      {exportState.type === "submitted" && (
+        <Alert
+          variant="success"
+          title={`Экспорт принят: ${exportState.exportRequestId}`}
+        />
+      )}
+
+      {state.type === "loading" && (
+        <Bullseye className="cloud-ui-loading">
+          <Spinner aria-label="Загрузка аудита" />
+        </Bullseye>
+      )}
+
+      {state.type === "error" && <Alert variant="danger" title={state.message} />}
+
+      {state.type === "ready" &&
+        (state.page.items.length === 0 ? (
+          <p className="cloud-ui-empty">События аудита не найдены.</p>
+        ) : (
+          <AuditTable page={state.page} onAuditNextPage={onAuditNextPage} />
+        ))}
+    </section>
+  );
+}
+
+function AuditTable({
+  onAuditNextPage,
+  page,
+}: {
+  onAuditNextPage: (cursor: string) => void;
+  page: AuditEventListResponse;
+}) {
+  return (
+    <div className="cloud-ui-inventory-page">
+      <div className="cloud-ui-table-wrapper">
+        <table
+          aria-label="Таблица аудита"
+          className="cloud-ui-table cloud-ui-audit-table"
+        >
+          <thead>
+            <tr>
+              <th scope="col">Event ID</th>
+              <th scope="col">Время</th>
+              <th scope="col">Action</th>
+              <th scope="col">Outcome</th>
+              <th scope="col">Actor</th>
+              <th scope="col">Target</th>
+              <th scope="col">Correlation</th>
+              <th scope="col">Delivery</th>
+              <th scope="col">Error</th>
+              <th scope="col">Metadata</th>
+            </tr>
+          </thead>
+          <tbody>
+            {page.items.map((event) => (
+              <tr key={event.event_id}>
+                <th scope="row">{event.event_id}</th>
+                <td>{formatUtc(event.occurred_at)}</td>
+                <td>{event.action}</td>
+                <td>{event.outcome}</td>
+                <td>{event.actor.display}</td>
+                <td>{formatAuditTarget(event)}</td>
+                <td>{event.correlation_id}</td>
+                <td>{event.delivery_state}</td>
+                <td>{event.safe_error_code ?? "-"}</td>
+                <td>
+                  <code>{formatAuditMetadata(event.metadata)}</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="cloud-ui-pagination">
+        <span className="cloud-ui-muted">Sort: {page.sort}</span>
+        <Button
+          isDisabled={page.next_cursor === null}
+          onClick={() => {
+            if (page.next_cursor !== null) {
+              onAuditNextPage(page.next_cursor);
+            }
+          }}
+          type="button"
+          variant="secondary"
+        >
+          Следующая страница
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function formatAuditTarget(event: AuditEvent): string {
+  return `${event.target.type}:${event.target.id ?? "-"}`;
+}
+
+function formatAuditMetadata(metadata: Record<string, unknown>): string {
+  const serialized = JSON.stringify(metadata);
+  return serialized.length > 96 ? `${serialized.slice(0, 93)}...` : serialized;
 }
 
 function OperationsWorkArea({
