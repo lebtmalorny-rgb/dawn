@@ -109,7 +109,13 @@
   `tests/security/test_mock_identity.py tests/security/test_security_api.py` -> `17 passed`;
   `mypy src` -> success; spec review approved; code quality review found no Critical/Important
   issues.
-- [ ] Group schema implemented and tested.
+- [x] 2026-06-22: Group schema implemented and tested. Evidence: commits
+  `7a94d8e feat: add resource group schema`,
+  `e0790be fix: harden resource group migration schema`,
+  `8105628 fix: tighten resource group migration evidence`; targeted tests
+  `tests/groups/test_group_migration.py tests/inventory/test_inventory_migration.py` -> `3 passed`;
+  scoped Ruff and mypy passed; spec review approved; final code quality review found no
+  Critical/Important/Minor issues.
 - [ ] Group repository and rule compiler implemented and tested.
 - [ ] Group API and group-aware inventory filters implemented and tested.
 - [ ] Frontend group UX implemented and tested.
@@ -126,6 +132,12 @@
 - Existing E04 inventory rows have `project_id` only for instances. Hypervisors are not project-owned,
   so host groups require an explicit P0 admin/system-like rule and must not be silently treated as
   project-owned.
+- Task 2 changed the group-member page index to
+  `(group_id, added_at, resource_type, cloud_id, region_id, resource_id)` so it does not duplicate the
+  member primary key and can support stable member listing.
+- Task 2 review recommended deciding in Task 3 whether revision history needs a unique
+  `(group_id, revision)` constraint. This is not blocking for the schema slice but should be
+  considered when repository write semantics land.
 - `make test` runs backend tests from `backend/` and frontend Vitest. A root-level `pytest` also
   collects `tests/test_e015_kolla_layout.py`, which expects future Kolla files and is not part of the
   current project gate.

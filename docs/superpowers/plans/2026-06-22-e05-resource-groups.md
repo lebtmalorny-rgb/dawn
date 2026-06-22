@@ -210,7 +210,7 @@ def test_group_migration_creates_tables_indexes_and_reversible_order(monkeypatch
     assert (
         "ix_resource_group_members_group_page",
         "resource_group_members",
-        ("group_id", "resource_type", "cloud_id", "region_id", "resource_id"),
+        ("group_id", "added_at", "resource_type", "cloud_id", "region_id", "resource_id"),
     ) in fake_op.created_indexes
 ```
 
@@ -766,4 +766,3 @@ Run:
 git add docs
 git commit -m "docs: update E05 resource group evidence"
 ```
-
