@@ -145,7 +145,18 @@ Markdown evidence under `docs/generated/`.
   `ImportError: cannot import name 'SecretForbiddenError' from 'cloud_ui.secrets'`; after exporting
   all Task 1 public symbols, `cd backend && .venv/bin/python -m pytest tests/secrets/test_provider.py -q`
   passed `4 passed in 0.03s`; Ruff, mypy and `git diff --check` passed.
-- [ ] Vault HTTP adapter implemented.
+- [x] 2026-06-22: Vault HTTP adapter implemented. Evidence: RED
+  `cd backend && .venv/bin/python -m pytest tests/secrets/test_vault_adapter.py -q` failed with
+  `ModuleNotFoundError: No module named 'cloud_ui.secrets.vault'`; GREEN
+  `cd backend && .venv/bin/python -m pytest tests/secrets -q` passed `15 passed in 0.05s`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/secrets tests/secrets` passed;
+  `cd backend && .venv/bin/python -m mypy src/cloud_ui/secrets` passed; `git diff --check` passed.
+  Review fix evidence: sealed/uninitialized 503 RED
+  `cd backend && .venv/bin/python -m pytest tests/secrets/test_vault_adapter.py -q -k "sealed or uninitialized"`
+  failed on `assert calls == 1` with `3 == 1`; after making sealed/uninitialized unavailable
+  responses non-retryable, the focused command passed `2 passed, 11 deselected in 0.04s`, and
+  `cd backend && .venv/bin/python -m pytest tests/secrets -q` passed `17 passed in 0.05s`;
+  Ruff, mypy and `git diff --check` passed.
 - [ ] Config/readiness integration implemented.
 - [ ] Documentation/evidence updated.
 - [ ] Optional lab runbook execution completed or explicitly skipped.
