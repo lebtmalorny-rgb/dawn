@@ -121,7 +121,12 @@ semantics, operation timeline или frontend operation page. Единствен
   `28 passed`.
 - [x] 2026-06-22: E06 design approved and committed. Evidence: commit
   `4341a6e docs: add E06 workflow design`.
-- [ ] 2026-06-22: Operation schema/state machine.
+- [x] 2026-06-22: Operation schema/state machine implemented and tested. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/operations/test_state_machine.py
+  tests/operations/test_operation_migration.py -q` -> `37 passed`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations tests/operations` ->
+  all checks passed; `cd backend && .venv/bin/python -m mypy src/cloud_ui/operations` -> success;
+  `git diff --check` -> success.
 - [ ] 2026-06-22: Operation repository/idempotency/outbox.
 - [ ] 2026-06-22: Workflow catalog/input validation.
 - [ ] 2026-06-22: Submit/detail/cancel API.
