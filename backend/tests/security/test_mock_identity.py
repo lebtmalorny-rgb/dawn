@@ -43,6 +43,17 @@ def test_operator_has_project_scope_and_group_manage() -> None:
     assert "group.manage" in result.subject.capabilities
 
 
+def test_mock_identity_separates_audit_read_and_export() -> None:
+    provider = build_mock_identity_provider()
+
+    auditor = provider.authenticate(LoginRequest(login="auditor", credential="auditor-code"))
+    admin = provider.authenticate(LoginRequest(login="admin", credential="admin-code"))
+
+    assert "audit.read" in auditor.subject.capabilities
+    assert "audit.export" not in auditor.subject.capabilities
+    assert {"audit.read", "audit.export"}.issubset(admin.subject.capabilities)
+
+
 def test_mock_identity_rejects_unknown_credential() -> None:
     provider = build_mock_identity_provider()
 

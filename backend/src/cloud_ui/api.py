@@ -4,8 +4,13 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from starlette.middleware.base import RequestResponseEndpoint
 
 from cloud_ui.audit.repository import AuditRepository
+from cloud_ui.audit.routes import AuditServices, build_audit_router
 from cloud_ui.audit.sink import DurableAuditSink
-from cloud_ui.config import DEV_OPERATION_CURSOR_SIGNING_KEY, get_settings
+from cloud_ui.config import (
+    DEV_AUDIT_CURSOR_SIGNING_KEY,
+    DEV_OPERATION_CURSOR_SIGNING_KEY,
+    get_settings,
+)
 from cloud_ui.groups.repository import GroupRepository
 from cloud_ui.groups.routes import GroupServices, build_group_router
 from cloud_ui.health import HealthReport, ReadinessCheck, build_readiness_check
@@ -51,6 +56,7 @@ def create_app(
     inventory_services: InventoryServices | None = None,
     group_services: GroupServices | None = None,
     operation_services: OperationServices | None = None,
+    audit_services: AuditServices | None = None,
 ) -> FastAPI:
     check = readiness_check
     if check is None:
@@ -108,11 +114,30 @@ def create_app(
             ),
         )
 
+    audit = audit_services
+    if audit is None:
+        audit_repository = (
+            AuditRepository(engine=inventory.engine) if inventory.engine is not None else None
+        )
+        audit = AuditServices(
+            repository=audit_repository,
+            cursor_codec=CursorCodec(
+                signing_key=(
+                    settings.audit_cursor_signing_key
+                    if settings is not None
+                    else DEV_AUDIT_CURSOR_SIGNING_KEY
+                )
+            ),
+            default_limit=settings.audit_default_limit if settings is not None else 50,
+            max_limit=settings.audit_max_limit if settings is not None else 200,
+        )
+
     app = FastAPI(title="Cloud UI API", version="0.1.0")
     app.state.security_services = security
     app.state.inventory_services = inventory
     app.state.group_services = groups
     app.state.operation_services = operations
+    app.state.audit_services = audit
     if inventory.engine is not None:
         app.state.inventory_engine = inventory.engine
 
@@ -135,6 +160,7 @@ def create_app(
     app.include_router(build_health_router(check), prefix="/api/v1")
     app.include_router(build_security_router(security), prefix="/api/v1")
     app.include_router(build_operation_router(operations, security), prefix="/api/v1")
+    app.include_router(build_audit_router(audit, security), prefix="/api/v1")
     app.include_router(build_watcher_router(security), prefix="/api/v1")
     app.include_router(build_masakari_router(security), prefix="/api/v1")
     app.include_router(build_group_router(groups, security), prefix="/api/v1")

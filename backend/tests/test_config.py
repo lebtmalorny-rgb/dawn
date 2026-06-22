@@ -38,6 +38,9 @@ _CLOUD_UI_ENVIRONMENT_NAMES = {
     "CLOUD_UI_AUDIT_DELIVERY_RETRY_DELAY_SECONDS",
     "CLOUD_UI_AUDIT_DELIVERY_BATCH_SIZE",
     "CLOUD_UI_AUDIT_FLUENTD_HTTP_URL",
+    "CLOUD_UI_AUDIT_DEFAULT_LIMIT",
+    "CLOUD_UI_AUDIT_MAX_LIMIT",
+    "CLOUD_UI_AUDIT_CURSOR_SIGNING_KEY",
 }
 
 
@@ -86,6 +89,9 @@ def test_settings_accept_dummy_dev_values() -> None:
     assert settings.audit_delivery_retry_delay_seconds == 30
     assert settings.audit_delivery_batch_size == 20
     assert settings.audit_fluentd_http_url is None
+    assert settings.audit_default_limit == 50
+    assert settings.audit_max_limit == 200
+    assert settings.audit_cursor_signing_key == "dev-audit-cursor-key"
 
 
 def test_settings_reject_dev_inventory_cursor_key_in_production() -> None:
@@ -117,6 +123,19 @@ def test_settings_still_reject_mock_identity_in_production() -> None:
             database_url="mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui",
             rabbitmq_url="amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui",
             environment="production",
+            inventory_cursor_signing_key="production-inventory-cursor-key",
+            operation_cursor_signing_key="production-operation-cursor-key",
+        )
+
+
+def test_settings_reject_dev_audit_cursor_key_in_production() -> None:
+    with pytest.raises(ValidationError, match="development audit cursor signing key"):
+        Settings(
+            database_url="mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui",
+            rabbitmq_url="amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui",
+            environment="production",
+            identity_provider="external",
+            mock_identity_enabled=False,
             inventory_cursor_signing_key="production-inventory-cursor-key",
             operation_cursor_signing_key="production-operation-cursor-key",
         )

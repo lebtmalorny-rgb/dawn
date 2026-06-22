@@ -11,6 +11,7 @@ SameSiteName = Literal["lax", "strict"]
 AuditSinkTypeName = Literal["local", "fluentd_http"]
 DEV_INVENTORY_CURSOR_SIGNING_KEY = "dev-inventory-cursor-key"
 DEV_OPERATION_CURSOR_SIGNING_KEY = "dev-operation-cursor-key"
+DEV_AUDIT_CURSOR_SIGNING_KEY = "dev-audit-cursor-key"
 
 
 class Settings(BaseSettings):
@@ -57,6 +58,12 @@ class Settings(BaseSettings):
     audit_delivery_retry_delay_seconds: int = Field(default=30, ge=1)
     audit_delivery_batch_size: int = Field(default=20, ge=1, le=200)
     audit_fluentd_http_url: AnyUrl | None = None
+    audit_default_limit: int = Field(default=50, ge=1, le=200)
+    audit_max_limit: int = Field(default=200, ge=1, le=200)
+    audit_cursor_signing_key: str = Field(
+        default=DEV_AUDIT_CURSOR_SIGNING_KEY,
+        min_length=16,
+    )
 
     @model_validator(mode="after")
     def reject_unsafe_production_settings(self) -> "Settings":
@@ -74,6 +81,11 @@ class Settings(BaseSettings):
             and self.operation_cursor_signing_key == DEV_OPERATION_CURSOR_SIGNING_KEY
         ):
             raise ValueError("Production cannot use the development operation cursor signing key")
+        if (
+            self.environment == "production"
+            and self.audit_cursor_signing_key == DEV_AUDIT_CURSOR_SIGNING_KEY
+        ):
+            raise ValueError("Production cannot use the development audit cursor signing key")
         return self
 
 

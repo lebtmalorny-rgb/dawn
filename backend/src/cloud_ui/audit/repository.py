@@ -41,6 +41,34 @@ class AuditOutboxItem:
     not_before_at: datetime
 
 
+@dataclass(frozen=True)
+class AuditEventFilters:
+    occurred_from: datetime | None = None
+    occurred_to: datetime | None = None
+    action: str | None = None
+    outcome: str | None = None
+    actor_id: str | None = None
+    target_type: str | None = None
+    target_id: str | None = None
+    request_id: str | None = None
+    correlation_id: str | None = None
+    operation_id: str | None = None
+    delivery_state: str | None = None
+    safe_error_code: str | None = None
+
+
+@dataclass(frozen=True)
+class AuditListCursor:
+    occurred_at: datetime
+    event_id: str
+
+
+@dataclass(frozen=True)
+class AuditEventPage:
+    items: list[AuditEvent]
+    next_cursor: AuditListCursor | None
+
+
 class AuditRepository:
     def __init__(
         self,
@@ -134,6 +162,58 @@ class AuditRepository:
         if claimed is None:
             return None
         return _outbox_from_mapping(claimed)
+
+    def list_events(
+        self,
+        *,
+        filters: AuditEventFilters | None = None,
+        limit: int = 50,
+        cursor: AuditListCursor | None = None,
+    ) -> AuditEventPage:
+        effective_limit = max(1, limit)
+        conditions = _event_filter_conditions(filters or AuditEventFilters())
+        if cursor is not None:
+            cursor_time = _as_utc(cursor.occurred_at)
+            conditions.append(
+                sa.or_(
+                    schema.audit_events.c.occurred_at < cursor_time,
+                    sa.and_(
+                        schema.audit_events.c.occurred_at == cursor_time,
+                        schema.audit_events.c.event_id < cursor.event_id,
+                    ),
+                )
+            )
+        statement = (
+            sa.select(schema.audit_events)
+            .where(*conditions)
+            .order_by(
+                schema.audit_events.c.occurred_at.desc(),
+                schema.audit_events.c.event_id.desc(),
+            )
+            .limit(effective_limit + 1)
+        )
+        with self._engine.connect() as connection:
+            rows = list(connection.execute(statement).mappings())
+
+        page_rows = rows[:effective_limit]
+        next_cursor = None
+        if len(rows) > effective_limit:
+            last = page_rows[-1]
+            next_cursor = AuditListCursor(
+                occurred_at=_as_utc(last["occurred_at"]),
+                event_id=str(last["event_id"]),
+            )
+        return AuditEventPage(
+            items=[_event_from_mapping(row) for row in page_rows],
+            next_cursor=next_cursor,
+        )
+
+    def get_event(self, event_id: str) -> AuditEvent | None:
+        with self._engine.connect() as connection:
+            row = _event_row(connection, event_id)
+        if row is None:
+            return None
+        return _event_from_mapping(row)
 
     def mark_outbox_delivered(
         self,
@@ -365,6 +445,30 @@ def _event_row(connection: Connection, event_id: str) -> RowMapping | None:
         .mappings()
         .one_or_none()
     )
+
+
+def _event_filter_conditions(filters: AuditEventFilters) -> list[Any]:
+    conditions: list[Any] = []
+    if filters.occurred_from is not None:
+        conditions.append(schema.audit_events.c.occurred_at >= _as_utc(filters.occurred_from))
+    if filters.occurred_to is not None:
+        conditions.append(schema.audit_events.c.occurred_at <= _as_utc(filters.occurred_to))
+    for field_name in (
+        "action",
+        "outcome",
+        "actor_id",
+        "target_type",
+        "target_id",
+        "request_id",
+        "correlation_id",
+        "operation_id",
+        "delivery_state",
+        "safe_error_code",
+    ):
+        value = getattr(filters, field_name)
+        if value is not None:
+            conditions.append(getattr(schema.audit_events.c, field_name) == value)
+    return conditions
 
 
 def _outbox_row(connection: Connection, outbox_id: str) -> RowMapping | None:

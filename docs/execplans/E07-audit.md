@@ -167,7 +167,17 @@ heartbeat and full audit source map do not exist.
   src/cloud_ui/config.py tests/audit tests/test_cli.py tests/test_config.py` -> all checks passed;
   `cd backend && .venv/bin/python -m mypy src` -> success;
   `git diff --check` -> success.
-- [ ] Audit API/backend authorization implemented and tested.
+- [x] 2026-06-22: Audit API/backend authorization implemented and tested. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/audit tests/security/test_mock_identity.py
+  tests/security/test_security_api.py tests/test_config.py -q` -> `56 passed`;
+  `cd backend && .venv/bin/python -m pytest --import-mode=importlib tests/security tests/groups
+  tests/inventory tests/operations tests/audit -q` -> `231 passed`;
+  `cd backend && .venv/bin/python -m pytest -q` -> `279 passed, 1 skipped`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/audit src/cloud_ui/api.py
+  src/cloud_ui/config.py src/cloud_ui/security/mock_identity.py tests/audit
+  tests/security/test_mock_identity.py tests/test_config.py` -> all checks passed;
+  `cd backend && .venv/bin/python -m mypy src` -> success;
+  `git diff --check` -> success.
 - [ ] Frontend audit search UX implemented and tested.
 - [ ] Documentation/evidence/lab runbook and final verification completed.
 
@@ -182,6 +192,9 @@ heartbeat and full audit source map do not exist.
   they were removed before committing design/plan docs.
 - Local Node is `25.9.0`, while frontend package requires `>=24 <25`. `npm ci` warns but baseline tests
   pass. This is environment drift, not an E07 code change.
+- Standard backend `pytest -q` initially exposed a collection conflict between
+  `backend/tests/audit/test_repository.py` and `backend/tests/inventory/test_repository.py`. The audit
+  test file was renamed to `test_audit_repository.py`; after the rename, standard backend pytest passes.
 
 ## Журнал решений
 
