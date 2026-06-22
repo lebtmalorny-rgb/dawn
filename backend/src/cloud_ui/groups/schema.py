@@ -60,6 +60,7 @@ resource_group_members = sa.Table(
     sa.Index(
         "ix_resource_group_members_group_page",
         "group_id",
+        "added_at",
         "resource_type",
         "cloud_id",
         "region_id",

@@ -60,7 +60,7 @@ def upgrade() -> None:
     op.create_index(
         "ix_resource_group_members_group_page",
         "resource_group_members",
-        ["group_id", "resource_type", "cloud_id", "region_id", "resource_id"],
+        ["group_id", "added_at", "resource_type", "cloud_id", "region_id", "resource_id"],
     )
     op.create_index(
         "ix_resource_group_members_resource_lookup",
