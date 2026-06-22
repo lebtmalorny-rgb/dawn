@@ -133,7 +133,11 @@ semantics, operation timeline или frontend operation page. Единствен
   `43 passed`; `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations
   tests/operations` -> all checks passed; `cd backend && .venv/bin/python -m mypy
   src/cloud_ui/operations` -> success; `git diff --check` -> success.
-- [ ] 2026-06-22: Workflow catalog/input validation.
+- [x] 2026-06-22: Workflow catalog/input validation implemented and tested. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/operations -q` -> `53 passed`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations tests/operations` ->
+  all checks passed; `cd backend && .venv/bin/python -m mypy src/cloud_ui/operations` -> success;
+  `git diff --check` -> success.
 - [ ] 2026-06-22: Submit/detail/cancel API.
 - [ ] 2026-06-22: Mistral mock adapter and worker.
 - [ ] 2026-06-22: Group target snapshot.
@@ -155,6 +159,9 @@ semantics, operation timeline или frontend operation page. Единствен
 - Repository tests found that `workflow_version` must be part of the operation idempotency primary key.
   Without it, the same actor/key/scope could incorrectly conflict across definition versions. The
   `0005_operations` migration and runtime schema now include `workflow_version` in the PK.
+- The P0 JSON Schema validator intentionally supports only object/string/boolean/integer, enum,
+  required, additionalProperties and scalar bounds. Unsupported keywords such as `pattern` fail closed,
+  so catalog authors cannot assume generic JSON Schema support without adding an ADR-backed dependency.
 
 ## Журнал решений
 
