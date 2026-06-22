@@ -3,7 +3,7 @@ BACKEND_VENV := backend/.venv
 BACKEND_PY := $(BACKEND_VENV)/bin/python
 COMPOSE ?= docker compose
 
-.PHONY: bootstrap format lint typecheck test test-load build up down reset smoke security
+.PHONY: bootstrap format lint typecheck test test-integration test-load build up down reset smoke security
 
 bootstrap:
 	$(PYTHON) -m venv $(BACKEND_VENV)
@@ -27,6 +27,9 @@ typecheck:
 test:
 	cd backend && .venv/bin/python -m pytest -q
 	cd frontend && npm test
+
+test-integration:
+	cd backend && .venv/bin/python -m pytest tests/integrations -q
 
 test-load:
 	$(BACKEND_PY) scripts/e04_scale_report.py

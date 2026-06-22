@@ -170,6 +170,12 @@ semantics, operation timeline или frontend operation page. Единствен
   `cd frontend && npm test -- --run src/App.test.tsx` -> `31 passed`; `cd frontend && npm run
   lint` -> success; `cd frontend && npm run typecheck` -> success; `cd frontend && npm test` ->
   `31 passed`; `cd frontend && npm run build` -> success; `git diff --check` -> success.
+- [x] 2026-06-22: Optional P2 all-in-one Mistral smoke path added as opt-in read-only workflow
+  lookup. Evidence: `cd backend && .venv/bin/python -m pytest
+  tests/integrations/test_mistral_live_smoke.py -q` -> `1 skipped`; `make test-integration` ->
+  `21 passed, 1 skipped`; `cd backend && .venv/bin/python -m ruff check
+  tests/integrations/test_mistral_live_smoke.py` -> all checks passed; `git diff --check` ->
+  success.
 - [ ] 2026-06-22: Documentation/registers/final verification.
 
 ## Неожиданные открытия
@@ -209,6 +215,9 @@ semantics, operation timeline или frontend operation page. Единствен
 - The frontend milestone uses `POST /api/v1/operations` and `GET /api/v1/operations/{id}`. A
   paginated `GET /api/v1/operations` list endpoint remains unimplemented despite being listed in the
   original E06 scope and must be resolved before final closeout or explicitly carried as a risk.
+- The P2 Mistral smoke intentionally uses only `GET /v2/workflows/{workflow_name}`. It proves endpoint
+  reachability and allowlisted workflow visibility for the explicitly configured all-in-one test
+  project; it does not create a Mistral execution and does not prove mutating workflow safety.
 
 ## Журнал решений
 
