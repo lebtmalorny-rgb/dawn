@@ -33,6 +33,11 @@ _CLOUD_UI_ENVIRONMENT_NAMES = {
     "CLOUD_UI_INVENTORY_STALE_AFTER_SECONDS",
     "CLOUD_UI_INVENTORY_SYNTHETIC_INSTANCE_COUNT",
     "CLOUD_UI_INVENTORY_SYNTHETIC_HYPERVISOR_COUNT",
+    "CLOUD_UI_AUDIT_SINK_TYPE",
+    "CLOUD_UI_AUDIT_DELIVERY_MAX_ATTEMPTS",
+    "CLOUD_UI_AUDIT_DELIVERY_RETRY_DELAY_SECONDS",
+    "CLOUD_UI_AUDIT_DELIVERY_BATCH_SIZE",
+    "CLOUD_UI_AUDIT_FLUENTD_HTTP_URL",
 }
 
 
@@ -76,6 +81,11 @@ def test_settings_accept_dummy_dev_values() -> None:
     assert settings.inventory_stale_after_seconds == 900
     assert settings.inventory_synthetic_instance_count == 10_000
     assert settings.inventory_synthetic_hypervisor_count == 1_000
+    assert settings.audit_sink_type == "local"
+    assert settings.audit_delivery_max_attempts == 3
+    assert settings.audit_delivery_retry_delay_seconds == 30
+    assert settings.audit_delivery_batch_size == 20
+    assert settings.audit_fluentd_http_url is None
 
 
 def test_settings_reject_dev_inventory_cursor_key_in_production() -> None:

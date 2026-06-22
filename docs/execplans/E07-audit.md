@@ -159,7 +159,14 @@ heartbeat and full audit source map do not exist.
   tests/audit` -> all checks passed;
   `cd backend && .venv/bin/python -m mypy src` -> success;
   `git diff --check` -> success.
-- [ ] Delivery worker/sinks/heartbeat implemented and tested.
+- [x] 2026-06-22: Delivery worker/sinks/heartbeat implemented and tested. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/audit/test_sinks.py
+  tests/audit/test_delivery_worker.py tests/audit/test_heartbeat.py tests/test_cli.py
+  tests/test_config.py -q` -> `25 passed`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/audit src/cloud_ui/cli.py
+  src/cloud_ui/config.py tests/audit tests/test_cli.py tests/test_config.py` -> all checks passed;
+  `cd backend && .venv/bin/python -m mypy src` -> success;
+  `git diff --check` -> success.
 - [ ] Audit API/backend authorization implemented and tested.
 - [ ] Frontend audit search UX implemented and tested.
 - [ ] Documentation/evidence/lab runbook and final verification completed.

@@ -6,6 +6,9 @@ import uvicorn
 from alembic import command
 from alembic.config import Config
 
+from cloud_ui.audit.delivery import AuditDeliveryWorker
+from cloud_ui.audit.repository import AuditRepository
+from cloud_ui.audit.sinks import LocalTestAuditSink
 from cloud_ui.config import get_settings
 from cloud_ui.db import create_db_engine
 from cloud_ui.inventory.cursor import CursorCodec
@@ -24,8 +27,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cloud-ui")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for command_name in ("api", "events", "db-upgrade", "inventory-sync-synthetic", "smoke"):
+    for command_name in ("api", "db-upgrade", "inventory-sync-synthetic", "smoke"):
         subparsers.add_parser(command_name)
+    events_parser = subparsers.add_parser("events")
+    events_parser.add_argument("--once", action="store_true")
     worker_parser = subparsers.add_parser("worker")
     worker_parser.add_argument("--once", action="store_true")
 
@@ -119,6 +124,26 @@ def run_operation_worker_once() -> int:
     return 0
 
 
+def run_audit_delivery_once() -> int:
+    settings = get_settings()
+    engine = create_db_engine(settings.database_url.unicode_string())
+    try:
+        result = AuditDeliveryWorker(
+            repository=AuditRepository(engine=engine),
+            sink=LocalTestAuditSink(),
+            retry_delay_seconds=settings.audit_delivery_retry_delay_seconds,
+            max_attempts=settings.audit_delivery_max_attempts,
+        ).run_once()
+    finally:
+        engine.dispose()
+
+    if result.processed:
+        print(f"audit delivery processed: event_id={result.event_id} status={result.status}")
+    else:
+        print("audit delivery idle")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -137,6 +162,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_operation_worker_once()
         run_loop("worker")
     elif args.command == "events":
+        if args.once:
+            return run_audit_delivery_once()
         run_loop("events")
     elif args.command == "db-upgrade":
         run_db_upgrade()

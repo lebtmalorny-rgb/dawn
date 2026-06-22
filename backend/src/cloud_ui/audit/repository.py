@@ -135,6 +135,152 @@ class AuditRepository:
             return None
         return _outbox_from_mapping(claimed)
 
+    def mark_outbox_delivered(
+        self,
+        outbox_id: str,
+        *,
+        sink_message_id: str,
+        now: datetime | None = None,
+    ) -> None:
+        delivered_at = _as_utc(now or self._now())
+        with self._engine.begin() as connection:
+            connection.execute(
+                schema.audit_outbox.update()
+                .where(schema.audit_outbox.c.outbox_id == outbox_id)
+                .values(
+                    state="delivered",
+                    delivered_at=delivered_at,
+                    sink_message_id=sink_message_id,
+                    updated_at=delivered_at,
+                )
+            )
+            _update_event_delivery_state(connection, outbox_id=outbox_id, state="delivered")
+
+    def schedule_outbox_retry(
+        self,
+        outbox_id: str,
+        *,
+        safe_error_code: str,
+        retry_at: datetime,
+        now: datetime | None = None,
+    ) -> None:
+        updated_at = _as_utc(now or self._now())
+        with self._engine.begin() as connection:
+            connection.execute(
+                schema.audit_outbox.update()
+                .where(schema.audit_outbox.c.outbox_id == outbox_id)
+                .values(
+                    state="retry_wait",
+                    not_before_at=_as_utc(retry_at),
+                    last_error_code=safe_error_code,
+                    last_error_at=updated_at,
+                    updated_at=updated_at,
+                )
+            )
+            _update_event_delivery_state(connection, outbox_id=outbox_id, state="retry_wait")
+
+    def mark_outbox_dead_letter(
+        self,
+        outbox_id: str,
+        *,
+        safe_error_code: str,
+        now: datetime | None = None,
+    ) -> None:
+        updated_at = _as_utc(now or self._now())
+        with self._engine.begin() as connection:
+            connection.execute(
+                schema.audit_outbox.update()
+                .where(schema.audit_outbox.c.outbox_id == outbox_id)
+                .values(
+                    state="dead_letter",
+                    last_error_code=safe_error_code,
+                    last_error_at=updated_at,
+                    updated_at=updated_at,
+                )
+            )
+            _update_event_delivery_state(connection, outbox_id=outbox_id, state="dead_letter")
+
+    def record_delivery_attempt(
+        self,
+        *,
+        outbox_id: str,
+        event_id: str,
+        sink_id: str,
+        outcome: str,
+        created_at: datetime,
+        attempt_count: int,
+        safe_error_code: str | None = None,
+        ack_id: str | None = None,
+        duration_ms: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        created = _as_utc(created_at)
+        with self._engine.begin() as connection:
+            connection.execute(
+                schema.audit_delivery_attempts.insert().values(
+                    attempt_id=f"{outbox_id}:{attempt_count}",
+                    outbox_id=outbox_id,
+                    event_id=event_id,
+                    sink_id=sink_id,
+                    outcome=outcome,
+                    safe_error_code=safe_error_code,
+                    ack_id=ack_id,
+                    duration_ms=duration_ms,
+                    metadata_json=metadata or {},
+                    created_at=created,
+                )
+            )
+
+    def audit_queue_status(self, *, now: datetime | None = None) -> tuple[int, int | None]:
+        checked_at = _as_utc(now or self._now())
+        with self._engine.connect() as connection:
+            rows = list(
+                connection.execute(
+                    sa.select(schema.audit_outbox.c.not_before_at).where(
+                        schema.audit_outbox.c.state.in_(["pending", "retry_wait", "claimed"])
+                    )
+                ).scalars()
+            )
+        if not rows:
+            return 0, None
+        oldest = min(_as_utc(row) for row in rows)
+        return len(rows), max(0, int((checked_at - oldest).total_seconds()))
+
+    def upsert_heartbeat(
+        self,
+        *,
+        sink_id: str,
+        state: str,
+        at: datetime,
+        queue_depth: int,
+        oldest_pending_age_seconds: int | None,
+    ) -> None:
+        heartbeat_at = _as_utc(at)
+        values = {
+            "state": state,
+            "last_success_at": heartbeat_at if state == "ok" else None,
+            "last_failure_at": heartbeat_at if state != "ok" else None,
+            "queue_depth": queue_depth,
+            "oldest_pending_age_seconds": oldest_pending_age_seconds,
+            "updated_at": heartbeat_at,
+        }
+        with self._engine.begin() as connection:
+            existing = connection.execute(
+                sa.select(schema.audit_heartbeats.c.sink_id).where(
+                    schema.audit_heartbeats.c.sink_id == sink_id
+                )
+            ).one_or_none()
+            if existing is None:
+                connection.execute(
+                    schema.audit_heartbeats.insert().values(sink_id=sink_id, **values)
+                )
+            else:
+                connection.execute(
+                    schema.audit_heartbeats.update()
+                    .where(schema.audit_heartbeats.c.sink_id == sink_id)
+                    .values(**values)
+                )
+
 
 def _event_row_values(
     event: AuditEvent,
@@ -231,6 +377,24 @@ def _outbox_row(connection: Connection, outbox_id: str) -> RowMapping | None:
     )
 
 
+def _update_event_delivery_state(
+    connection: Connection,
+    *,
+    outbox_id: str,
+    state: str,
+) -> None:
+    event_id = (
+        sa.select(schema.audit_outbox.c.event_id)
+        .where(schema.audit_outbox.c.outbox_id == outbox_id)
+        .scalar_subquery()
+    )
+    connection.execute(
+        schema.audit_events.update()
+        .where(schema.audit_events.c.event_id == event_id)
+        .values(delivery_state=state)
+    )
+
+
 def _outbox_from_mapping(row: RowMapping) -> AuditOutboxItem:
     return AuditOutboxItem(
         outbox_id=str(row["outbox_id"]),
@@ -263,4 +427,3 @@ def _as_utc(value: Any) -> datetime:
 
 def _optional_str(value: Any) -> str | None:
     return None if value is None else str(value)
-

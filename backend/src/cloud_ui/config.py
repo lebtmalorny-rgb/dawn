@@ -8,6 +8,7 @@ EnvironmentName = Literal["local", "test", "production"]
 IdentityProviderName = Literal["mock", "external"]
 SessionLimitPolicyName = Literal["deny", "disconnect_oldest"]
 SameSiteName = Literal["lax", "strict"]
+AuditSinkTypeName = Literal["local", "fluentd_http"]
 DEV_INVENTORY_CURSOR_SIGNING_KEY = "dev-inventory-cursor-key"
 DEV_OPERATION_CURSOR_SIGNING_KEY = "dev-operation-cursor-key"
 
@@ -51,6 +52,11 @@ class Settings(BaseSettings):
     inventory_stale_after_seconds: int = Field(default=900, ge=60)
     inventory_synthetic_instance_count: int = Field(default=10_000, ge=1)
     inventory_synthetic_hypervisor_count: int = Field(default=1_000, ge=1)
+    audit_sink_type: AuditSinkTypeName = Field(default="local")
+    audit_delivery_max_attempts: int = Field(default=3, ge=1, le=20)
+    audit_delivery_retry_delay_seconds: int = Field(default=30, ge=1)
+    audit_delivery_batch_size: int = Field(default=20, ge=1, le=200)
+    audit_fluentd_http_url: AnyUrl | None = None
 
     @model_validator(mode="after")
     def reject_unsafe_production_settings(self) -> "Settings":
