@@ -4,26 +4,11 @@ from typing import Any
 
 from pythonjsonlogger.json import JsonFormatter
 
-SECRET_MARKERS = (
-    "password",
-    "passwd",
-    "secret",
-    "token",
-    "credential",
-    "authorization",
-    "database_url",
-    "rabbitmq_url",
-)
+from cloud_ui.audit.redaction import sanitize_metadata
 
 
 def redact_mapping(values: Mapping[str, Any]) -> dict[str, Any]:
-    redacted: dict[str, Any] = {}
-    for key, value in values.items():
-        if any(marker in key.lower() for marker in SECRET_MARKERS):
-            redacted[key] = "***"
-        else:
-            redacted[key] = value
-    return redacted
+    return sanitize_metadata(values)
 
 
 def configure_logging(level: str) -> None:

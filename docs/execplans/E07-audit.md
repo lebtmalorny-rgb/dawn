@@ -139,7 +139,16 @@ heartbeat and full audit source map do not exist.
 - [x] 2026-06-22: E07 design spec approved and committed. Evidence: commit
   `f7f9177 docs: add E07 audit design`.
 - [x] 2026-06-22: E07 ExecPlan created. Evidence: this document.
-- [ ] Audit schema/taxonomy/redaction implemented and tested.
+- [x] 2026-06-22: Audit models/taxonomy/redaction implemented and tested. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/audit/test_models.py
+  tests/audit/test_taxonomy.py tests/audit/test_audit_redaction.py tests/security/test_audit.py
+  tests/test_redaction.py -q` -> `14 passed`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/audit src/cloud_ui/security/audit.py
+  src/cloud_ui/logging.py tests/audit tests/security/test_audit.py tests/test_redaction.py` ->
+  all checks passed;
+  `cd backend && .venv/bin/python -m mypy src/cloud_ui/audit src/cloud_ui/security/audit.py
+  src/cloud_ui/logging.py` -> success;
+  `git diff --check` -> success.
 - [ ] Migration/repository/durable sink implemented and tested.
 - [ ] Delivery worker/sinks/heartbeat implemented and tested.
 - [ ] Audit API/backend authorization implemented and tested.
