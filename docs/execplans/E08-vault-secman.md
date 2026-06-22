@@ -135,7 +135,16 @@ Markdown evidence under `docs/generated/`.
   `abc3f75 docs: add E08 vault secman design`.
 - [x] 2026-06-22: User approved written spec. Evidence: conversation review gate response `ок`.
 - [x] 2026-06-22: Implementation ExecPlan created. Evidence: this document.
-- [ ] Contract and test double implemented.
+- [x] 2026-06-22: Contract and test double implemented. Evidence: RED
+  `cd backend && .venv/bin/python -m pytest tests/secrets/test_provider.py -q` failed with
+  `ModuleNotFoundError: No module named 'cloud_ui.secrets'`; GREEN
+  `cd backend && .venv/bin/python -m pytest tests/secrets/test_provider.py -q` passed
+  `3 passed in 0.49s`; `cd backend && .venv/bin/python -m ruff check src/cloud_ui/secrets tests/secrets`
+  passed; `cd backend && .venv/bin/python -m mypy src/cloud_ui/secrets` passed; `git diff --check`
+  passed. Export review fix evidence: package export test RED failed with
+  `ImportError: cannot import name 'SecretForbiddenError' from 'cloud_ui.secrets'`; after exporting
+  all Task 1 public symbols, `cd backend && .venv/bin/python -m pytest tests/secrets/test_provider.py -q`
+  passed `4 passed in 0.03s`; Ruff, mypy and `git diff --check` passed.
 - [ ] Vault HTTP adapter implemented.
 - [ ] Config/readiness integration implemented.
 - [ ] Documentation/evidence updated.
