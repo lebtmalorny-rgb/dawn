@@ -13,6 +13,9 @@ from cloud_ui.inventory.routes import (
     build_inventory_services,
     unavailable_inventory_services,
 )
+from cloud_ui.operations.catalog import build_builtin_workflow_catalog
+from cloud_ui.operations.repository import OperationRepository
+from cloud_ui.operations.routes import OperationServices, build_operation_router
 from cloud_ui.security.dependencies import SecurityServices, build_security_services
 from cloud_ui.security.routes import build_security_router
 
@@ -42,6 +45,7 @@ def create_app(
     security_services: SecurityServices | None = None,
     inventory_services: InventoryServices | None = None,
     group_services: GroupServices | None = None,
+    operation_services: OperationServices | None = None,
 ) -> FastAPI:
     check = readiness_check
     if check is None:
@@ -71,10 +75,23 @@ def create_app(
             inventory_repository=inventory.repository,
         )
 
+    operations = operation_services
+    if operations is None:
+        operation_repository = (
+            OperationRepository(engine=inventory.engine) if inventory.engine is not None else None
+        )
+        environment = settings.environment if settings is not None else "local"
+        operations = OperationServices(
+            repository=operation_repository,
+            inventory_repository=inventory.repository,
+            catalog=build_builtin_workflow_catalog(environment=environment),
+        )
+
     app = FastAPI(title="Cloud UI API", version="0.1.0")
     app.state.security_services = security
     app.state.inventory_services = inventory
     app.state.group_services = groups
+    app.state.operation_services = operations
     if inventory.engine is not None:
         app.state.inventory_engine = inventory.engine
 
@@ -96,6 +113,7 @@ def create_app(
     app.include_router(build_health_router(check))
     app.include_router(build_health_router(check), prefix="/api/v1")
     app.include_router(build_security_router(security), prefix="/api/v1")
+    app.include_router(build_operation_router(operations, security), prefix="/api/v1")
     app.include_router(build_group_router(groups, security), prefix="/api/v1")
     app.include_router(
         build_inventory_router_with_groups(inventory, security, groups),

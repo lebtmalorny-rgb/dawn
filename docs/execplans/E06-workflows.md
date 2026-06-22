@@ -138,7 +138,12 @@ semantics, operation timeline или frontend operation page. Единствен
   `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations tests/operations` ->
   all checks passed; `cd backend && .venv/bin/python -m mypy src/cloud_ui/operations` -> success;
   `git diff --check` -> success.
-- [ ] 2026-06-22: Submit/detail/cancel API.
+- [x] 2026-06-22: Submit/detail/cancel API implemented and tested for the initial durable accept
+  path. Evidence: `cd backend && .venv/bin/python -m pytest tests/operations
+  tests/security/test_mock_identity.py tests/security/test_security_api.py -q` -> `79 passed`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations tests/operations
+  src/cloud_ui/api.py` -> all checks passed; `cd backend && .venv/bin/python -m mypy src` ->
+  success; `git diff --check` -> success.
 - [ ] 2026-06-22: Mistral mock adapter and worker.
 - [ ] 2026-06-22: Group target snapshot.
 - [ ] 2026-06-22: Watcher/Masakari modules.
@@ -162,6 +167,9 @@ semantics, operation timeline или frontend operation page. Единствен
 - The P0 JSON Schema validator intentionally supports only object/string/boolean/integer, enum,
   required, additionalProperties and scalar bounds. Unsupported keywords such as `pattern` fail closed,
   so catalog authors cannot assume generic JSON Schema support without adding an ADR-backed dependency.
+- The first cancel API is deliberately fail-closed with `operation_not_cancelable` until worker state
+  and Mistral cancel semantics land. This exposes the route shape without pretending cancel is safe for
+  all states.
 
 ## Журнал решений
 
