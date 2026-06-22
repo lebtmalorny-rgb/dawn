@@ -138,7 +138,14 @@
   tests/groups/test_group_rules.py tests/groups/test_group_migration.py
   tests/security/test_security_api.py` -> `54 passed`; scoped Ruff passed; `mypy src` passed;
   spec review approved; final code quality review found no Critical/Important/Minor issues.
-- [ ] Group-aware inventory filters implemented and tested.
+- [x] 2026-06-22: Group-aware inventory filters implemented and tested. Evidence: commits
+  `552f20f feat: filter inventory by resource group`,
+  `f368498 fix: require group read for inventory filters`; targeted tests
+  `tests/inventory/test_repository.py tests/inventory/test_inventory_api.py` -> `42 passed`;
+  combined group/inventory tests `tests/groups/test_group_api.py
+  tests/inventory/test_repository.py tests/inventory/test_inventory_api.py` -> `57 passed`;
+  scoped Ruff passed; `mypy src` passed; spec/quality re-review approved with no
+  Critical/Important/Minor findings.
 - [ ] Frontend group UX implemented and tested.
 - [ ] Documentation, DKB evidence and final verification completed.
 
@@ -178,6 +185,11 @@
 - Same-key/same-payload member replay is still re-evaluated against current membership state rather
   than served from a stored response. This is acceptable for E05 metadata CRUD but must not be copied
   into future destructive workflow idempotency without stronger stored-result semantics.
+- Task 6 group-aware inventory filters require both inventory read capability and `group.read`, then
+  validate group owner/scope access before applying the repository filter. Review caught the missing
+  `group.read` gate before completion.
+- Task 6 uses an `EXISTS` predicate against `resource_group_members` instead of joining into the main
+  inventory page query, preserving stable pagination and preventing duplicate inventory rows.
 - `make test` runs backend tests from `backend/` and frontend Vitest. A root-level `pytest` also
   collects `tests/test_e015_kolla_layout.py`, which expects future Kolla files and is not part of the
   current project gate.
@@ -201,6 +213,11 @@
   not create revisions, but their idempotency keys must still be bound to the original payload.
   Consequence: migration `0004_resource_groups` includes one extra group-owned table that downgrades
   before the revision/member/group tables.
+- 2026-06-22: Implement inventory `group_id` filtering as repository-level `EXISTS` predicates after
+  route-level group authorization. Alternative: route could resolve member ids and pass explicit
+  lists. Reason: server-side SQL keeps pagination/filtering stable and avoids loading whole group
+  membership into the API handler. Consequence: inventory repository now imports the group schema
+  table metadata but does not own group authorization decisions.
 
 ## Детальный план реализации
 
