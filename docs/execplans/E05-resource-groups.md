@@ -104,7 +104,11 @@
   `b92f1f5 docs: add E05 resource groups design`.
 - [x] 2026-06-22: E05 ExecPlan and implementation plan created. Evidence: this file and
   `docs/superpowers/plans/2026-06-22-e05-resource-groups.md`.
-- [ ] P0 scope model implemented and tested.
+- [x] 2026-06-22: P0 scope model implemented and tested. Evidence: commit
+  `8d79942 feat: add project scope to mock subjects`; targeted tests
+  `tests/security/test_mock_identity.py tests/security/test_security_api.py` -> `17 passed`;
+  `mypy src` -> success; spec review approved; code quality review found no Critical/Important
+  issues.
 - [ ] Group schema implemented and tested.
 - [ ] Group repository and rule compiler implemented and tested.
 - [ ] Group API and group-aware inventory filters implemented and tested.
@@ -116,6 +120,9 @@
 - Current `Subject` lacks project scope. E05 cannot safely enforce project-owned groups until the P0
   mock identity and capability response expose a trusted `scope={"type":"project","id":"..."}` for
   viewer/operator test subjects.
+- Task 1 kept `Subject.scope_type` and `Subject.scope_id` as simple Pydantic fields. Review noted
+  this permits inconsistent states such as project scope with null id. This is acceptable for P0 mock
+  data but should become a typed scope value or validator before production identity integration.
 - Existing E04 inventory rows have `project_id` only for instances. Hypervisors are not project-owned,
   so host groups require an explicit P0 admin/system-like rule and must not be silently treated as
   project-owned.
