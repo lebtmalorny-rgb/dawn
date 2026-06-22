@@ -164,7 +164,12 @@ semantics, operation timeline или frontend operation page. Единствен
   src/cloud_ui/masakari src/cloud_ui/api.py tests/operations/test_watcher_masakari_api.py` ->
   all checks passed; `cd backend && .venv/bin/python -m mypy src` -> success;
   `git diff --check` -> success.
-- [ ] 2026-06-22: Frontend operations UX.
+- [x] 2026-06-22: Frontend operations UX implemented for catalog, host precheck submit,
+  operation detail, timeline, cancel state and polling. RED evidence: `cd frontend && npm test --
+  --run src/App.test.tsx` -> 3 new operation tests failed before implementation. GREEN evidence:
+  `cd frontend && npm test -- --run src/App.test.tsx` -> `31 passed`; `cd frontend && npm run
+  lint` -> success; `cd frontend && npm run typecheck` -> success; `cd frontend && npm test` ->
+  `31 passed`; `cd frontend && npm run build` -> success; `git diff --check` -> success.
 - [ ] 2026-06-22: Documentation/registers/final verification.
 
 ## Неожиданные открытия
@@ -196,6 +201,14 @@ semantics, operation timeline или frontend operation page. Единствен
 - FastAPI cannot derive a response field from route return annotations such as
   `dict[str, Any] | JSONResponse`. Watcher/Masakari routes therefore follow the existing backend
   pattern and declare explicit Pydantic `response_model` schemas for public API responses.
+- Frontend mutation UX can submit operations only when the current browser state has a CSRF token.
+  Existing-cookie sessions expose capabilities but not CSRF in the current `/api/v1/session` payload,
+  so the submit button is disabled until login refreshes CSRF in memory. This preserves the current
+  session contract but leaves reload-after-login mutation ergonomics for a later session contract
+  improvement.
+- The frontend milestone uses `POST /api/v1/operations` and `GET /api/v1/operations/{id}`. A
+  paginated `GET /api/v1/operations` list endpoint remains unimplemented despite being listed in the
+  original E06 scope and must be resolved before final closeout or explicitly carried as a risk.
 
 ## Журнал решений
 

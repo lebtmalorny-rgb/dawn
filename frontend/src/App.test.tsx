@@ -121,6 +121,54 @@ function inventoryModulesPayload() {
   };
 }
 
+function workflowDefinitionsPayload() {
+  return {
+    items: [
+      {
+        workflow_key: "maintenance-host-precheck",
+        version: "1.0.0",
+        title: "Host maintenance precheck",
+        description: "Dry-run host maintenance readiness check",
+        target_type: "host",
+        required_capability: "workflow.execute.maintenance-host",
+        risk_level: "low",
+        approval_mode: "none",
+        cancel_policy: "best_effort",
+        checksum: "definition-checksum",
+        mistral_workflow_name: null,
+      },
+    ],
+    limit: 50,
+  };
+}
+
+function operationDetailPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    operation_id: "op-precheck-1",
+    workflow_key: "maintenance-host-precheck",
+    workflow_version: "1.0.0",
+    status: "accepted",
+    correlation_id: "op-precheck-1",
+    external_execution_id: null,
+    created_at: "2026-06-21T10:00:00Z",
+    updated_at: "2026-06-21T10:00:00Z",
+    events: [
+      {
+        event_id: "event-1",
+        event_type: "operation.accepted",
+        from_status: null,
+        to_status: "accepted",
+        outcome: "success",
+        safe_message: "Operation accepted",
+        safe_error_code: null,
+        metadata: { workflow_key: "maintenance-host-precheck" },
+        created_at: "2026-06-21T10:00:00Z",
+      },
+    ],
+    ...overrides,
+  };
+}
+
 function instanceItem(overrides: Record<string, unknown> = {}) {
   return {
     cloud_id: "synthetic",
@@ -519,6 +567,193 @@ test("renders groups navigation for group read capability", async () => {
   ).toBeInTheDocument();
   expect(await screen.findByText("Prod VMs")).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "ВМ" })).not.toBeInTheDocument();
+});
+
+test("renders operations catalog for operation read capability", async () => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["operation.read"]));
+    }
+    if (url === "/api/v1/workflow-definitions?limit=50") {
+      return jsonResponse(workflowDefinitionsPayload());
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(
+    await screen.findByRole("link", { name: "Операции" }),
+  ).toBeInTheDocument();
+  expect(await screen.findByText("Host maintenance precheck")).toBeInTheDocument();
+  expect(screen.getByText("Dry-run host maintenance readiness check")).toBeInTheDocument();
+  expect(screen.getByText("workflow.execute.maintenance-host")).toBeInTheDocument();
+  expect(screen.getByLabelText("Хост")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Запустить precheck" })).toBeDisabled();
+});
+
+test("submits host precheck through BFF with csrf and idempotency key", async () => {
+  const user = userEvent.setup();
+  const storageSet = vi.spyOn(Storage.prototype, "setItem");
+  const fetchMock = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/v1/session") {
+        return jsonResponse(
+          {
+            error: { code: "not_authenticated", message: "Требуется вход" },
+          },
+          401,
+        );
+      }
+      if (url === "/api/v1/health/ready") {
+        return jsonResponse(readyPayload);
+      }
+      if (url === "/api/v1/session/login") {
+        return jsonResponse({
+          subject: operatorSessionPayload.subject,
+          csrf: "csrf-value",
+          expires_at: "2026-06-21T15:00:00Z",
+        });
+      }
+      if (url === "/api/v1/capabilities") {
+        return jsonResponse(
+          capabilitiesPayload([
+            "operation.read",
+            "workflow.execute.maintenance-host",
+          ]),
+        );
+      }
+      if (url === "/api/v1/workflow-definitions?limit=50") {
+        return jsonResponse(workflowDefinitionsPayload());
+      }
+      if (url === "/api/v1/operations") {
+        const headers = init?.headers as Record<string, string>;
+        const body = JSON.parse(String(init?.body));
+        expect(init?.method).toBe("POST");
+        expect(headers["content-type"]).toBe("application/json");
+        expect(headers["x-csrf-token"]).toBe("csrf-value");
+        expect(headers["idempotency-key"]).toEqual(expect.any(String));
+        expect(body).toEqual({
+          workflow_key: "maintenance-host-precheck",
+          version: "1.0.0",
+          targets: [
+            {
+              target_type: "host",
+              cloud_id: "synthetic",
+              region_id: "RegionOne",
+              resource_id: "compute-a",
+            },
+          ],
+          input: { reason: "Плановое обслуживание", dry_run: true },
+        });
+        return jsonResponse({ operation_id: "op-precheck-1", status: "accepted" }, 202);
+      }
+      if (url === "/api/v1/operations/op-precheck-1") {
+        return jsonResponse(
+          operationDetailPayload({
+            status: "running",
+            external_execution_id: "exec-1",
+            events: [
+              {
+                event_id: "event-1",
+                event_type: "operation.accepted",
+                from_status: null,
+                to_status: "accepted",
+                outcome: "success",
+                safe_message: "Operation accepted",
+                safe_error_code: null,
+                metadata: {},
+                created_at: "2026-06-21T10:00:00Z",
+              },
+              {
+                event_id: "event-2",
+                event_type: "operation.dispatched",
+                from_status: "dispatching",
+                to_status: "running",
+                outcome: "success",
+                safe_message: "Mistral execution started",
+                safe_error_code: null,
+                metadata: {},
+                created_at: "2026-06-21T10:00:05Z",
+              },
+            ],
+          }),
+        );
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    },
+  );
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  await user.type(await screen.findByLabelText("Логин"), "operator");
+  await user.type(screen.getByLabelText("Код доступа"), "operator-code");
+  await user.click(screen.getByRole("button", { name: "Войти" }));
+  await user.type(await screen.findByLabelText("Хост"), "compute-a");
+  fireEvent.change(screen.getByLabelText("Причина"), {
+    target: { value: "Плановое обслуживание" },
+  });
+  await user.click(screen.getByRole("button", { name: "Запустить precheck" }));
+
+  expect(await screen.findByText("Статус: running")).toBeInTheDocument();
+  expect(screen.getByText("Mistral execution: exec-1")).toBeInTheDocument();
+  expect(screen.getByText("Mistral execution started")).toBeInTheDocument();
+  expect(window.location.search).toBe(
+    "?view=operations&operation_id=op-precheck-1",
+  );
+  expect(storageSet).not.toHaveBeenCalled();
+});
+
+test("operation detail route renders timeline without direct OpenStack calls", async () => {
+  window.history.replaceState(
+    {},
+    "",
+    "/?view=operations&operation_id=op-precheck-1",
+  );
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload(["operation.read"]));
+    }
+    if (url === "/api/v1/workflow-definitions?limit=50") {
+      return jsonResponse(workflowDefinitionsPayload());
+    }
+    if (url === "/api/v1/operations/op-precheck-1") {
+      return jsonResponse(operationDetailPayload());
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  const timeline = await screen.findByLabelText("Timeline операции");
+  expect(screen.getByText("Операция op-precheck-1")).toBeInTheDocument();
+  expect(screen.getByText("Correlation: op-precheck-1")).toBeInTheDocument();
+  expect(screen.getByText("Mistral execution: -")).toBeInTheDocument();
+  expect(within(timeline).getByText("Operation accepted")).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Запросить отмену" }),
+  ).toBeDisabled();
+  expect(
+    fetchMock.mock.calls.some(([input]) => String(input).includes("openstack")),
+  ).toBe(false);
 });
 
 test("group list renders loading, empty and error states", async () => {

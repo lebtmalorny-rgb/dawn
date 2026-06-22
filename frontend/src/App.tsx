@@ -23,6 +23,9 @@ import {
   type InstanceItem,
   type InventoryModuleDescriptor,
   type InventoryPage,
+  type OperationDetail,
+  type OperationSubmitRequest,
+  type WorkflowDefinition,
   type Readiness,
   type Subject,
   fetchCapabilities,
@@ -33,9 +36,12 @@ import {
   fetchHypervisors,
   fetchInstances,
   fetchInventoryModules,
+  fetchOperation,
   fetchReadiness,
+  fetchWorkflowDefinitions,
   login,
   previewGroupRule,
+  submitOperation,
 } from "./api";
 import "./styles.css";
 
@@ -43,7 +49,7 @@ const READINESS_UNAVAILABLE_MESSAGE = "Готовность API недоступ
 const SESSION_UNAVAILABLE_MESSAGE = "Сессия недоступна";
 const CAPABILITIES_UNAVAILABLE_MESSAGE = "Список прав недоступен";
 
-type PortalView = "inventory" | "groups";
+type PortalView = "inventory" | "groups" | "operations";
 type InventoryView = "instances" | "hypervisors";
 type Density = "compact" | "comfortable";
 type InstanceColumnKey =
@@ -117,7 +123,21 @@ type InventoryModulesState =
   | { type: "ready"; modules: InventoryModuleDescriptor[] }
   | { type: "error"; message: string };
 
+type WorkflowDefinitionsState =
+  | { type: "idle" }
+  | { type: "loading" }
+  | { type: "ready"; definitions: WorkflowDefinition[] }
+  | { type: "error"; message: string };
+
+type OperationDetailState =
+  | { type: "idle" }
+  | { type: "loading"; operationId: string }
+  | { type: "ready"; operation: OperationDetail }
+  | { type: "error"; operationId: string; message: string };
+
 const INVENTORY_MODULES_UNAVAILABLE_MESSAGE = "Модули inventory недоступны";
+const OPERATIONS_UNAVAILABLE_MESSAGE = "Каталог операций недоступен";
+const OPERATION_UNAVAILABLE_MESSAGE = "Операция недоступна";
 
 const INSTANCE_COLUMN_KEYS = [
   "name",
@@ -200,6 +220,14 @@ export function App() {
   const [groupDetailState, setGroupDetailState] = useState<GroupDetailState>({
     type: "idle",
   });
+  const [workflowDefinitionsState, setWorkflowDefinitionsState] =
+    useState<WorkflowDefinitionsState>({
+      type: "idle",
+    });
+  const [operationDetailState, setOperationDetailState] =
+    useState<OperationDetailState>({
+      type: "idle",
+    });
   const [locationSearch, setLocationSearch] = useState(
     () => window.location.search,
   );
@@ -225,6 +253,10 @@ export function App() {
   const selectedGroupId =
     activePortalView === "groups"
       ? new URLSearchParams(locationSearch).get("group_id")
+      : null;
+  const selectedOperationId =
+    activePortalView === "operations"
+      ? new URLSearchParams(locationSearch).get("operation_id")
       : null;
   const capabilitySignature = currentCapabilities?.capabilities.join("|") ?? "";
 
@@ -466,6 +498,100 @@ export function App() {
     selectedGroupId,
   ]);
 
+  useEffect(() => {
+    if (
+      currentCapabilities === null ||
+      activePortalView !== "operations" ||
+      !hasOperationsAccess(currentCapabilities.capabilities)
+    ) {
+      setWorkflowDefinitionsState({ type: "idle" });
+      return;
+    }
+
+    let mounted = true;
+    setWorkflowDefinitionsState({ type: "loading" });
+    fetchWorkflowDefinitions()
+      .then((response) => {
+        if (mounted) {
+          setWorkflowDefinitionsState({
+            type: "ready",
+            definitions: response.items,
+          });
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setWorkflowDefinitionsState({
+            type: "error",
+            message: OPERATIONS_UNAVAILABLE_MESSAGE,
+          });
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [activePortalView, capabilitySignature, currentCapabilities]);
+
+  useEffect(() => {
+    if (
+      currentCapabilities === null ||
+      activePortalView !== "operations" ||
+      selectedOperationId === null ||
+      !hasOperationsAccess(currentCapabilities.capabilities)
+    ) {
+      setOperationDetailState({ type: "idle" });
+      return;
+    }
+
+    let mounted = true;
+    let lastStatus: string | null = null;
+    const operationId = selectedOperationId;
+    const abortController = new AbortController();
+
+    async function loadOperation(showLoading: boolean) {
+      if (showLoading) {
+        setOperationDetailState({
+          type: "loading",
+          operationId,
+        });
+      }
+      try {
+        const operation = await fetchOperation(operationId, abortController.signal);
+        if (mounted) {
+          lastStatus = operation.status;
+          setOperationDetailState({ type: "ready", operation });
+        }
+      } catch (error: unknown) {
+        if (mounted && !isAbortError(error)) {
+          setOperationDetailState({
+            type: "error",
+            operationId,
+            message: OPERATION_UNAVAILABLE_MESSAGE,
+          });
+        }
+      }
+    }
+
+    void loadOperation(true);
+    const interval = window.setInterval(() => {
+      if (lastStatus === null || !isOperationTerminal(lastStatus)) {
+        void loadOperation(false);
+      }
+    }, 5000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+      abortController.abort();
+    };
+  }, [
+    activePortalView,
+    capabilitySignature,
+    currentCapabilities,
+    selectedOperationId,
+  ]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
@@ -547,6 +673,31 @@ export function App() {
     for (const key of INVENTORY_FILTER_KEYS) {
       params.delete(key);
     }
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
+    setLocationSearch(window.location.search);
+  }
+
+  function handleOperationsViewSelect() {
+    const params = new URLSearchParams(locationSearch);
+    params.set("view", "operations");
+    params.delete("cursor");
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
+    setLocationSearch(window.location.search);
+  }
+
+  function handleOperationSubmitted(operationId: string) {
+    const params = new URLSearchParams(locationSearch);
+    params.set("view", "operations");
+    params.set("operation_id", operationId);
+    params.delete("cursor");
     window.history.pushState(
       {},
       "",
@@ -647,9 +798,21 @@ export function App() {
                             {authState.capabilities.capabilities.includes(
                               "operation.read",
                             ) && (
-                              <span className="cloud-ui-nav-item">
+                              <a
+                                aria-current={
+                                  activePortalView === "operations"
+                                    ? "page"
+                                    : undefined
+                                }
+                                className="cloud-ui-nav-item"
+                                href={operationsViewHref(locationSearch)}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  handleOperationsViewSelect();
+                                }}
+                              >
                                 Операции
-                              </span>
+                              </a>
                             )}
                             {authState.capabilities.capabilities.includes(
                               "role.manage",
@@ -725,7 +888,20 @@ export function App() {
             )}
 
           {authState.type === "authenticated" &&
-            activePortalView !== "groups" && (
+            activePortalView === "operations" && (
+              <OperationsWorkArea
+                capabilities={authState.capabilities}
+                csrf={authState.csrf}
+                detailState={operationDetailState}
+                onOperationSubmitted={handleOperationSubmitted}
+                selectedOperationId={selectedOperationId}
+                state={workflowDefinitionsState}
+              />
+            )}
+
+          {authState.type === "authenticated" &&
+            activePortalView !== "groups" &&
+            activePortalView !== "operations" && (
               <InventoryWorkArea
                 activeView={activeInventoryView}
                 capabilities={authState.capabilities}
@@ -749,9 +925,13 @@ function resolveActivePortalView(
 ): PortalView | null {
   const requestedView = new URLSearchParams(locationSearch).get("view");
   const canReadGroups = hasGroupsAccess(capabilities);
+  const canReadOperations = hasOperationsAccess(capabilities);
 
   if (requestedView === "groups" && canReadGroups) {
     return "groups";
+  }
+  if (requestedView === "operations" && canReadOperations) {
+    return "operations";
   }
   if (
     (requestedView === "instances" || requestedView === "hypervisors") &&
@@ -764,6 +944,9 @@ function resolveActivePortalView(
   }
   if (canReadGroups) {
     return "groups";
+  }
+  if (canReadOperations) {
+    return "operations";
   }
   return null;
 }
@@ -809,6 +992,13 @@ function groupViewHref(locationSearch: string): string {
   return `?${params.toString()}`;
 }
 
+function operationsViewHref(locationSearch: string): string {
+  const params = new URLSearchParams(locationSearch);
+  params.set("view", "operations");
+  params.delete("cursor");
+  return `?${params.toString()}`;
+}
+
 function hasSessionNavigation(capabilities: Capabilities): boolean {
   return (
     capabilities.capabilities.includes("group.read") ||
@@ -821,10 +1011,315 @@ function hasGroupsAccess(capabilities: string[]): boolean {
   return capabilities.includes("group.read");
 }
 
+function hasOperationsAccess(capabilities: string[]): boolean {
+  return capabilities.includes("operation.read");
+}
+
 function hasInventoryAccess(capabilities: string[]): boolean {
   return (
     capabilities.includes("instance.read") ||
     capabilities.includes("hypervisor.read")
+  );
+}
+
+function OperationsWorkArea({
+  capabilities,
+  csrf,
+  detailState,
+  onOperationSubmitted,
+  selectedOperationId,
+  state,
+}: {
+  capabilities: Capabilities | null;
+  csrf: string | null;
+  detailState: OperationDetailState;
+  onOperationSubmitted: (operationId: string) => void;
+  selectedOperationId: string | null;
+  state: WorkflowDefinitionsState;
+}) {
+  if (capabilities === null) {
+    return (
+      <section aria-label="Операции" className="cloud-ui-workarea">
+        <Bullseye className="cloud-ui-loading">
+          <Spinner aria-label="Загрузка прав операций" />
+        </Bullseye>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="Операции" className="cloud-ui-workarea">
+      <div className="cloud-ui-workarea-header">
+        <Title headingLevel="h2" size="lg">
+          Операции
+        </Title>
+      </div>
+
+      {state.type === "loading" && (
+        <Bullseye className="cloud-ui-loading">
+          <Spinner aria-label="Загрузка каталога операций" />
+        </Bullseye>
+      )}
+
+      {state.type === "error" && <Alert variant="danger" title={state.message} />}
+
+      {state.type === "ready" &&
+        (state.definitions.length === 0 ? (
+          <p className="cloud-ui-empty">Операции недоступны.</p>
+        ) : (
+          <div className="cloud-ui-operations-grid">
+            <OperationSubmitPanel
+              capabilities={capabilities}
+              csrf={csrf}
+              definition={state.definitions[0]}
+              onOperationSubmitted={onOperationSubmitted}
+            />
+            <OperationDetailPanel
+              csrf={csrf}
+              selectedOperationId={selectedOperationId}
+              state={detailState}
+            />
+          </div>
+        ))}
+    </section>
+  );
+}
+
+function OperationSubmitPanel({
+  capabilities,
+  csrf,
+  definition,
+  onOperationSubmitted,
+}: {
+  capabilities: Capabilities;
+  csrf: string | null;
+  definition: WorkflowDefinition;
+  onOperationSubmitted: (operationId: string) => void;
+}) {
+  const [host, setHost] = useState("");
+  const [reason, setReason] = useState("Проверка перед обслуживанием");
+  const [submitState, setSubmitState] = useState<
+    | { type: "idle" }
+    | { type: "submitting" }
+    | { type: "error"; message: string }
+    | { type: "submitted"; operationId: string }
+  >({ type: "idle" });
+  const canExecute = capabilities.capabilities.includes(
+    definition.required_capability,
+  );
+  const canSubmit =
+    canExecute &&
+    csrf !== null &&
+    host.trim() !== "" &&
+    reason.trim() !== "" &&
+    submitState.type !== "submitting";
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit || csrf === null) {
+      return;
+    }
+
+    const body: OperationSubmitRequest = {
+      workflow_key: definition.workflow_key,
+      version: definition.version,
+      targets: [
+        {
+          target_type: definition.target_type,
+          cloud_id: "synthetic",
+          region_id: "RegionOne",
+          resource_id: host.trim(),
+        },
+      ],
+      input: { reason: reason.trim(), dry_run: true },
+    };
+
+    setSubmitState({ type: "submitting" });
+    try {
+      const response = await submitOperation(
+        body,
+        csrf,
+        createIdempotencyKey(),
+      );
+      setSubmitState({
+        type: "submitted",
+        operationId: response.operation_id,
+      });
+      onOperationSubmitted(response.operation_id);
+    } catch (error: unknown) {
+      setSubmitState({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Операцию не удалось отправить",
+      });
+    }
+  }
+
+  return (
+    <section
+      aria-label="Запуск операции"
+      className="cloud-ui-operation-panel"
+    >
+      <div className="cloud-ui-operation-definition">
+        <Title headingLevel="h3" size="md">
+          {definition.title}
+        </Title>
+        <p className="cloud-ui-muted">{definition.description}</p>
+        <div className="cloud-ui-inventory-notices" aria-label="Параметры workflow">
+          <span className="cloud-ui-badge">{definition.required_capability}</span>
+          <span className="cloud-ui-badge">Risk: {definition.risk_level}</span>
+          <span className="cloud-ui-badge">Approval: {definition.approval_mode}</span>
+          <span className="cloud-ui-badge">Dry-run включен</span>
+        </div>
+      </div>
+
+      <form className="cloud-ui-operation-form" onSubmit={handleSubmit}>
+        <label>
+          <span>Хост</span>
+          <input
+            onChange={(event) => setHost(event.target.value)}
+            placeholder="compute-a"
+            type="text"
+            value={host}
+          />
+        </label>
+        <label>
+          <span>Причина</span>
+          <textarea
+            onChange={(event) => setReason(event.target.value)}
+            rows={3}
+            value={reason}
+          />
+        </label>
+        <Button isDisabled={!canSubmit} type="submit" variant="primary">
+          {submitState.type === "submitting"
+            ? "Отправка..."
+            : "Запустить precheck"}
+        </Button>
+      </form>
+
+      {!canExecute && (
+        <Alert
+          variant="warning"
+          title="Нет права workflow.execute.maintenance-host"
+        />
+      )}
+      {canExecute && csrf === null && (
+        <Alert variant="warning" title="CSRF недоступен для отправки операции" />
+      )}
+      {submitState.type === "error" && (
+        <Alert variant="danger" title={submitState.message} />
+      )}
+      {submitState.type === "submitted" && (
+        <Alert
+          variant="success"
+          title={`Операция принята: ${submitState.operationId}`}
+        />
+      )}
+    </section>
+  );
+}
+
+function OperationDetailPanel({
+  csrf,
+  selectedOperationId,
+  state,
+}: {
+  csrf: string | null;
+  selectedOperationId: string | null;
+  state: OperationDetailState;
+}) {
+  if (selectedOperationId === null) {
+    return (
+      <section
+        aria-label="Детали операции"
+        className="cloud-ui-operation-panel"
+      >
+        <Title headingLevel="h3" size="md">
+          Timeline
+        </Title>
+        <p className="cloud-ui-empty">Операция не выбрана.</p>
+      </section>
+    );
+  }
+
+  if (state.type === "loading") {
+    return (
+      <section
+        aria-label="Детали операции"
+        className="cloud-ui-operation-panel"
+      >
+        <Bullseye className="cloud-ui-loading">
+          <Spinner aria-label="Загрузка операции" />
+        </Bullseye>
+      </section>
+    );
+  }
+
+  if (state.type === "error") {
+    return (
+      <section
+        aria-label="Детали операции"
+        className="cloud-ui-operation-panel"
+      >
+        <Alert variant="danger" title={state.message} />
+      </section>
+    );
+  }
+
+  if (state.type !== "ready") {
+    return null;
+  }
+
+  const operation = state.operation;
+  const cancelDisabled = csrf === null || isOperationTerminal(operation.status);
+
+  return (
+    <section aria-label="Детали операции" className="cloud-ui-operation-panel">
+      <div className="cloud-ui-group-detail-header">
+        <Title headingLevel="h3" size="md">
+          Операция {operation.operation_id}
+        </Title>
+        <Button isDisabled={cancelDisabled} type="button" variant="secondary">
+          Запросить отмену
+        </Button>
+      </div>
+
+      <dl className="cloud-ui-detail-list cloud-ui-operation-detail-list">
+        <div>
+          <dt>Статус</dt>
+          <dd>Статус: {operation.status}</dd>
+        </div>
+        <div>
+          <dt>Correlation</dt>
+          <dd>Correlation: {operation.correlation_id}</dd>
+        </div>
+        <div>
+          <dt>Mistral</dt>
+          <dd>
+            Mistral execution: {operation.external_execution_id ?? "-"}
+          </dd>
+        </div>
+        <div>
+          <dt>Обновлено</dt>
+          <dd>{formatUtc(operation.updated_at)}</dd>
+        </div>
+      </dl>
+
+      <ul className="cloud-ui-timeline" aria-label="Timeline операции">
+        {operation.events.map((event) => (
+          <li key={event.event_id}>
+            <span>{event.safe_message}</span>
+            <span className="cloud-ui-muted">
+              {event.from_status ?? "-"} - {event.to_status ?? "-"} /{" "}
+              {event.outcome} / {formatUtc(event.created_at)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -1941,6 +2436,22 @@ function previewItemLabel(item: Record<string, unknown>): string {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
+}
+
+function isOperationTerminal(status: string): boolean {
+  return [
+    "succeeded",
+    "partially_succeeded",
+    "failed",
+    "cancelled",
+  ].includes(status);
+}
+
+function createIdempotencyKey(): string {
+  if (globalThis.crypto?.randomUUID !== undefined) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `operation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function formatRam(value: number): string {

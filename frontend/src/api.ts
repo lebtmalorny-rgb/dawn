@@ -148,6 +148,69 @@ export type InventoryModuleDescriptor = {
   reason: string | null;
 };
 
+export type WorkflowDefinition = {
+  workflow_key: string;
+  version: string;
+  title: string;
+  description: string;
+  target_type: "host" | "vm" | "group";
+  required_capability: string;
+  risk_level: string;
+  approval_mode: string;
+  cancel_policy: string;
+  checksum: string;
+  mistral_workflow_name: null;
+};
+
+export type WorkflowDefinitionListResponse = {
+  items: WorkflowDefinition[];
+  limit: number;
+};
+
+export type OperationTargetRequest = {
+  target_type: "host" | "vm" | "group";
+  cloud_id: string;
+  region_id: string;
+  resource_id: string;
+  expected_revision?: number;
+};
+
+export type OperationSubmitRequest = {
+  workflow_key: string;
+  version: string;
+  targets: OperationTargetRequest[];
+  input: Record<string, unknown>;
+};
+
+export type OperationSubmitResponse = {
+  operation_id: string;
+  status: string;
+};
+
+export type OperationEvent = {
+  event_id: string;
+  event_type: string;
+  from_status: string | null;
+  to_status: string | null;
+  outcome: string;
+  safe_message: string;
+  safe_error_code: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type OperationDetail = {
+  operation_id: string;
+  workflow_key: string;
+  workflow_version: string;
+  status: string;
+  correlation_id: string;
+  external_execution_id: string | null;
+  created_at: string;
+  updated_at: string;
+  events: OperationEvent[];
+};
+
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -355,6 +418,77 @@ function isInventoryModulesPayload(
     isPlainRecord(payload) &&
     Array.isArray(payload.modules) &&
     payload.modules.every(isInventoryModuleDescriptor)
+  );
+}
+
+function isWorkflowDefinition(value: unknown): value is WorkflowDefinition {
+  return (
+    isPlainRecord(value) &&
+    typeof value.workflow_key === "string" &&
+    typeof value.version === "string" &&
+    typeof value.title === "string" &&
+    typeof value.description === "string" &&
+    (value.target_type === "host" ||
+      value.target_type === "vm" ||
+      value.target_type === "group") &&
+    typeof value.required_capability === "string" &&
+    typeof value.risk_level === "string" &&
+    typeof value.approval_mode === "string" &&
+    typeof value.cancel_policy === "string" &&
+    typeof value.checksum === "string" &&
+    value.mistral_workflow_name === null
+  );
+}
+
+function isWorkflowDefinitionListResponse(
+  payload: unknown,
+): payload is WorkflowDefinitionListResponse {
+  return (
+    isPlainRecord(payload) &&
+    Array.isArray(payload.items) &&
+    payload.items.every(isWorkflowDefinition) &&
+    isNumber(payload.limit)
+  );
+}
+
+function isOperationSubmitResponse(
+  payload: unknown,
+): payload is OperationSubmitResponse {
+  return (
+    isPlainRecord(payload) &&
+    typeof payload.operation_id === "string" &&
+    typeof payload.status === "string"
+  );
+}
+
+function isOperationEvent(value: unknown): value is OperationEvent {
+  return (
+    isPlainRecord(value) &&
+    typeof value.event_id === "string" &&
+    typeof value.event_type === "string" &&
+    isStringOrNull(value.from_status) &&
+    isStringOrNull(value.to_status) &&
+    typeof value.outcome === "string" &&
+    typeof value.safe_message === "string" &&
+    isStringOrNull(value.safe_error_code) &&
+    isPlainRecord(value.metadata) &&
+    typeof value.created_at === "string"
+  );
+}
+
+function isOperationDetail(payload: unknown): payload is OperationDetail {
+  return (
+    isPlainRecord(payload) &&
+    typeof payload.operation_id === "string" &&
+    typeof payload.workflow_key === "string" &&
+    typeof payload.workflow_version === "string" &&
+    typeof payload.status === "string" &&
+    typeof payload.correlation_id === "string" &&
+    isStringOrNull(payload.external_execution_id) &&
+    typeof payload.created_at === "string" &&
+    typeof payload.updated_at === "string" &&
+    Array.isArray(payload.events) &&
+    payload.events.every(isOperationEvent)
   );
 }
 
@@ -607,6 +741,57 @@ export async function fetchInventoryModules(): Promise<
   }
 
   throw new Error("Список модулей inventory недоступен");
+}
+
+export async function fetchWorkflowDefinitions(): Promise<WorkflowDefinitionListResponse> {
+  const response = await fetch("/api/v1/workflow-definitions?limit=50");
+  const payload: unknown = await response.json();
+
+  if (response.ok && isWorkflowDefinitionListResponse(payload)) {
+    return payload;
+  }
+
+  throw new Error("Каталог операций недоступен");
+}
+
+export async function submitOperation(
+  body: OperationSubmitRequest,
+  csrf: string,
+  idempotencyKey: string,
+): Promise<OperationSubmitResponse> {
+  const response = await fetch("/api/v1/operations", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "idempotency-key": idempotencyKey,
+      "x-csrf-token": csrf,
+    },
+    body: JSON.stringify(body),
+  });
+  const payload: unknown = await response.json();
+
+  if (response.ok && isOperationSubmitResponse(payload)) {
+    return payload;
+  }
+
+  throw new Error(errorMessage(payload, "Операцию не удалось отправить"));
+}
+
+export async function fetchOperation(
+  operationId: string,
+  signal?: AbortSignal,
+): Promise<OperationDetail> {
+  const response = await fetch(
+    `/api/v1/operations/${encodeURIComponent(operationId)}`,
+    signal === undefined ? undefined : { signal },
+  );
+  const payload: unknown = await response.json();
+
+  if (response.ok && isOperationDetail(payload)) {
+    return payload;
+  }
+
+  throw new Error(errorMessage(payload, "Операция недоступна"));
 }
 
 export async function fetchGroups(
