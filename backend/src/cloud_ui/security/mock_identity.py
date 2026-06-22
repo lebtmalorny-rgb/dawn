@@ -40,6 +40,8 @@ def build_mock_identity_provider() -> MockIdentityProvider:
                     subject_id="mock-user-viewer",
                     display_name="Наблюдатель облака",
                     subject_type="human",
+                    scope_type="project",
+                    scope_id="project-a",
                     roles=frozenset({"cloud_viewer"}),
                     capabilities=frozenset(
                         {
@@ -58,12 +60,15 @@ def build_mock_identity_provider() -> MockIdentityProvider:
                     subject_id="mock-user-operator",
                     display_name="Оператор облака",
                     subject_type="human",
+                    scope_type="project",
+                    scope_id="project-a",
                     roles=frozenset({"cloud_operator"}),
                     capabilities=frozenset(
                         {
                             "instance.read",
                             "hypervisor.read",
                             "group.read",
+                            "group.manage",
                             "operation.read",
                             "instance.refresh",
                             "workflow.execute.maintenance-host",
@@ -78,6 +83,8 @@ def build_mock_identity_provider() -> MockIdentityProvider:
                     subject_id="mock-user-auditor",
                     display_name="Аудитор безопасности",
                     subject_type="human",
+                    scope_type="system",
+                    scope_id=None,
                     roles=frozenset({"security_auditor"}),
                     capabilities=frozenset({"audit.read", "operation.read"}),
                 ),
@@ -89,6 +96,8 @@ def build_mock_identity_provider() -> MockIdentityProvider:
                     subject_id="mock-user-admin",
                     display_name="Администратор портала",
                     subject_type="human",
+                    scope_type="system",
+                    scope_id=None,
                     roles=frozenset({"portal_admin"}),
                     capabilities=frozenset(
                         {
@@ -96,6 +105,8 @@ def build_mock_identity_provider() -> MockIdentityProvider:
                             "instance.read",
                             "instance.refresh",
                             "hypervisor.read",
+                            "group.read",
+                            "group.manage",
                             "operation.read",
                             "role.manage",
                             "session.manage",

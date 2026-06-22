@@ -22,6 +22,7 @@ def test_mock_identity_authenticates_known_operator_without_browser_secrets() ->
             "instance.refresh",
             "hypervisor.read",
             "group.read",
+            "group.manage",
             "operation.read",
             "workflow.execute.maintenance-host",
         }
@@ -30,6 +31,16 @@ def test_mock_identity_authenticates_known_operator_without_browser_secrets() ->
     serialized = result.model_dump()
     assert "operator-code" not in repr(serialized)
     assert "token" not in repr(serialized).lower()
+
+
+def test_operator_has_project_scope_and_group_manage() -> None:
+    provider = build_mock_identity_provider()
+
+    result = provider.authenticate(LoginRequest(login="operator", credential="operator-code"))
+
+    assert result.subject.scope_type == "project"
+    assert result.subject.scope_id == "project-a"
+    assert "group.manage" in result.subject.capabilities
 
 
 def test_mock_identity_rejects_unknown_credential() -> None:

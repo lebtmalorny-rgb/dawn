@@ -22,6 +22,8 @@ class Subject(BaseModel):
     subject_id: str
     display_name: str
     subject_type: SubjectType
+    scope_type: Literal["project", "system"] = "system"
+    scope_id: str | None = None
     roles: frozenset[str]
     capabilities: frozenset[str]
 

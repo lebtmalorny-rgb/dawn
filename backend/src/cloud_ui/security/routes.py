@@ -162,7 +162,7 @@ def build_security_router(services: SecurityServices) -> APIRouter:
         if isinstance(session, JSONResponse):
             return session
         return CapabilitiesResponse(
-            scope={"type": "system", "id": None},
+            scope={"type": session.subject.scope_type, "id": session.subject.scope_id},
             capabilities=sorted(session.subject.capabilities),
             expires_at=session.absolute_expires_at,
             policy_revision=services.policy_service.policy_revision,

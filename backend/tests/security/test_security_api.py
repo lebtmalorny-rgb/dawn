@@ -60,7 +60,9 @@ def test_login_current_session_and_capabilities_use_server_side_cookie() -> None
     capabilities_response = client.get("/api/v1/capabilities")
     assert capabilities_response.status_code == 200
     capabilities = capabilities_response.json()
+    assert capabilities["scope"] == {"type": "project", "id": "project-a"}
     assert "workflow.execute.maintenance-host" in capabilities["capabilities"]
+    assert "group.manage" in capabilities["capabilities"]
     assert "policy_expression" not in repr(capabilities)
     assert csrf
     assert any(event.action == "session.login" for event in security.audit_sink.events)
