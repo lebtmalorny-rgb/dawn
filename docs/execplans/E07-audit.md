@@ -149,7 +149,16 @@ heartbeat and full audit source map do not exist.
   `cd backend && .venv/bin/python -m mypy src/cloud_ui/audit src/cloud_ui/security/audit.py
   src/cloud_ui/logging.py` -> success;
   `git diff --check` -> success.
-- [ ] Migration/repository/durable sink implemented and tested.
+- [x] 2026-06-22: Migration/repository/durable sink implemented and tested. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/audit/test_audit_migration.py
+  tests/audit/test_repository.py tests/audit/test_durable_sink.py -q` -> `7 passed`;
+  `cd backend && .venv/bin/python -m pytest tests/security tests/groups tests/inventory
+  tests/operations -q` -> `198 passed`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/audit
+  src/cloud_ui/migrations/versions/0006_audit_delivery.py src/cloud_ui/security src/cloud_ui/api.py
+  tests/audit` -> all checks passed;
+  `cd backend && .venv/bin/python -m mypy src` -> success;
+  `git diff --check` -> success.
 - [ ] Delivery worker/sinks/heartbeat implemented and tested.
 - [ ] Audit API/backend authorization implemented and tested.
 - [ ] Frontend audit search UX implemented and tested.

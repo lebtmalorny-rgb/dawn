@@ -3,6 +3,8 @@ from uuid import uuid4
 from fastapi import APIRouter, FastAPI, Request, Response
 from starlette.middleware.base import RequestResponseEndpoint
 
+from cloud_ui.audit.repository import AuditRepository
+from cloud_ui.audit.sink import DurableAuditSink
 from cloud_ui.config import DEV_OPERATION_CURSOR_SIGNING_KEY, get_settings
 from cloud_ui.groups.repository import GroupRepository
 from cloud_ui.groups.routes import GroupServices, build_group_router
@@ -57,16 +59,24 @@ def create_app(
     else:
         settings = None
 
-    security = security_services
-    if security is None:
-        security = build_security_services(settings)
-
     inventory = inventory_services
     if inventory is None:
         if settings is None:
             inventory = unavailable_inventory_services()
         else:
             inventory = build_inventory_services(settings)
+
+    security = security_services
+    if security is None:
+        audit_sink = (
+            DurableAuditSink(
+                repository=AuditRepository(engine=inventory.engine),
+                keep_events_for_tests=settings is None,
+            )
+            if inventory.engine is not None
+            else None
+        )
+        security = build_security_services(settings, audit_sink=audit_sink)
 
     groups = group_services
     if groups is None:
