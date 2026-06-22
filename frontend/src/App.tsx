@@ -10,12 +10,15 @@ import {
   Page,
   PageSection,
   Spinner,
-  Title
+  Title,
 } from "@patternfly/react-core";
 import { type FormEvent, useEffect, useState } from "react";
 
 import {
   type Capabilities,
+  type GroupMember,
+  type GroupPreviewResponse,
+  type ResourceGroup,
   type HypervisorItem,
   type InstanceItem,
   type InventoryModuleDescriptor,
@@ -24,11 +27,15 @@ import {
   type Subject,
   fetchCapabilities,
   fetchCurrentSession,
+  fetchGroup,
+  fetchGroupMembers,
+  fetchGroups,
   fetchHypervisors,
   fetchInstances,
   fetchInventoryModules,
   fetchReadiness,
-  login
+  login,
+  previewGroupRule,
 } from "./api";
 import "./styles.css";
 
@@ -36,6 +43,7 @@ const READINESS_UNAVAILABLE_MESSAGE = "Готовность API недоступ
 const SESSION_UNAVAILABLE_MESSAGE = "Сессия недоступна";
 const CAPABILITIES_UNAVAILABLE_MESSAGE = "Список прав недоступен";
 
+type PortalView = "inventory" | "groups";
 type InventoryView = "instances" | "hypervisors";
 type Density = "compact" | "comfortable";
 type InstanceColumnKey =
@@ -78,6 +86,31 @@ type InventoryState =
   | { type: "ready"; view: "hypervisors"; page: InventoryPage<HypervisorItem> }
   | { type: "error"; view: InventoryView; message: string };
 
+type GroupState =
+  | { type: "idle" }
+  | { type: "loading" }
+  | { type: "ready"; groups: ResourceGroup[] }
+  | { type: "error"; message: string };
+
+type GroupDetailState =
+  | { type: "idle" }
+  | { type: "loading"; groupId: string }
+  | { type: "ready"; group: ResourceGroup; members: GroupMember[] }
+  | { type: "error"; groupId: string; message: string };
+
+type MemberSearchState =
+  | { type: "idle" }
+  | { type: "loading" }
+  | { type: "instances"; page: InventoryPage<InstanceItem> }
+  | { type: "hypervisors"; page: InventoryPage<HypervisorItem> }
+  | { type: "error"; message: string };
+
+type PreviewState =
+  | { type: "idle" }
+  | { type: "loading" }
+  | { type: "ready"; response: GroupPreviewResponse }
+  | { type: "error"; message: string };
+
 type InventoryModulesState =
   | { type: "idle" }
   | { type: "loading" }
@@ -93,7 +126,7 @@ const INSTANCE_COLUMN_KEYS = [
   "host_name",
   "hypervisor_id",
   "availability_zone",
-  "observed_at"
+  "observed_at",
 ] as const;
 const DEFAULT_INSTANCE_COLUMNS: InstanceColumnKey[] = [
   "name",
@@ -102,7 +135,7 @@ const DEFAULT_INSTANCE_COLUMNS: InstanceColumnKey[] = [
   "host_name",
   "hypervisor_id",
   "availability_zone",
-  "observed_at"
+  "observed_at",
 ];
 const INSTANCE_COLUMN_LABELS: Record<InstanceColumnKey, string> = {
   name: "Имя",
@@ -111,7 +144,7 @@ const INSTANCE_COLUMN_LABELS: Record<InstanceColumnKey, string> = {
   host_name: "Узел",
   hypervisor_id: "Гипервизор",
   availability_zone: "Зона",
-  observed_at: "Наблюдение"
+  observed_at: "Наблюдение",
 };
 
 const HYPERVISOR_COLUMN_KEYS = [
@@ -121,7 +154,7 @@ const HYPERVISOR_COLUMN_KEYS = [
   "running_vms",
   "capacity",
   "availability_zone",
-  "observed_at"
+  "observed_at",
 ] as const;
 const DEFAULT_HYPERVISOR_COLUMNS: HypervisorColumnKey[] = [
   "host_name",
@@ -129,7 +162,7 @@ const DEFAULT_HYPERVISOR_COLUMNS: HypervisorColumnKey[] = [
   "service_state",
   "running_vms",
   "capacity",
-  "observed_at"
+  "observed_at",
 ];
 const HYPERVISOR_COLUMN_LABELS: Record<HypervisorColumnKey, string> = {
   host_name: "Узел",
@@ -138,7 +171,7 @@ const HYPERVISOR_COLUMN_LABELS: Record<HypervisorColumnKey, string> = {
   running_vms: "ВМ",
   capacity: "Емкость",
   availability_zone: "Зона",
-  observed_at: "Наблюдение"
+  observed_at: "Наблюдение",
 };
 
 const INVENTORY_FILTER_KEYS = [
@@ -150,26 +183,49 @@ const INVENTORY_FILTER_KEYS = [
   "availability_zone",
   "service_status",
   "service_state",
-  "maintenance_status"
+  "maintenance_status",
 ] as const;
 
 export function App() {
   const [state, setState] = useState<LoadState>({ type: "loading" });
   const [authState, setAuthState] = useState<AuthState>({ type: "loading" });
-  const [inventoryState, setInventoryState] = useState<InventoryState>({ type: "idle" });
-  const [inventoryModulesState, setInventoryModulesState] = useState<InventoryModulesState>({
-    type: "idle"
+  const [inventoryState, setInventoryState] = useState<InventoryState>({
+    type: "idle",
   });
-  const [locationSearch, setLocationSearch] = useState(() => window.location.search);
+  const [inventoryModulesState, setInventoryModulesState] =
+    useState<InventoryModulesState>({
+      type: "idle",
+    });
+  const [groupState, setGroupState] = useState<GroupState>({ type: "idle" });
+  const [groupDetailState, setGroupDetailState] = useState<GroupDetailState>({
+    type: "idle",
+  });
+  const [locationSearch, setLocationSearch] = useState(
+    () => window.location.search,
+  );
   const [loginName, setLoginName] = useState("");
   const [credential, setCredential] = useState("");
 
   const currentCapabilities =
     authState.type === "authenticated" ? authState.capabilities : null;
-  const activeInventoryView =
+  const activePortalView =
     currentCapabilities === null
       ? null
-      : resolveActiveInventoryView(currentCapabilities.capabilities, locationSearch);
+      : resolveActivePortalView(
+          currentCapabilities.capabilities,
+          locationSearch,
+        );
+  const activeInventoryView =
+    currentCapabilities === null || activePortalView !== "inventory"
+      ? null
+      : resolveActiveInventoryView(
+          currentCapabilities.capabilities,
+          locationSearch,
+        );
+  const selectedGroupId =
+    activePortalView === "groups"
+      ? new URLSearchParams(locationSearch).get("group_id")
+      : null;
   const capabilitySignature = currentCapabilities?.capabilities.join("|") ?? "";
 
   useEffect(() => {
@@ -200,7 +256,7 @@ export function App() {
           type: "authenticated",
           subject: session.subject,
           capabilities: null,
-          csrf: null
+          csrf: null,
         });
         fetchCapabilities()
           .then((capabilities) => {
@@ -209,13 +265,16 @@ export function App() {
                 type: "authenticated",
                 subject: session.subject,
                 capabilities,
-                csrf: null
+                csrf: null,
               });
             }
           })
           .catch(() => {
             if (mounted) {
-              setAuthState({ type: "error", message: CAPABILITIES_UNAVAILABLE_MESSAGE });
+              setAuthState({
+                type: "error",
+                message: CAPABILITIES_UNAVAILABLE_MESSAGE,
+              });
             }
           });
       })
@@ -240,7 +299,11 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (currentCapabilities === null || activeInventoryView === null) {
+    if (
+      currentCapabilities === null ||
+      activePortalView !== "inventory" ||
+      activeInventoryView === null
+    ) {
       setInventoryState({ type: "idle" });
       return;
     }
@@ -262,7 +325,7 @@ export function App() {
             setInventoryState({
               type: "error",
               view: "instances",
-              message: "Список ВМ недоступен"
+              message: "Список ВМ недоступен",
             });
           }
         });
@@ -278,7 +341,7 @@ export function App() {
             setInventoryState({
               type: "error",
               view: "hypervisors",
-              message: "Список гипервизоров недоступен"
+              message: "Список гипервизоров недоступен",
             });
           }
         });
@@ -288,11 +351,18 @@ export function App() {
       mounted = false;
       abortController.abort();
     };
-  }, [activeInventoryView, capabilitySignature, currentCapabilities, locationSearch]);
+  }, [
+    activeInventoryView,
+    activePortalView,
+    capabilitySignature,
+    currentCapabilities,
+    locationSearch,
+  ]);
 
   useEffect(() => {
     if (
       currentCapabilities === null ||
+      activePortalView !== "inventory" ||
       !hasInventoryAccess(currentCapabilities.capabilities)
     ) {
       setInventoryModulesState({ type: "idle" });
@@ -311,7 +381,7 @@ export function App() {
         if (mounted) {
           setInventoryModulesState({
             type: "error",
-            message: INVENTORY_MODULES_UNAVAILABLE_MESSAGE
+            message: INVENTORY_MODULES_UNAVAILABLE_MESSAGE,
           });
         }
       });
@@ -319,7 +389,82 @@ export function App() {
     return () => {
       mounted = false;
     };
-  }, [capabilitySignature, currentCapabilities]);
+  }, [activePortalView, capabilitySignature, currentCapabilities]);
+
+  useEffect(() => {
+    if (
+      currentCapabilities === null ||
+      activePortalView !== "groups" ||
+      !hasGroupsAccess(currentCapabilities.capabilities)
+    ) {
+      setGroupState({ type: "idle" });
+      return;
+    }
+
+    let mounted = true;
+    setGroupState({ type: "loading" });
+    fetchGroups()
+      .then((response) => {
+        if (mounted) {
+          setGroupState({ type: "ready", groups: response.items });
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setGroupState({ type: "error", message: "Список групп недоступен" });
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [activePortalView, capabilitySignature, currentCapabilities]);
+
+  useEffect(() => {
+    if (
+      currentCapabilities === null ||
+      activePortalView !== "groups" ||
+      selectedGroupId === null ||
+      !hasGroupsAccess(currentCapabilities.capabilities)
+    ) {
+      setGroupDetailState({ type: "idle" });
+      return;
+    }
+
+    let mounted = true;
+    setGroupDetailState({ type: "loading", groupId: selectedGroupId });
+    Promise.all([
+      fetchGroup(selectedGroupId),
+      fetchGroupMembers(selectedGroupId),
+    ])
+      .then(([group, membersResponse]) => {
+        if (mounted) {
+          setGroupDetailState({
+            type: "ready",
+            group,
+            members: membersResponse.items,
+          });
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setGroupDetailState({
+            type: "error",
+            groupId: selectedGroupId,
+            message: "Группа недоступна",
+          });
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [
+    activePortalView,
+    capabilitySignature,
+    currentCapabilities,
+    selectedGroupId,
+  ]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -330,7 +475,7 @@ export function App() {
         type: "authenticated",
         subject: loginResult.subject,
         capabilities,
-        csrf: loginResult.csrf
+        csrf: loginResult.csrf,
       });
       setCredential("");
     } catch {
@@ -342,19 +487,71 @@ export function App() {
     const params = new URLSearchParams(locationSearch);
     params.set("view", view);
     params.delete("cursor");
-    window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
     setLocationSearch(window.location.search);
   }
 
   function handleInventoryNextPage(cursor: string) {
     const params = new URLSearchParams(locationSearch);
     params.set("cursor", cursor);
-    window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
     setLocationSearch(window.location.search);
   }
 
   function handleInventoryLinkSelect(href: string) {
     window.history.pushState({}, "", `${window.location.pathname}${href}`);
+    setLocationSearch(window.location.search);
+  }
+
+  function handleGroupViewSelect() {
+    const params = new URLSearchParams(locationSearch);
+    params.set("view", "groups");
+    params.delete("cursor");
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
+    setLocationSearch(window.location.search);
+  }
+
+  function handleGroupSelect(groupId: string) {
+    const params = new URLSearchParams(locationSearch);
+    params.set("view", "groups");
+    params.set("group_id", groupId);
+    params.delete("cursor");
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
+    setLocationSearch(window.location.search);
+  }
+
+  function handleGroupInventoryOpen(group: ResourceGroup) {
+    const view = group.resource_type === "host" ? "hypervisors" : "instances";
+    const params = new URLSearchParams(locationSearch);
+    params.set("view", view);
+    params.set("group_id", group.group_id);
+    params.delete("cursor");
+    params.delete("sort");
+    params.delete("columns");
+    for (const key of INVENTORY_FILTER_KEYS) {
+      params.delete(key);
+    }
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
     setLocationSearch(window.location.search);
   }
 
@@ -378,7 +575,10 @@ export function App() {
                   )}
 
                   {authState.type === "anonymous" && (
-                    <form className="cloud-ui-login-form" onSubmit={handleLogin}>
+                    <form
+                      className="cloud-ui-login-form"
+                      onSubmit={handleLogin}
+                    >
                       <label>
                         <span>Логин</span>
                         <input
@@ -392,7 +592,9 @@ export function App() {
                         <span>Код доступа</span>
                         <input
                           autoComplete="current-password"
-                          onChange={(event) => setCredential(event.target.value)}
+                          onChange={(event) =>
+                            setCredential(event.target.value)
+                          }
                           type="password"
                           value={credential}
                         />
@@ -409,19 +611,52 @@ export function App() {
 
                   {authState.type === "authenticated" && (
                     <div className="cloud-ui-session">
-                      <Alert variant="success" title={authState.subject.display_name} />
+                      <Alert
+                        variant="success"
+                        title={authState.subject.display_name}
+                      />
                       {authState.capabilities === null ? (
                         <Bullseye className="cloud-ui-compact-loading">
                           <Spinner aria-label="Загрузка прав" size="md" />
                         </Bullseye>
                       ) : (
                         hasSessionNavigation(authState.capabilities) && (
-                          <nav aria-label="Разделы портала" className="cloud-ui-nav">
-                            {authState.capabilities.capabilities.includes("operation.read") && (
-                              <span className="cloud-ui-nav-item">Операции</span>
+                          <nav
+                            aria-label="Разделы портала"
+                            className="cloud-ui-nav"
+                          >
+                            {authState.capabilities.capabilities.includes(
+                              "group.read",
+                            ) && (
+                              <a
+                                aria-current={
+                                  activePortalView === "groups"
+                                    ? "page"
+                                    : undefined
+                                }
+                                className="cloud-ui-nav-item"
+                                href={groupViewHref(locationSearch)}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  handleGroupViewSelect();
+                                }}
+                              >
+                                Группы
+                              </a>
                             )}
-                            {authState.capabilities.capabilities.includes("role.manage") && (
-                              <span className="cloud-ui-nav-item">Управление ролями</span>
+                            {authState.capabilities.capabilities.includes(
+                              "operation.read",
+                            ) && (
+                              <span className="cloud-ui-nav-item">
+                                Операции
+                              </span>
+                            )}
+                            {authState.capabilities.capabilities.includes(
+                              "role.manage",
+                            ) && (
+                              <span className="cloud-ui-nav-item">
+                                Управление ролями
+                              </span>
                             )}
                           </nav>
                         )
@@ -440,16 +675,25 @@ export function App() {
                     </Bullseye>
                   )}
 
-                  {state.type === "error" && <Alert variant="danger" title={state.message} />}
+                  {state.type === "error" && (
+                    <Alert variant="danger" title={state.message} />
+                  )}
 
                   {state.type === "ready" && (
                     <div className="cloud-ui-status-content">
                       <Alert
-                        variant={state.readiness.status === "ok" ? "success" : "warning"}
+                        variant={
+                          state.readiness.status === "ok"
+                            ? "success"
+                            : "warning"
+                        }
                         title={`Готовность API: ${state.readiness.status}`}
                       />
 
-                      <dl className="cloud-ui-dependencies" aria-label="Зависимости сервиса">
+                      <dl
+                        className="cloud-ui-dependencies"
+                        aria-label="Зависимости сервиса"
+                      >
                         {Object.entries(state.readiness.dependencies).map(
                           ([name, dependency]) => (
                             <div className="cloud-ui-dependency-row" key={name}>
@@ -458,7 +702,7 @@ export function App() {
                                 {dependency.status} - {dependency.detail}
                               </dd>
                             </div>
-                          )
+                          ),
                         )}
                       </dl>
                     </div>
@@ -468,27 +712,65 @@ export function App() {
             </div>
           </div>
 
-          {authState.type === "authenticated" && (
-            <InventoryWorkArea
-              activeView={activeInventoryView}
-              capabilities={authState.capabilities}
-              locationSearch={locationSearch}
-              modulesState={inventoryModulesState}
-              onInventoryLinkSelect={handleInventoryLinkSelect}
-              onInventoryNextPage={handleInventoryNextPage}
-              onInventoryViewSelect={handleInventoryViewSelect}
-              state={inventoryState}
-            />
-          )}
+          {authState.type === "authenticated" &&
+            activePortalView === "groups" && (
+              <GroupsWorkArea
+                capabilities={authState.capabilities}
+                detailState={groupDetailState}
+                locationSearch={locationSearch}
+                onGroupInventoryOpen={handleGroupInventoryOpen}
+                onGroupSelect={handleGroupSelect}
+                state={groupState}
+              />
+            )}
+
+          {authState.type === "authenticated" &&
+            activePortalView !== "groups" && (
+              <InventoryWorkArea
+                activeView={activeInventoryView}
+                capabilities={authState.capabilities}
+                locationSearch={locationSearch}
+                modulesState={inventoryModulesState}
+                onInventoryLinkSelect={handleInventoryLinkSelect}
+                onInventoryNextPage={handleInventoryNextPage}
+                onInventoryViewSelect={handleInventoryViewSelect}
+                state={inventoryState}
+              />
+            )}
         </div>
       </PageSection>
     </Page>
   );
 }
 
+function resolveActivePortalView(
+  capabilities: string[],
+  locationSearch: string,
+): PortalView | null {
+  const requestedView = new URLSearchParams(locationSearch).get("view");
+  const canReadGroups = hasGroupsAccess(capabilities);
+
+  if (requestedView === "groups" && canReadGroups) {
+    return "groups";
+  }
+  if (
+    (requestedView === "instances" || requestedView === "hypervisors") &&
+    hasInventoryAccess(capabilities)
+  ) {
+    return "inventory";
+  }
+  if (hasInventoryAccess(capabilities)) {
+    return "inventory";
+  }
+  if (canReadGroups) {
+    return "groups";
+  }
+  return null;
+}
+
 function resolveActiveInventoryView(
   capabilities: string[],
-  locationSearch: string
+  locationSearch: string,
 ): InventoryView | null {
   const params = new URLSearchParams(locationSearch);
   const requestedView = params.get("view");
@@ -510,22 +792,40 @@ function resolveActiveInventoryView(
   return null;
 }
 
-function inventoryViewHref(view: InventoryView, locationSearch: string): string {
+function inventoryViewHref(
+  view: InventoryView,
+  locationSearch: string,
+): string {
   const params = new URLSearchParams(locationSearch);
   params.set("view", view);
   params.delete("cursor");
   return `?${params.toString()}`;
 }
 
+function groupViewHref(locationSearch: string): string {
+  const params = new URLSearchParams(locationSearch);
+  params.set("view", "groups");
+  params.delete("cursor");
+  return `?${params.toString()}`;
+}
+
 function hasSessionNavigation(capabilities: Capabilities): boolean {
   return (
+    capabilities.capabilities.includes("group.read") ||
     capabilities.capabilities.includes("operation.read") ||
     capabilities.capabilities.includes("role.manage")
   );
 }
 
+function hasGroupsAccess(capabilities: string[]): boolean {
+  return capabilities.includes("group.read");
+}
+
 function hasInventoryAccess(capabilities: string[]): boolean {
-  return capabilities.includes("instance.read") || capabilities.includes("hypervisor.read");
+  return (
+    capabilities.includes("instance.read") ||
+    capabilities.includes("hypervisor.read")
+  );
 }
 
 function InventoryWorkArea({
@@ -536,7 +836,7 @@ function InventoryWorkArea({
   onInventoryLinkSelect,
   onInventoryNextPage,
   onInventoryViewSelect,
-  state
+  state,
 }: {
   activeView: InventoryView | null;
   capabilities: Capabilities | null;
@@ -578,7 +878,9 @@ function InventoryWorkArea({
           onInventoryViewSelect={onInventoryViewSelect}
         />
         <Title headingLevel="h2" size="lg">
-          {activeView === "instances" ? "Виртуальные машины" : "Список гипервизоров"}
+          {activeView === "instances"
+            ? "Виртуальные машины"
+            : "Список гипервизоров"}
         </Title>
       </div>
       <InventoryModules state={modulesState} />
@@ -601,7 +903,7 @@ function InventoryWorkArea({
           locationSearch,
           capabilities,
           onInventoryLinkSelect,
-          onInventoryNextPage
+          onInventoryNextPage,
         )}
 
       {state.type === "ready" &&
@@ -612,7 +914,7 @@ function InventoryWorkArea({
           locationSearch,
           capabilities,
           onInventoryLinkSelect,
-          onInventoryNextPage
+          onInventoryNextPage,
         )}
     </section>
   );
@@ -622,7 +924,7 @@ function InventoryNavigation({
   activeView,
   capabilities,
   locationSearch,
-  onInventoryViewSelect
+  onInventoryViewSelect,
 }: {
   activeView: InventoryView;
   capabilities: Capabilities;
@@ -693,7 +995,9 @@ function InventoryModules({ state }: { state: InventoryModulesState }) {
             {module.enabled ? "Доступно" : "Отключено"}
           </span>
           {module.required_capability !== null && (
-            <span className="cloud-ui-module-meta">{module.required_capability}</span>
+            <span className="cloud-ui-module-meta">
+              {module.required_capability}
+            </span>
           )}
         </li>
       ))}
@@ -701,18 +1005,453 @@ function InventoryModules({ state }: { state: InventoryModulesState }) {
   );
 }
 
+function GroupsWorkArea({
+  capabilities,
+  detailState,
+  locationSearch,
+  onGroupInventoryOpen,
+  onGroupSelect,
+  state,
+}: {
+  capabilities: Capabilities | null;
+  detailState: GroupDetailState;
+  locationSearch: string;
+  onGroupInventoryOpen: (group: ResourceGroup) => void;
+  onGroupSelect: (groupId: string) => void;
+  state: GroupState;
+}) {
+  if (capabilities === null) {
+    return (
+      <section aria-label="Группы" className="cloud-ui-workarea">
+        <Bullseye className="cloud-ui-loading">
+          <Spinner aria-label="Загрузка прав групп" />
+        </Bullseye>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="Группы" className="cloud-ui-workarea">
+      <div className="cloud-ui-workarea-header">
+        <Title headingLevel="h2" size="lg">
+          Группы
+        </Title>
+      </div>
+
+      {state.type === "loading" && (
+        <Bullseye className="cloud-ui-loading">
+          <Spinner aria-label="Загрузка групп" />
+        </Bullseye>
+      )}
+
+      {state.type === "error" && (
+        <Alert variant="danger" title={state.message} />
+      )}
+
+      {state.type === "ready" &&
+        (state.groups.length === 0 ? (
+          <p className="cloud-ui-empty">Группы не найдены.</p>
+        ) : (
+          <div className="cloud-ui-table-wrapper">
+            <table
+              className="cloud-ui-table cloud-ui-group-table"
+              aria-label="Таблица групп"
+            >
+              <thead>
+                <tr>
+                  <th scope="col">Имя</th>
+                  <th scope="col">Тип</th>
+                  <th scope="col">Режим</th>
+                  <th scope="col">Область</th>
+                  <th scope="col">Ревизия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {state.groups.map((group) => (
+                  <tr key={group.group_id}>
+                    <th scope="row">
+                      <button
+                        className="cloud-ui-link-button"
+                        onClick={() => onGroupSelect(group.group_id)}
+                        type="button"
+                      >
+                        {group.name}
+                      </button>
+                    </th>
+                    <td>{formatGroupResourceType(group.resource_type)}</td>
+                    <td>{formatGroupMembershipMode(group.membership_mode)}</td>
+                    <td>{formatGroupScope(group)}</td>
+                    <td>{group.revision}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+
+      {detailState.type === "loading" && (
+        <Bullseye className="cloud-ui-loading">
+          <Spinner aria-label="Загрузка деталей группы" />
+        </Bullseye>
+      )}
+
+      {detailState.type === "error" && (
+        <Alert variant="danger" title={detailState.message} />
+      )}
+
+      {detailState.type === "ready" && (
+        <GroupDetailPanel
+          capabilities={capabilities}
+          group={detailState.group}
+          locationSearch={locationSearch}
+          members={detailState.members}
+          onGroupInventoryOpen={onGroupInventoryOpen}
+        />
+      )}
+    </section>
+  );
+}
+
+function GroupDetailPanel({
+  capabilities,
+  group,
+  locationSearch,
+  members,
+  onGroupInventoryOpen,
+}: {
+  capabilities: Capabilities;
+  group: ResourceGroup;
+  locationSearch: string;
+  members: GroupMember[];
+  onGroupInventoryOpen: (group: ResourceGroup) => void;
+}) {
+  const capabilitySet = capabilities.capabilities;
+  const canManageGroups = capabilitySet.includes("group.manage");
+  const canSearchMembers =
+    canManageGroups &&
+    group.membership_mode !== "dynamic" &&
+    ((group.resource_type === "vm" &&
+      capabilitySet.includes("instance.read")) ||
+      (group.resource_type === "host" &&
+        capabilitySet.includes("hypervisor.read")));
+  const canOpenInventory =
+    (group.resource_type === "vm" && capabilitySet.includes("instance.read")) ||
+    (group.resource_type === "host" &&
+      capabilitySet.includes("hypervisor.read"));
+  const canPreview =
+    group.membership_mode === "dynamic" &&
+    ((group.resource_type === "vm" &&
+      capabilitySet.includes("instance.read")) ||
+      (group.resource_type === "host" &&
+        capabilitySet.includes("hypervisor.read")));
+
+  return (
+    <section aria-label="Детали группы" className="cloud-ui-group-detail">
+      <div className="cloud-ui-group-detail-header">
+        <Title headingLevel="h3" size="md">
+          {group.name}
+        </Title>
+        {canOpenInventory && (
+          <a
+            className="cloud-ui-action-link"
+            href={groupInventoryHref(group, locationSearch)}
+            onClick={(event) => {
+              event.preventDefault();
+              onGroupInventoryOpen(group);
+            }}
+          >
+            Открыть в инвентаре
+          </a>
+        )}
+      </div>
+
+      <dl className="cloud-ui-detail-list">
+        <div>
+          <dt>Владелец</dt>
+          <dd>{group.owner_subject_id}</dd>
+        </div>
+        <div>
+          <dt>Область</dt>
+          <dd>{formatGroupScope(group)}</dd>
+        </div>
+        <div>
+          <dt>Ревизия</dt>
+          <dd>{group.revision}</dd>
+        </div>
+        <div>
+          <dt>Тип</dt>
+          <dd>{formatGroupResourceType(group.resource_type)}</dd>
+        </div>
+        <div>
+          <dt>Режим</dt>
+          <dd>{formatGroupMembershipMode(group.membership_mode)}</dd>
+        </div>
+      </dl>
+
+      <section aria-label="Участники группы" className="cloud-ui-group-panel">
+        <Title headingLevel="h4" size="md">
+          Участники
+        </Title>
+        {members.length === 0 ? (
+          <p className="cloud-ui-empty">Участники не назначены.</p>
+        ) : (
+          <ul className="cloud-ui-resource-list">
+            {members.map((member) => (
+              <li
+                key={`${member.resource_type}:${member.cloud_id}:${member.region_id}:${member.resource_id}`}
+              >
+                <span>{member.resource_id}</span>
+                <span className="cloud-ui-muted">
+                  {member.cloud_id}/{member.region_id}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {canSearchMembers && <MemberSearchPanel group={group} />}
+      {canPreview && <GroupPreviewPanel group={group} />}
+    </section>
+  );
+}
+
+function MemberSearchPanel({ group }: { group: ResourceGroup }) {
+  const [query, setQuery] = useState("");
+  const [searchState, setSearchState] = useState<MemberSearchState>({
+    type: "idle",
+  });
+
+  useEffect(() => {
+    setQuery("");
+    setSearchState({ type: "idle" });
+  }, [group.group_id]);
+
+  async function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    const trimmedQuery = query.trim();
+    if (trimmedQuery !== "") {
+      params.set("q", trimmedQuery);
+    }
+
+    setSearchState({ type: "loading" });
+    try {
+      if (group.resource_type === "vm") {
+        const page = await fetchInstances(params);
+        setSearchState({ type: "instances", page });
+        return;
+      }
+      if (group.resource_type === "host") {
+        const page = await fetchHypervisors(params);
+        setSearchState({ type: "hypervisors", page });
+        return;
+      }
+      setSearchState({
+        type: "error",
+        message: "Поиск mixed групп недоступен",
+      });
+    } catch {
+      setSearchState({ type: "error", message: "Поиск ресурсов недоступен" });
+    }
+  }
+
+  return (
+    <section aria-label="Подбор участников" className="cloud-ui-group-panel">
+      <Title headingLevel="h4" size="md">
+        Подбор участников
+      </Title>
+      <form className="cloud-ui-inline-form" onSubmit={handleSearch}>
+        <label>
+          <span>Поиск ресурсов</span>
+          <input
+            onChange={(event) => setQuery(event.target.value)}
+            type="search"
+            value={query}
+          />
+        </label>
+        <Button type="submit" variant="secondary">
+          {group.resource_type === "host" ? "Найти хосты" : "Найти ВМ"}
+        </Button>
+      </form>
+
+      {searchState.type === "loading" && (
+        <Bullseye className="cloud-ui-compact-loading">
+          <Spinner aria-label="Поиск ресурсов" size="md" />
+        </Bullseye>
+      )}
+      {searchState.type === "error" && (
+        <Alert variant="warning" title={searchState.message} />
+      )}
+      {searchState.type === "instances" &&
+        renderMemberSearchInstances(searchState.page)}
+      {searchState.type === "hypervisors" &&
+        renderMemberSearchHypervisors(searchState.page)}
+    </section>
+  );
+}
+
+function GroupPreviewPanel({ group }: { group: ResourceGroup }) {
+  const [ruleText, setRuleText] = useState(() => formatGroupRule(group));
+  const [previewState, setPreviewState] = useState<PreviewState>({
+    type: "idle",
+  });
+
+  useEffect(() => {
+    setRuleText(formatGroupRule(group));
+    setPreviewState({ type: "idle" });
+  }, [group]);
+
+  async function handlePreview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const rule = parseGroupRule(ruleText);
+    if (rule === null) {
+      setPreviewState({ type: "error", message: "Правило группы отклонено" });
+      return;
+    }
+
+    setPreviewState({ type: "loading" });
+    try {
+      const response = await previewGroupRule(group.group_id, rule);
+      setPreviewState({ type: "ready", response });
+    } catch (error: unknown) {
+      setPreviewState({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Правило группы отклонено",
+      });
+    }
+  }
+
+  return (
+    <section aria-label="Preview группы" className="cloud-ui-group-panel">
+      <Title headingLevel="h4" size="md">
+        Preview
+      </Title>
+      <form className="cloud-ui-rule-form" onSubmit={handlePreview}>
+        <label>
+          <span>Правило preview</span>
+          <textarea
+            onChange={(event) => setRuleText(event.target.value)}
+            rows={5}
+            value={ruleText}
+          />
+        </label>
+        <Button type="submit" variant="secondary">
+          Предпросмотр
+        </Button>
+      </form>
+
+      {previewState.type === "loading" && (
+        <Bullseye className="cloud-ui-compact-loading">
+          <Spinner aria-label="Загрузка preview" size="md" />
+        </Bullseye>
+      )}
+      {previewState.type === "error" && (
+        <Alert variant="warning" title={previewState.message} />
+      )}
+      {previewState.type === "ready" &&
+        renderGroupPreview(previewState.response)}
+    </section>
+  );
+}
+
+function renderMemberSearchInstances(page: InventoryPage<InstanceItem>) {
+  if (page.items.length === 0) {
+    return <p className="cloud-ui-empty">Ресурсы не найдены.</p>;
+  }
+  return (
+    <ul className="cloud-ui-resource-list" aria-label="Найденные ресурсы">
+      {page.items.map((item) => (
+        <li key={`${item.cloud_id}:${item.region_id}:${item.instance_id}`}>
+          <span>{item.name}</span>
+          <span className="cloud-ui-muted">
+            {item.cloud_id}/{item.region_id}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function renderMemberSearchHypervisors(page: InventoryPage<HypervisorItem>) {
+  if (page.items.length === 0) {
+    return <p className="cloud-ui-empty">Ресурсы не найдены.</p>;
+  }
+  return (
+    <ul className="cloud-ui-resource-list" aria-label="Найденные ресурсы">
+      {page.items.map((item) => (
+        <li key={`${item.cloud_id}:${item.region_id}:${item.hypervisor_id}`}>
+          <span>{item.host_name}</span>
+          <span className="cloud-ui-muted">
+            {item.cloud_id}/{item.region_id}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function renderGroupPreview(response: GroupPreviewResponse) {
+  return (
+    <div className="cloud-ui-preview-result">
+      <div
+        className="cloud-ui-inventory-notices"
+        aria-label="Результат preview"
+      >
+        <span className="cloud-ui-badge">
+          Оценка: {response.count_estimate}
+        </span>
+        <span className="cloud-ui-badge">Ограничение: {response.limit}</span>
+        {response.warnings.map((warning) => (
+          <span className="cloud-ui-warning-text" key={warning}>
+            {warning}
+          </span>
+        ))}
+        {response.explain.map((line) => (
+          <span className="cloud-ui-badge" key={line}>
+            {line}
+          </span>
+        ))}
+      </div>
+      {response.items.length === 0 ? (
+        <p className="cloud-ui-empty">Preview пуст.</p>
+      ) : (
+        <ul className="cloud-ui-resource-list" aria-label="Preview ресурсов">
+          {response.items.map((item) => (
+            <li key={previewItemKey(item)}>
+              <span>{previewItemLabel(item)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function renderInventoryNotices<T>(page: InventoryPage<T>) {
   return (
     <div className="cloud-ui-inventory-notices" aria-label="Состояние данных">
-      {page.partial && <span className="cloud-ui-badge cloud-ui-badge-warning">Частичные данные</span>}
+      {page.partial && (
+        <span className="cloud-ui-badge cloud-ui-badge-warning">
+          Частичные данные
+        </span>
+      )}
       {page.freshness?.is_stale && (
-        <span className="cloud-ui-badge cloud-ui-badge-stale">Данные устарели</span>
+        <span className="cloud-ui-badge cloud-ui-badge-stale">
+          Данные устарели
+        </span>
       )}
       {page.freshness?.observed_at && (
-        <span className="cloud-ui-badge">Наблюдение: {formatUtc(page.freshness.observed_at)}</span>
+        <span className="cloud-ui-badge">
+          Наблюдение: {formatUtc(page.freshness.observed_at)}
+        </span>
       )}
       {page.warnings.map((warning) => (
-        <span className="cloud-ui-warning-text" key={`${warning.source}:${warning.code}`}>
+        <span
+          className="cloud-ui-warning-text"
+          key={`${warning.source}:${warning.code}`}
+        >
           {warning.detail}
         </span>
       ))}
@@ -725,12 +1464,14 @@ function renderInstancesPage(
   locationSearch: string,
   capabilities: Capabilities,
   onInventoryLinkSelect: (href: string) => void,
-  onInventoryNextPage: (cursor: string) => void
+  onInventoryNextPage: (cursor: string) => void,
 ) {
   const columns = parseInstanceColumns(locationSearch);
   const density = parseDensity(locationSearch);
-  const canReadHypervisors = capabilities.capabilities.includes("hypervisor.read");
-  const canRefreshInstances = capabilities.capabilities.includes("instance.refresh");
+  const canReadHypervisors =
+    capabilities.capabilities.includes("hypervisor.read");
+  const canRefreshInstances =
+    capabilities.capabilities.includes("instance.refresh");
 
   return (
     <div className="cloud-ui-inventory-page">
@@ -739,7 +1480,11 @@ function renderInstancesPage(
         <p className="cloud-ui-empty">Нет ВМ для выбранных фильтров.</p>
       ) : (
         <div className="cloud-ui-table-wrapper">
-          <table className="cloud-ui-table" aria-label="Таблица ВМ" data-density={density}>
+          <table
+            className="cloud-ui-table"
+            aria-label="Таблица ВМ"
+            data-density={density}
+          >
             <thead>
               <tr>
                 {columns.map((column) => (
@@ -752,15 +1497,17 @@ function renderInstancesPage(
             </thead>
             <tbody>
               {page.items.map((item) => (
-                <tr key={`${item.cloud_id}:${item.region_id}:${item.instance_id}`}>
+                <tr
+                  key={`${item.cloud_id}:${item.region_id}:${item.instance_id}`}
+                >
                   {columns.map((column) =>
                     renderInstanceCell(
                       column,
                       item,
                       canReadHypervisors,
                       locationSearch,
-                      onInventoryLinkSelect
-                    )
+                      onInventoryLinkSelect,
+                    ),
                   )}
                   {canRefreshInstances && (
                     <td>
@@ -801,7 +1548,7 @@ function renderHypervisorsPage(
   locationSearch: string,
   capabilities: Capabilities,
   onInventoryLinkSelect: (href: string) => void,
-  onInventoryNextPage: (cursor: string) => void
+  onInventoryNextPage: (cursor: string) => void,
 ) {
   const columns = parseHypervisorColumns(locationSearch);
   const density = parseDensity(locationSearch);
@@ -811,7 +1558,9 @@ function renderHypervisorsPage(
     <div className="cloud-ui-inventory-page">
       {renderInventoryNotices(page)}
       {page.items.length === 0 ? (
-        <p className="cloud-ui-empty">Нет гипервизоров для выбранных фильтров.</p>
+        <p className="cloud-ui-empty">
+          Нет гипервизоров для выбранных фильтров.
+        </p>
       ) : (
         <div className="cloud-ui-table-wrapper">
           <table
@@ -830,15 +1579,17 @@ function renderHypervisorsPage(
             </thead>
             <tbody>
               {page.items.map((item) => (
-                <tr key={`${item.cloud_id}:${item.region_id}:${item.hypervisor_id}`}>
+                <tr
+                  key={`${item.cloud_id}:${item.region_id}:${item.hypervisor_id}`}
+                >
                   {columns.map((column) =>
                     renderHypervisorCell(
                       column,
                       item,
                       canReadInstances,
                       locationSearch,
-                      onInventoryLinkSelect
-                    )
+                      onInventoryLinkSelect,
+                    ),
                   )}
                 </tr>
               ))}
@@ -866,7 +1617,7 @@ function renderInstanceCell(
   item: InstanceItem,
   canReadHypervisors: boolean,
   locationSearch: string,
-  onInventoryLinkSelect: (href: string) => void
+  onInventoryLinkSelect: (href: string) => void,
 ) {
   const key = `${item.instance_id}:${column}`;
   if (column === "name") {
@@ -885,9 +1636,9 @@ function renderInstanceCell(
               filteredInventoryHref(
                 "hypervisors",
                 { host_name: item.host_name },
-                locationSearch
+                locationSearch,
               ),
-              onInventoryLinkSelect
+              onInventoryLinkSelect,
             )
           : formatNullable(item.host_name)}
       </td>
@@ -899,8 +1650,12 @@ function renderInstanceCell(
         {item.hypervisor_id !== null && canReadHypervisors
           ? renderInventoryLink(
               item.hypervisor_id,
-              filteredInventoryHref("hypervisors", { q: item.hypervisor_id }, locationSearch),
-              onInventoryLinkSelect
+              filteredInventoryHref(
+                "hypervisors",
+                { q: item.hypervisor_id },
+                locationSearch,
+              ),
+              onInventoryLinkSelect,
             )
           : formatNullable(item.hypervisor_id)}
       </td>
@@ -917,7 +1672,7 @@ function renderHypervisorCell(
   item: HypervisorItem,
   canReadInstances: boolean,
   locationSearch: string,
-  onInventoryLinkSelect: (href: string) => void
+  onInventoryLinkSelect: (href: string) => void,
 ) {
   const key = `${item.hypervisor_id}:${column}`;
   if (column === "host_name") {
@@ -929,9 +1684,9 @@ function renderHypervisorCell(
               filteredInventoryHref(
                 "instances",
                 { host_name: item.host_name },
-                locationSearch
+                locationSearch,
               ),
-              onInventoryLinkSelect
+              onInventoryLinkSelect,
             )
           : item.host_name}
       </th>
@@ -947,9 +1702,9 @@ function renderHypervisorCell(
               filteredInventoryHref(
                 "instances",
                 { host_name: item.host_name },
-                locationSearch
+                locationSearch,
               ),
-              onInventoryLinkSelect
+              onInventoryLinkSelect,
             )
           : label}
       </td>
@@ -958,8 +1713,8 @@ function renderHypervisorCell(
   if (column === "capacity") {
     return (
       <td key={key}>
-        vCPU {item.vcpus_used}/{item.vcpus_total}; RAM {formatRam(item.ram_mb_used)} /{" "}
-        {formatRam(item.ram_mb_total)}
+        vCPU {item.vcpus_used}/{item.vcpus_total}; RAM{" "}
+        {formatRam(item.ram_mb_used)} / {formatRam(item.ram_mb_total)}
       </td>
     );
   }
@@ -972,7 +1727,7 @@ function renderHypervisorCell(
 function renderInventoryLink(
   label: string,
   href: string,
-  onInventoryLinkSelect: (href: string) => void
+  onInventoryLinkSelect: (href: string) => void,
 ) {
   return (
     <a
@@ -990,7 +1745,7 @@ function renderInventoryLink(
 function filteredInventoryHref(
   view: InventoryView,
   filters: Partial<Record<(typeof INVENTORY_FILTER_KEYS)[number], string>>,
-  locationSearch: string
+  locationSearch: string,
 ): string {
   const params = new URLSearchParams(locationSearch);
   params.set("view", view);
@@ -1012,13 +1767,20 @@ function parseDensity(locationSearch: string): Density {
 }
 
 function parseInstanceColumns(locationSearch: string): InstanceColumnKey[] {
-  const requestedColumns = parseColumnList(locationSearch).filter(isInstanceColumnKey);
-  return requestedColumns.length > 0 ? requestedColumns : DEFAULT_INSTANCE_COLUMNS;
+  const requestedColumns =
+    parseColumnList(locationSearch).filter(isInstanceColumnKey);
+  return requestedColumns.length > 0
+    ? requestedColumns
+    : DEFAULT_INSTANCE_COLUMNS;
 }
 
 function parseHypervisorColumns(locationSearch: string): HypervisorColumnKey[] {
-  const requestedColumns = parseColumnList(locationSearch).filter(isHypervisorColumnKey);
-  return requestedColumns.length > 0 ? requestedColumns : DEFAULT_HYPERVISOR_COLUMNS;
+  const requestedColumns = parseColumnList(locationSearch).filter(
+    isHypervisorColumnKey,
+  );
+  return requestedColumns.length > 0
+    ? requestedColumns
+    : DEFAULT_HYPERVISOR_COLUMNS;
 }
 
 function parseColumnList(locationSearch: string): string[] {
@@ -1040,7 +1802,10 @@ function isHypervisorColumnKey(value: string): value is HypervisorColumnKey {
   return (HYPERVISOR_COLUMN_KEYS as readonly string[]).includes(value);
 }
 
-function formatInstanceValue(column: InstanceColumnKey, item: InstanceItem): string {
+function formatInstanceValue(
+  column: InstanceColumnKey,
+  item: InstanceItem,
+): string {
   if (column === "status") {
     return item.status;
   }
@@ -1053,7 +1818,10 @@ function formatInstanceValue(column: InstanceColumnKey, item: InstanceItem): str
   return "";
 }
 
-function formatHypervisorValue(column: HypervisorColumnKey, item: HypervisorItem): string {
+function formatHypervisorValue(
+  column: HypervisorColumnKey,
+  item: HypervisorItem,
+): string {
   if (column === "service_status") {
     return item.service_status;
   }
@@ -1068,6 +1836,107 @@ function formatHypervisorValue(column: HypervisorColumnKey, item: HypervisorItem
 
 function formatNullable(value: string | null): string {
   return value ?? "-";
+}
+
+function formatGroupScope(group: ResourceGroup): string {
+  return `${group.scope.type}:${group.scope.id ?? "all"}`;
+}
+
+function formatGroupResourceType(
+  resourceType: ResourceGroup["resource_type"],
+): string {
+  if (resourceType === "vm") {
+    return "ВМ";
+  }
+  if (resourceType === "host") {
+    return "Хосты";
+  }
+  return "Смешанная";
+}
+
+function formatGroupMembershipMode(
+  mode: ResourceGroup["membership_mode"],
+): string {
+  if (mode === "explicit") {
+    return "Явная";
+  }
+  if (mode === "dynamic") {
+    return "Динамическая";
+  }
+  return "Импорт";
+}
+
+function groupInventoryHref(
+  group: ResourceGroup,
+  locationSearch: string,
+): string {
+  const params = new URLSearchParams(locationSearch);
+  params.set(
+    "view",
+    group.resource_type === "host" ? "hypervisors" : "instances",
+  );
+  params.set("group_id", group.group_id);
+  params.delete("cursor");
+  params.delete("sort");
+  params.delete("columns");
+  for (const key of INVENTORY_FILTER_KEYS) {
+    params.delete(key);
+  }
+  return `?${params.toString()}`;
+}
+
+function formatGroupRule(group: ResourceGroup): string {
+  const rule =
+    group.rule_body_json ??
+    (group.resource_type === "host"
+      ? { field: "service_status", operator: "eq", value: "enabled" }
+      : { field: "status", operator: "eq", value: "ACTIVE" });
+  return JSON.stringify(rule, null, 2);
+}
+
+function parseGroupRule(value: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isPlainObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function previewItemKey(item: Record<string, unknown>): string {
+  for (const key of [
+    "instance_id",
+    "hypervisor_id",
+    "resource_id",
+    "name",
+    "host_name",
+  ]) {
+    const value = item[key];
+    if (typeof value === "string" && value !== "") {
+      return `${key}:${value}`;
+    }
+  }
+  return JSON.stringify(item);
+}
+
+function previewItemLabel(item: Record<string, unknown>): string {
+  for (const key of [
+    "name",
+    "host_name",
+    "instance_id",
+    "hypervisor_id",
+    "resource_id",
+  ]) {
+    const value = item[key];
+    if (typeof value === "string" && value !== "") {
+      return value;
+    }
+  }
+  return "resource";
 }
 
 function isAbortError(error: unknown): boolean {

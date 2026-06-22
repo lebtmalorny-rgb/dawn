@@ -1,3 +1,31 @@
+import {
+  type GroupDeleteResponse,
+  type GroupListResponse,
+  type GroupMember,
+  type GroupMemberMutationResponse,
+  type GroupMembersResponse,
+  type GroupPreviewResponse,
+  type GroupResourceType,
+  type ResourceGroup,
+  isGroupDeleteResponse,
+  isGroupListResponse,
+  isGroupMemberMutationResponse,
+  isGroupMembersResponse,
+  isGroupPreviewResponse,
+  isResourceGroup,
+} from "./groups";
+
+export type {
+  GroupDeleteResponse,
+  GroupListResponse,
+  GroupMember,
+  GroupMemberMutationResponse,
+  GroupMembersResponse,
+  GroupPreviewResponse,
+  GroupResourceType,
+  ResourceGroup,
+} from "./groups";
+
 export type DependencyState = {
   status: "ok" | "down";
   detail: string;
@@ -138,7 +166,8 @@ function isDependencyState(value: unknown): value is DependencyState {
   }
 
   return (
-    (value.status === "ok" || value.status === "down") && typeof value.detail === "string"
+    (value.status === "ok" || value.status === "down") &&
+    typeof value.detail === "string"
   );
 }
 
@@ -193,7 +222,9 @@ function isCapabilities(payload: unknown): payload is Capabilities {
     typeof scope.type === "string" &&
     (typeof scope.id === "string" || scope.id === null) &&
     Array.isArray(payload.capabilities) &&
-    payload.capabilities.every((capability) => typeof capability === "string") &&
+    payload.capabilities.every(
+      (capability) => typeof capability === "string",
+    ) &&
     typeof payload.expires_at === "string" &&
     typeof payload.policy_revision === "string"
   );
@@ -282,7 +313,7 @@ function isHypervisorItem(value: unknown): value is HypervisorItem {
 
 function isInventoryPage<T>(
   payload: unknown,
-  isItem: (value: unknown) => value is T
+  isItem: (value: unknown) => value is T,
 ): payload is InventoryPage<T> {
   if (!isPlainRecord(payload)) {
     return false;
@@ -302,7 +333,9 @@ function isInventoryPage<T>(
   );
 }
 
-function isInventoryModuleDescriptor(value: unknown): value is InventoryModuleDescriptor {
+function isInventoryModuleDescriptor(
+  value: unknown,
+): value is InventoryModuleDescriptor {
   return (
     isPlainRecord(value) &&
     typeof value.key === "string" &&
@@ -316,7 +349,7 @@ function isInventoryModuleDescriptor(value: unknown): value is InventoryModuleDe
 }
 
 function isInventoryModulesPayload(
-  payload: unknown
+  payload: unknown,
 ): payload is { modules: InventoryModuleDescriptor[] } {
   return (
     isPlainRecord(payload) &&
@@ -328,7 +361,14 @@ function isInventoryModulesPayload(
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
 
-const COMMON_LIST_PARAMS = ["cursor", "sort", "q", "cloud_id", "region_id"] as const;
+const COMMON_LIST_PARAMS = [
+  "cursor",
+  "sort",
+  "q",
+  "cloud_id",
+  "region_id",
+  "group_id",
+] as const;
 const SORT_DIRECTIONS = ["asc", "desc"] as const;
 const INSTANCE_LIST_PARAMS = [
   ...COMMON_LIST_PARAMS,
@@ -336,7 +376,7 @@ const INSTANCE_LIST_PARAMS = [
   "status",
   "host_name",
   "hypervisor_id",
-  "availability_zone"
+  "availability_zone",
 ] as const;
 const HYPERVISOR_LIST_PARAMS = [
   ...COMMON_LIST_PARAMS,
@@ -344,7 +384,7 @@ const HYPERVISOR_LIST_PARAMS = [
   "service_state",
   "host_name",
   "availability_zone",
-  "maintenance_status"
+  "maintenance_status",
 ] as const;
 const INSTANCE_SORT_FIELDS = [
   "instance_id",
@@ -354,7 +394,7 @@ const INSTANCE_SORT_FIELDS = [
   "host_name",
   "availability_zone",
   "source_updated_at",
-  "observed_at"
+  "observed_at",
 ] as const;
 const HYPERVISOR_SORT_FIELDS = [
   "hypervisor_id",
@@ -362,7 +402,7 @@ const HYPERVISOR_SORT_FIELDS = [
   "service_status",
   "service_state",
   "availability_zone",
-  "observed_at"
+  "observed_at",
 ] as const;
 
 type SortConfig = {
@@ -372,11 +412,11 @@ type SortConfig = {
 
 const INSTANCE_SORT_CONFIG: SortConfig = {
   allowedFields: INSTANCE_SORT_FIELDS,
-  defaultSort: "name.asc"
+  defaultSort: "name.asc",
 };
 const HYPERVISOR_SORT_CONFIG: SortConfig = {
   allowedFields: HYPERVISOR_SORT_FIELDS,
-  defaultSort: "host_name.asc"
+  defaultSort: "host_name.asc",
 };
 
 function boundedLimit(rawLimit: string | null): string {
@@ -389,7 +429,9 @@ function boundedLimit(rawLimit: string | null): string {
     return String(DEFAULT_LIST_LIMIT);
   }
 
-  return String(Math.max(1, Math.min(Math.trunc(requestedLimit), MAX_LIST_LIMIT)));
+  return String(
+    Math.max(1, Math.min(Math.trunc(requestedLimit), MAX_LIST_LIMIT)),
+  );
 }
 
 function normalizedSort(rawSort: string | null, config: SortConfig): string {
@@ -415,7 +457,7 @@ function inventoryUrl(
   path: string,
   params: URLSearchParams,
   supportedParams: readonly string[],
-  sortConfig: SortConfig
+  sortConfig: SortConfig,
 ): string {
   const query = new URLSearchParams();
   query.set("limit", boundedLimit(params.get("limit")));
@@ -434,6 +476,26 @@ function inventoryUrl(
   }
 
   return `${path}?${query.toString()}`;
+}
+
+function listUrl(path: string, params: URLSearchParams): string {
+  const query = new URLSearchParams();
+  query.set("limit", boundedLimit(params.get("limit")));
+  return `${path}?${query.toString()}`;
+}
+
+function groupUrl(groupId: string, suffix = ""): string {
+  return `/api/v1/groups/${encodeURIComponent(groupId)}${suffix}`;
+}
+
+function errorMessage(payload: unknown, fallback: string): string {
+  if (isPlainRecord(payload) && isPlainRecord(payload.error)) {
+    const message = payload.error.message;
+    if (typeof message === "string" && message !== "") {
+      return message;
+    }
+  }
+  return fallback;
 }
 
 export async function fetchReadiness(): Promise<Readiness> {
@@ -461,11 +523,14 @@ export async function fetchCurrentSession(): Promise<CurrentSession | null> {
   throw new Error("Сессия недоступна");
 }
 
-export async function login(loginName: string, credential: string): Promise<LoginResult> {
+export async function login(
+  loginName: string,
+  credential: string,
+): Promise<LoginResult> {
   const response = await fetch("/api/v1/session/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ login: loginName, credential })
+    body: JSON.stringify({ login: loginName, credential }),
   });
   const payload: unknown = await response.json();
 
@@ -489,11 +554,16 @@ export async function fetchCapabilities(): Promise<Capabilities> {
 
 export async function fetchInstances(
   params: URLSearchParams,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<InventoryPage<InstanceItem>> {
   const response = await fetch(
-    inventoryUrl("/api/v1/instances", params, INSTANCE_LIST_PARAMS, INSTANCE_SORT_CONFIG),
-    signal === undefined ? undefined : { signal }
+    inventoryUrl(
+      "/api/v1/instances",
+      params,
+      INSTANCE_LIST_PARAMS,
+      INSTANCE_SORT_CONFIG,
+    ),
+    signal === undefined ? undefined : { signal },
   );
   const payload: unknown = await response.json();
 
@@ -506,16 +576,16 @@ export async function fetchInstances(
 
 export async function fetchHypervisors(
   params: URLSearchParams,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<InventoryPage<HypervisorItem>> {
   const response = await fetch(
     inventoryUrl(
       "/api/v1/hypervisors",
       params,
       HYPERVISOR_LIST_PARAMS,
-      HYPERVISOR_SORT_CONFIG
+      HYPERVISOR_SORT_CONFIG,
     ),
-    signal === undefined ? undefined : { signal }
+    signal === undefined ? undefined : { signal },
   );
   const payload: unknown = await response.json();
 
@@ -526,7 +596,9 @@ export async function fetchHypervisors(
   throw new Error("Список гипервизоров недоступен");
 }
 
-export async function fetchInventoryModules(): Promise<InventoryModuleDescriptor[]> {
+export async function fetchInventoryModules(): Promise<
+  InventoryModuleDescriptor[]
+> {
   const response = await fetch("/api/v1/inventory/modules");
   const payload: unknown = await response.json();
 
@@ -535,4 +607,169 @@ export async function fetchInventoryModules(): Promise<InventoryModuleDescriptor
   }
 
   throw new Error("Список модулей inventory недоступен");
+}
+
+export async function fetchGroups(
+  params: URLSearchParams = new URLSearchParams(),
+): Promise<GroupListResponse> {
+  const response = await fetch(listUrl("/api/v1/groups", params));
+  const payload: unknown = await response.json();
+
+  if (response.ok && isGroupListResponse(payload)) {
+    return payload;
+  }
+
+  throw new Error("Список групп недоступен");
+}
+
+export async function fetchGroup(groupId: string): Promise<ResourceGroup> {
+  const response = await fetch(groupUrl(groupId));
+  const payload: unknown = await response.json();
+
+  if (response.ok && isResourceGroup(payload)) {
+    return payload;
+  }
+
+  throw new Error("Группа недоступна");
+}
+
+export async function createGroup(
+  body: {
+    name: string;
+    description: string | null;
+    resource_type: GroupResourceType;
+    membership_mode: "explicit" | "dynamic" | "imported";
+    scope_id: string | null;
+  },
+  csrf: string,
+): Promise<ResourceGroup> {
+  const response = await fetch("/api/v1/groups", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-csrf-token": csrf },
+    body: JSON.stringify(body),
+  });
+  const payload: unknown = await response.json();
+
+  if (response.ok && isResourceGroup(payload)) {
+    return payload;
+  }
+
+  throw new Error(errorMessage(payload, "Группу не удалось создать"));
+}
+
+export async function updateGroup(
+  groupId: string,
+  body: { revision: number; name: string; description: string | null },
+  csrf: string,
+): Promise<ResourceGroup> {
+  const response = await fetch(groupUrl(groupId), {
+    method: "PATCH",
+    headers: { "content-type": "application/json", "x-csrf-token": csrf },
+    body: JSON.stringify(body),
+  });
+  const payload: unknown = await response.json();
+
+  if (response.ok && isResourceGroup(payload)) {
+    return payload;
+  }
+
+  throw new Error(errorMessage(payload, "Группу не удалось обновить"));
+}
+
+export async function fetchGroupMembers(
+  groupId: string,
+  params: URLSearchParams = new URLSearchParams(),
+): Promise<GroupMembersResponse> {
+  const response = await fetch(listUrl(groupUrl(groupId, "/members"), params));
+  const payload: unknown = await response.json();
+
+  if (response.ok && isGroupMembersResponse(payload)) {
+    return payload;
+  }
+
+  throw new Error("Участники группы недоступны");
+}
+
+export async function addGroupMember(
+  groupId: string,
+  member: Pick<
+    GroupMember,
+    "resource_type" | "cloud_id" | "region_id" | "resource_id"
+  >,
+  csrf: string,
+  idempotencyKey: string,
+): Promise<GroupMemberMutationResponse> {
+  const response = await fetch(groupUrl(groupId, "/members"), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "idempotency-key": idempotencyKey,
+      "x-csrf-token": csrf,
+    },
+    body: JSON.stringify(member),
+  });
+  const payload: unknown = await response.json();
+
+  if (response.ok && isGroupMemberMutationResponse(payload)) {
+    return payload;
+  }
+
+  throw new Error(errorMessage(payload, "Участник группы не добавлен"));
+}
+
+export async function removeGroupMember(
+  groupId: string,
+  member: Pick<
+    GroupMember,
+    "resource_type" | "cloud_id" | "region_id" | "resource_id"
+  >,
+  csrf: string,
+  idempotencyKey: string,
+): Promise<GroupDeleteResponse> {
+  const path = [
+    groupUrl(groupId, "/members"),
+    encodeURIComponent(member.resource_type),
+    encodeURIComponent(member.cloud_id),
+    encodeURIComponent(member.region_id),
+    encodeURIComponent(member.resource_id),
+  ].join("/");
+  const response = await fetch(path, {
+    method: "DELETE",
+    headers: {
+      "idempotency-key": idempotencyKey,
+      "x-csrf-token": csrf,
+    },
+  });
+  const payload: unknown = await response.json();
+
+  if (response.ok && isGroupDeleteResponse(payload)) {
+    return payload;
+  }
+
+  throw new Error(errorMessage(payload, "Участник группы не удален"));
+}
+
+export async function previewGroupRule(
+  groupId: string,
+  rule: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<GroupPreviewResponse> {
+  const response = await fetch(groupUrl(groupId, "/preview"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      rule,
+      cloud_id: "synthetic",
+      region_id: "RegionOne",
+      limit: 50,
+    }),
+    signal,
+  });
+  const payload: unknown = await response.json();
+
+  if (response.ok && isGroupPreviewResponse(payload)) {
+    return payload;
+  }
+
+  throw new Error(errorMessage(payload, "Правило группы отклонено"));
 }
