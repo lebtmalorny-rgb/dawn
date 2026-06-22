@@ -121,6 +121,43 @@ def test_vault_provider_denies_path_outside_allowed_prefix_before_reading_token(
     assert "kv/data/other-service" not in rendered
 
 
+def test_vault_provider_maps_missing_token_file_without_path_leak(tmp_path: Path) -> None:
+    calls = 0
+    missing_token_file = tmp_path / "missing-vault-token-DKB_CANARY"
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json={"data": {"data": {"value": "synthetic"}}})
+
+    provider = VaultSecretProvider(
+        address="https://vault.example",
+        token_file=missing_token_file,
+        allowed_prefix="kv/data/cloud-ui/local/",
+        timeout_seconds=1.0,
+        max_attempts=1,
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(SecretUnavailableError) as exc_info:
+        provider.get(
+            SecretReference(
+                path="kv/data/cloud-ui/local/session-DKB_CANARY",
+                alias="session",
+            ),
+            SecretSchema(required_keys=("value",)),
+            correlation_id="corr-missing-token",
+        )
+
+    assert calls == 0
+    assert exc_info.value.code == "secret_unavailable"
+    rendered = repr(exc_info.value)
+    assert str(missing_token_file) not in rendered
+    assert missing_token_file.name not in rendered
+    assert "DKB_CANARY" not in rendered
+    assert "kv/data/cloud-ui/local/session" not in rendered
+
+
 def test_vault_provider_maps_403_without_retry_or_secret_leak(tmp_path: Path) -> None:
     calls = 0
 

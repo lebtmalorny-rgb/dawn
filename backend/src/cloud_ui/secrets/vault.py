@@ -60,7 +60,7 @@ class VaultSecretProvider:
                 details={"path_alias": reference.alias},
             )
 
-        token = self._read_token()
+        token = self._read_token(reference, correlation_id)
         attempt = 1
         while True:
             try:
@@ -105,8 +105,16 @@ class VaultSecretProvider:
                 raise error
             attempt += 1
 
-    def _read_token(self) -> str:
-        return self._token_file.read_text(encoding="utf-8").strip()
+    def _read_token(self, reference: SecretReference, correlation_id: str) -> str:
+        try:
+            return self._token_file.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise SecretUnavailableError(
+                message="Vault token file is unavailable",
+                alias=reference.alias,
+                correlation_id=correlation_id,
+                details={"exception": exc.__class__.__name__},
+            ) from exc
 
     def _raise_for_status(
         self,

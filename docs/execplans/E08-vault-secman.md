@@ -157,7 +157,23 @@ Markdown evidence under `docs/generated/`.
   responses non-retryable, the focused command passed `2 passed, 11 deselected in 0.04s`, and
   `cd backend && .venv/bin/python -m pytest tests/secrets -q` passed `17 passed in 0.05s`;
   Ruff, mypy and `git diff --check` passed.
-- [ ] Config/readiness integration implemented.
+- [x] 2026-06-22: Config/readiness integration implemented. Evidence: RED
+  `cd backend && .venv/bin/python -m pytest tests/test_config.py tests/secrets/test_readiness.py tests/test_api_health.py -q`
+  failed with `ModuleNotFoundError: No module named 'cloud_ui.secrets.readiness'`; GREEN
+  same command passed `19 passed in 0.34s`;
+  `cd backend && .venv/bin/python -m pytest tests/test_config.py tests/test_api_health.py tests/secrets -q`
+  passed `36 passed in 0.36s`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/config.py src/cloud_ui/health.py src/cloud_ui/secrets tests/test_config.py tests/test_api_health.py tests/secrets`
+  passed; `cd backend && .venv/bin/python -m mypy src/cloud_ui/config.py src/cloud_ui/health.py src/cloud_ui/secrets`
+  passed; `git diff --check` passed. Review fix evidence: tightened accepted Vault settings
+  assertions for normalized `vault_addr` and `vault_allowed_prefix`; required pytest, Ruff, mypy,
+  and `git diff --check` commands passed again on 2026-06-22. Missing Vault token review fix
+  evidence: RED
+  `cd backend && .venv/bin/python -m pytest tests/test_config.py tests/secrets/test_readiness.py tests/test_api_health.py tests/secrets/test_vault_adapter.py -q`
+  failed with two uncaught `FileNotFoundError` failures in adapter/readiness paths; after mapping
+  token-file `OSError` to `SecretUnavailableError`, the same command passed `34 passed in 0.38s`;
+  `cd backend && .venv/bin/python -m pytest tests/test_config.py tests/test_api_health.py tests/secrets -q`
+  passed `38 passed in 0.39s`; Ruff, mypy, and `git diff --check` passed.
 - [ ] Documentation/evidence updated.
 - [ ] Optional lab runbook execution completed or explicitly skipped.
 - [ ] Final verification completed.
