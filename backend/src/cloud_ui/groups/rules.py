@@ -13,6 +13,8 @@ _LOGICAL_KEYS = frozenset({"all", "any", "not"})
 _LEAF_KEYS = frozenset({"field", "op", "value"})
 _SCOPE_TYPES = frozenset({"project", "domain", "system"})
 
+JsonScalar = str | int | float | bool | None
+
 _VM_FIELDS: Mapping[str, sa.Column[Any]] = {
     "project_id": inventory_schema.instances.c.project_id,
     "status": inventory_schema.instances.c.status,
@@ -176,9 +178,8 @@ class GroupRuleCompiler:
 
         column = fields[field]
         if operator == "eq":
-            if _is_sequence_or_mapping(value):
-                raise GroupRuleError("invalid_value")
-            return column == value, [f"{field} eq {_format_value(value)}"]
+            scalar = _validate_json_scalar(value)
+            return column == scalar, [f"{field} eq {_format_value(scalar)}"]
         if operator == "in":
             values = _validate_in_values(value, max_values=self._max_in_values)
             return column.in_(values), [f"{field} in {len(values)} values"]
@@ -219,22 +220,22 @@ def _has_extra_leaf_keys(keys: frozenset[str]) -> bool:
     return _LEAF_KEYS < keys
 
 
-def _validate_in_values(value: object, *, max_values: int) -> list[Any]:
+def _validate_in_values(value: object, *, max_values: int) -> list[JsonScalar]:
     if not isinstance(value, list) or len(value) == 0:
         raise GroupRuleError("invalid_value")
     if len(value) > max_values:
         raise GroupRuleError("too_many_values")
-    if any(_is_sequence_or_mapping(item) for item in value):
-        raise GroupRuleError("invalid_value")
 
-    return value
+    return [_validate_json_scalar(item) for item in value]
 
 
-def _is_sequence_or_mapping(value: object) -> bool:
-    return isinstance(value, list | tuple | set | Mapping)
+def _validate_json_scalar(value: object) -> JsonScalar:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    raise GroupRuleError("invalid_value")
 
 
-def _format_value(value: object) -> str:
+def _format_value(value: JsonScalar) -> str:
     if value is None:
         return "null"
     return str(value)

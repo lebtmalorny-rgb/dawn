@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import pytest
+import sqlalchemy as sa
 
 from cloud_ui.groups.rules import GroupRuleCompiler, GroupRuleError
 
@@ -91,6 +92,21 @@ def test_depth_node_and_in_value_limits_are_enforced() -> None:
         GroupRuleCompiler(max_in_values=2),
         rule={"field": "status", "op": "in", "value": ["ACTIVE", "SHUTOFF", "ERROR"]},
         code="too_many_values",
+    )
+
+
+def test_sqlalchemy_expression_values_are_rejected() -> None:
+    compiler = GroupRuleCompiler()
+
+    _assert_rule_error(
+        compiler,
+        rule={"field": "status", "op": "eq", "value": sa.text("CURRENT_USER")},
+        code="invalid_value",
+    )
+    _assert_rule_error(
+        compiler,
+        rule={"field": "status", "op": "in", "value": [sa.literal_column("CURRENT_USER")]},
+        code="invalid_value",
     )
 
 
