@@ -84,6 +84,7 @@ def create_app(
         operations = OperationServices(
             repository=operation_repository,
             inventory_repository=inventory.repository,
+            group_repository=groups.repository,
             catalog=build_builtin_workflow_catalog(environment=environment),
         )
 

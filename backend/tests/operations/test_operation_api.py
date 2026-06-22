@@ -10,6 +10,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
 
 from cloud_ui.api import create_app
+from cloud_ui.groups import schema as group_schema
+from cloud_ui.groups.repository import GroupRepository
 from cloud_ui.health import HealthReport
 from cloud_ui.inventory import schema as inventory_schema
 from cloud_ui.inventory.cursor import CursorCodec
@@ -193,6 +195,108 @@ def test_operation_detail_returns_timeline_for_authorized_actor() -> None:
     assert payload["external_execution_id"] is None
 
 
+def test_submit_group_target_expands_and_freezes_member_snapshot() -> None:
+    client, security, repository = _client()
+    group_repository = _group_repository_from_state(security)
+    group = group_repository.create_group(
+        actor_id="mock-user-operator",
+        scope_type="project",
+        scope_id="project-a",
+        name="maintenance-hosts",
+        description=None,
+        resource_type="host",
+        membership_mode="explicit",
+    )
+    group_repository.add_member(
+        group_id=group.group_id,
+        resource_type="host",
+        cloud_id="synthetic",
+        region_id="RegionOne",
+        resource_id="hypervisor-0001",
+        source="explicit",
+        actor_id="mock-user-operator",
+    )
+    group_after_member = group_repository.get_group(group.group_id)
+    assert group_after_member is not None
+    csrf = _login(client, "operator", "operator-code")
+
+    response = client.post(
+        "/api/v1/operations",
+        json=_operation_body(
+            target_type="group",
+            resource_id=group.group_id,
+            expected_revision=group_after_member.revision,
+        ),
+        headers={
+            "x-request-id": "operation-group-target",
+            "x-csrf-token": csrf,
+            "idempotency-key": "group-target-key",
+        },
+    )
+    operation_id = response.json()["operation_id"]
+    group_repository.add_member(
+        group_id=group.group_id,
+        resource_type="host",
+        cloud_id="synthetic",
+        region_id="RegionOne",
+        resource_id="hypervisor-0002",
+        source="explicit",
+        actor_id="mock-user-operator",
+    )
+
+    operation = repository.get_operation(operation_id)
+    assert response.status_code == 202
+    assert operation is not None
+    assert [target["resource_id"] for target in operation.target_snapshot_json] == [
+        "hypervisor-0001"
+    ]
+    assert operation.target_snapshot_json[0]["snapshot"]["source_group_id"] == group.group_id
+    assert operation.target_snapshot_json[0]["snapshot"]["source_group_revision"] == (
+        group_after_member.revision
+    )
+
+
+def test_submit_group_target_rejects_stale_group_revision() -> None:
+    client, security, _repository = _client()
+    group_repository = _group_repository_from_state(security)
+    group = group_repository.create_group(
+        actor_id="mock-user-operator",
+        scope_type="project",
+        scope_id="project-a",
+        name="maintenance-hosts",
+        description=None,
+        resource_type="host",
+        membership_mode="explicit",
+    )
+    group_repository.add_member(
+        group_id=group.group_id,
+        resource_type="host",
+        cloud_id="synthetic",
+        region_id="RegionOne",
+        resource_id="hypervisor-0001",
+        source="explicit",
+        actor_id="mock-user-operator",
+    )
+    csrf = _login(client, "operator", "operator-code")
+
+    response = client.post(
+        "/api/v1/operations",
+        json=_operation_body(
+            target_type="group",
+            resource_id=group.group_id,
+            expected_revision=1,
+        ),
+        headers={
+            "x-request-id": "operation-stale-group",
+            "x-csrf-token": csrf,
+            "idempotency-key": "stale-group-key",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "stale_group_snapshot"
+
+
 def _client() -> tuple[TestClient, SecurityServices, OperationRepository]:
     app, security, repository = _app()
     return TestClient(app), security, repository
@@ -206,6 +310,7 @@ def _app() -> tuple[FastAPI, SecurityServices, OperationRepository]:
     engine = _engine()
     inventory_repository = _inventory_repository(engine)
     operation_repository = OperationRepository(engine=engine, clock=lambda: _NOW)
+    group_repository = GroupRepository(engine=engine)
     security.audit_sink.test_engine = engine
     app = create_app(
         readiness_check=check,
@@ -214,6 +319,7 @@ def _app() -> tuple[FastAPI, SecurityServices, OperationRepository]:
         operation_services=OperationServices(
             repository=operation_repository,
             inventory_repository=inventory_repository,
+            group_repository=group_repository,
             catalog=build_builtin_workflow_catalog(environment="local"),
         ),
     )
@@ -246,18 +352,21 @@ def _operation_body(
     *,
     reason: str = "replace host firmware",
     resource_id: str = "hypervisor-0001",
+    target_type: str = "host",
+    expected_revision: int | None = None,
 ) -> dict[str, Any]:
+    target: dict[str, Any] = {
+        "target_type": target_type,
+        "cloud_id": "synthetic",
+        "region_id": "RegionOne",
+        "resource_id": resource_id,
+    }
+    if expected_revision is not None:
+        target["expected_revision"] = expected_revision
     return {
         "workflow_key": "maintenance-host-precheck",
         "version": "1.0.0",
-        "targets": [
-            {
-                "target_type": "host",
-                "cloud_id": "synthetic",
-                "region_id": "RegionOne",
-                "resource_id": resource_id,
-            }
-        ],
+        "targets": [target],
         "input": {"reason": reason, "dry_run": True},
     }
 
@@ -270,6 +379,7 @@ def _engine() -> Engine:
         poolclass=StaticPool,
     )
     inventory_schema.metadata.create_all(engine)
+    group_schema.metadata.create_all(engine)
     operation_schema.metadata.create_all(engine)
     _seed_inventory(engine)
     return engine
@@ -312,34 +422,47 @@ def _seed_inventory(engine: Engine) -> None:
         )
         connection.execute(
             inventory_schema.hypervisors.insert(),
-            {
-                "cloud_id": "synthetic",
-                "region_id": "RegionOne",
-                "hypervisor_id": "hypervisor-0001",
-                "host_name": "compute-a",
-                "service_id": "service-hypervisor-0001",
-                "service_status": "enabled",
-                "service_state": "up",
-                "hypervisor_type": "QEMU",
-                "hypervisor_version": "9.0",
-                "availability_zone": "nova",
-                "aggregates_json": ["az-nova"],
-                "vcpus_total": 64,
-                "vcpus_used": 8,
-                "ram_mb_total": 262144,
-                "ram_mb_used": 32768,
-                "disk_gb_total": 4000,
-                "disk_gb_used": 1000,
-                "running_vms": 4,
-                "disabled_reason": None,
-                "maintenance_status": None,
-                "observed_at": _NOW,
-                "sync_generation": 1,
-                "sync_status": "ok",
-                "deleted_at": None,
-                "change_hash": "hash-hypervisor-0001",
-            },
+            [
+                _hypervisor_row("hypervisor-0001", "compute-a"),
+                _hypervisor_row("hypervisor-0002", "compute-b"),
+            ],
         )
+
+
+def _group_repository_from_state(security: SecurityServices) -> GroupRepository:
+    engine = security.audit_sink.test_engine
+    assert isinstance(engine, Engine)
+    return GroupRepository(engine=engine)
+
+
+def _hypervisor_row(hypervisor_id: str, host_name: str) -> dict[str, Any]:
+    return {
+        "cloud_id": "synthetic",
+        "region_id": "RegionOne",
+        "hypervisor_id": hypervisor_id,
+        "host_name": host_name,
+        "service_id": f"service-{hypervisor_id}",
+        "service_status": "enabled",
+        "service_state": "up",
+        "hypervisor_type": "QEMU",
+        "hypervisor_version": "9.0",
+        "availability_zone": "nova",
+        "aggregates_json": ["az-nova"],
+        "vcpus_total": 64,
+        "vcpus_used": 8,
+        "ram_mb_total": 262144,
+        "ram_mb_used": 32768,
+        "disk_gb_total": 4000,
+        "disk_gb_used": 1000,
+        "running_vms": 4,
+        "disabled_reason": None,
+        "maintenance_status": None,
+        "observed_at": _NOW,
+        "sync_generation": 1,
+        "sync_status": "ok",
+        "deleted_at": None,
+        "change_hash": f"hash-{hypervisor_id}",
+    }
 
 
 def _rows(engine: Engine, table: sa.Table) -> list[dict[str, Any]]:

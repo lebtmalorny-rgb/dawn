@@ -12,6 +12,8 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import JSONResponse
 
+from cloud_ui.groups.models import GroupNotFound, ResourceGroup
+from cloud_ui.groups.repository import GroupRepository
 from cloud_ui.inventory.repository import InventoryRepository
 from cloud_ui.operations.catalog import (
     WorkflowCatalog,
@@ -43,6 +45,7 @@ _OPERATION_IDEMPOTENCY_KEY = b"portal-operation-idempotency-key"
 class OperationServices:
     repository: OperationRepository | None
     inventory_repository: InventoryRepository | None
+    group_repository: GroupRepository | None
     catalog: WorkflowCatalog
 
     @property
@@ -80,6 +83,7 @@ class OperationTargetRequest(BaseModel):
     cloud_id: str = Field(min_length=1, max_length=128)
     region_id: str = Field(min_length=1, max_length=128)
     resource_id: str = Field(min_length=1, max_length=128)
+    expected_revision: int | None = Field(default=None, ge=1)
 
 
 class OperationSubmitRequest(BaseModel):
@@ -211,6 +215,8 @@ def build_operation_router(services: OperationServices, security: SecurityServic
             )
         targets = _operation_targets(
             services=services,
+            security=security,
+            session=session,
             definition=definition,
             body=body,
             request=request,
@@ -364,17 +370,12 @@ def _definition_or_error(
 def _operation_targets(
     *,
     services: OperationServices,
+    security: SecurityServices,
+    session: SessionRecord,
     definition: WorkflowDefinition,
     body: OperationSubmitRequest,
     request: Request,
 ) -> list[OperationTargetCreate] | JSONResponse:
-    if any(target.target_type != definition.target_type for target in body.targets):
-        return _error(
-            400,
-            "target_type_mismatch",
-            "Тип цели не соответствует workflow definition",
-            _request_id(request),
-        )
     if definition.target_type != "host":
         return _error(
             400,
@@ -387,29 +388,147 @@ def _operation_targets(
         return inventory_repository
     operation_targets: list[OperationTargetCreate] = []
     for target in body.targets:
-        hypervisor = inventory_repository.get_hypervisor(
-            target.cloud_id,
-            target.region_id,
-            target.resource_id,
-        )
-        if hypervisor is None:
-            return _error(404, "target_not_found", "Цель операции не найдена", _request_id(request))
-        operation_targets.append(
-            OperationTargetCreate(
-                target_type="host",
-                cloud_id=target.cloud_id,
-                region_id=target.region_id,
-                resource_id=target.resource_id,
-                snapshot={
-                    "host_name": hypervisor.host_name,
-                    "service_status": hypervisor.service_status,
-                    "service_state": hypervisor.service_state,
-                    "maintenance_status": hypervisor.maintenance_status,
-                    "observed_at": hypervisor.observed_at.isoformat(),
-                },
+        if target.target_type == definition.target_type:
+            target_or_error = _host_operation_target(
+                inventory_repository=inventory_repository,
+                target=target,
+                request=request,
             )
+            if isinstance(target_or_error, JSONResponse):
+                return target_or_error
+            operation_targets.append(target_or_error)
+            continue
+
+        if target.target_type == "group":
+            expanded = _expand_group_target(
+                services=services,
+                security=security,
+                session=session,
+                inventory_repository=inventory_repository,
+                target=target,
+                request=request,
+            )
+            if isinstance(expanded, JSONResponse):
+                return expanded
+            operation_targets.extend(expanded)
+            continue
+
+        return _error(
+            400,
+            "target_type_mismatch",
+            "Тип цели не соответствует workflow definition",
+            _request_id(request),
         )
     return operation_targets
+
+
+def _host_operation_target(
+    *,
+    inventory_repository: InventoryRepository,
+    target: OperationTargetRequest,
+    request: Request,
+    source_group: ResourceGroup | None = None,
+) -> OperationTargetCreate | JSONResponse:
+    hypervisor = inventory_repository.get_hypervisor(
+        target.cloud_id,
+        target.region_id,
+        target.resource_id,
+    )
+    if hypervisor is None:
+        return _error(404, "target_not_found", "Цель операции не найдена", _request_id(request))
+    snapshot: dict[str, Any] = {
+        "host_name": hypervisor.host_name,
+        "service_status": hypervisor.service_status,
+        "service_state": hypervisor.service_state,
+        "maintenance_status": hypervisor.maintenance_status,
+        "observed_at": hypervisor.observed_at.isoformat(),
+    }
+    if source_group is not None:
+        snapshot["source_group_id"] = source_group.group_id
+        snapshot["source_group_revision"] = source_group.revision
+    return OperationTargetCreate(
+        target_type="host",
+        cloud_id=target.cloud_id,
+        region_id=target.region_id,
+        resource_id=target.resource_id,
+        snapshot=snapshot,
+    )
+
+
+def _expand_group_target(
+    *,
+    services: OperationServices,
+    security: SecurityServices,
+    session: SessionRecord,
+    inventory_repository: InventoryRepository,
+    target: OperationTargetRequest,
+    request: Request,
+) -> list[OperationTargetCreate] | JSONResponse:
+    denied = _require_capability(
+        security,
+        request,
+        session,
+        "group.read",
+        target_type="group",
+        target_id=target.resource_id,
+    )
+    if denied is not None:
+        return denied
+    group_repository = _require_group_repository(services, request)
+    if isinstance(group_repository, JSONResponse):
+        return group_repository
+    group = group_repository.get_group(target.resource_id)
+    if group is None or not _can_access_group(session.subject, group):
+        return _error(404, "group_not_found", "Группа не найдена", _request_id(request))
+    if target.expected_revision is not None and target.expected_revision != group.revision:
+        return _error(
+            409,
+            "stale_group_snapshot",
+            "Версия группы устарела",
+            _request_id(request),
+        )
+    if group.resource_type not in {"host", "mixed"}:
+        return _error(
+            400,
+            "target_type_mismatch",
+            "Тип группы не соответствует workflow definition",
+            _request_id(request),
+        )
+    try:
+        members = group_repository.list_members(group.group_id, limit=200)
+    except GroupNotFound:
+        return _error(404, "group_not_found", "Группа не найдена", _request_id(request))
+    host_members = [member for member in members if member.resource_type == "host"]
+    if not host_members:
+        return _error(400, "empty_group_target", "Группа не содержит целей", _request_id(request))
+
+    expanded: list[OperationTargetCreate] = []
+    for member in host_members:
+        expanded_target = _host_operation_target(
+            inventory_repository=inventory_repository,
+            target=OperationTargetRequest(
+                target_type="host",
+                cloud_id=member.cloud_id,
+                region_id=member.region_id,
+                resource_id=member.resource_id,
+            ),
+            request=request,
+            source_group=group,
+        )
+        if isinstance(expanded_target, JSONResponse):
+            return expanded_target
+        expanded.append(expanded_target)
+    return expanded
+
+
+def _can_access_group(subject: Subject, group: ResourceGroup) -> bool:
+    if "portal_admin" in subject.roles:
+        return True
+    return (
+        group.owner_subject_id == subject.subject_id
+        and group.scope_type == subject.scope_type
+        and group.scope_id == subject.scope_id
+    )
 
 
 def _operation_detail(
@@ -468,6 +587,15 @@ def _require_inventory_repository(
         "Inventory API временно недоступен",
         _request_id(request),
     )
+
+
+def _require_group_repository(
+    services: OperationServices,
+    request: Request,
+) -> GroupRepository | JSONResponse:
+    if services.group_repository is not None:
+        return services.group_repository
+    return _error(503, "groups_unavailable", "Group API временно недоступен", _request_id(request))
 
 
 def _require_mutation_guard(

@@ -150,7 +150,12 @@ semantics, operation timeline или frontend operation page. Единствен
   tests/operations src/cloud_ui/api.py src/cloud_ui/cli.py tests/test_cli.py` -> all checks
   passed; `cd backend && .venv/bin/python -m mypy src` -> success; `git diff --check` ->
   success.
-- [ ] 2026-06-22: Group target snapshot.
+- [x] 2026-06-22: Group target snapshot implemented and tested for explicit host groups. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/operations tests/groups
+  tests/security/test_mock_identity.py tests/security/test_security_api.py -q` -> `129 passed`;
+  `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations tests/operations
+  src/cloud_ui/api.py` -> all checks passed; `cd backend && .venv/bin/python -m mypy src` ->
+  success; `git diff --check` -> success.
 - [ ] 2026-06-22: Watcher/Masakari modules.
 - [ ] 2026-06-22: Frontend operations UX.
 - [ ] 2026-06-22: Documentation/registers/final verification.
@@ -178,6 +183,9 @@ semantics, operation timeline или frontend operation page. Единствен
 - The P0 `InMemoryMistralAdapter` now proves the core duplicate-prevention rule: if a start response is
   lost after Mistral creates an execution, the worker finds the execution by operation correlation and
   does not call start again. Evidence: `test_worker_handles_lost_response_without_duplicate_execution`.
+- Group targets are accepted only as expansion inputs. The operation stores concrete host targets with
+  `source_group_id` and `source_group_revision`, so later membership changes do not alter the operation
+  snapshot. Evidence: `test_submit_group_target_expands_and_freezes_member_snapshot`.
 
 ## Журнал решений
 
