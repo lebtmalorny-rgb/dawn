@@ -183,7 +183,15 @@ heartbeat and full audit source map do not exist.
   `cd frontend && npm run lint` -> success;
   `cd frontend && npm run typecheck` -> success;
   `git diff --check` -> success.
-- [ ] Documentation/evidence/lab runbook and final verification completed.
+- [x] 2026-06-22: Documentation/evidence/lab runbook and final verification completed. Evidence:
+  `docs/generated/audit-event-schema.json`, `docs/generated/audit-action-dictionary.md`,
+  `docs/generated/audit-sample-events.md`, `docs/generated/audit-source-map.md`,
+  `docs/generated/e07-fluentd-opensearch-lab.md`; `cd backend && .venv/bin/python -m pytest
+  tests/audit/test_audit_api.py -q` -> `6 passed`; `make lint` -> Ruff, ESLint and secret scan
+  passed; `make typecheck` -> mypy and TypeScript passed; `make test` -> backend `280 passed,
+  1 skipped`, frontend `34 passed`; `make test-integration` -> `21 passed, 1 skipped`;
+  `make security` -> secret scan passed; `make build` -> `cloud-ui-frontend:dev` and
+  `cloud-ui-backend:dev` built; `git diff --check` -> success.
 
 ## Неожиданные открытия
 
@@ -199,6 +207,9 @@ heartbeat and full audit source map do not exist.
 - Standard backend `pytest -q` initially exposed a collection conflict between
   `backend/tests/audit/test_repository.py` and `backend/tests/inventory/test_repository.py`. The audit
   test file was renamed to `test_audit_repository.py`; after the rename, standard backend pytest passes.
+- Final `make lint` exposed that the secret scan flagged intentional E07 private-key redaction
+  canaries. The scanner now allowlists only the exact canary marker locations while keeping the
+  private-key pattern active for all other files.
 
 ## Журнал решений
 
@@ -677,7 +688,7 @@ Partial failure recovery:
 
 ## Итог и остаточные риски
 
-This section is updated as milestones complete. Initial residual risks:
+Final residual risks:
 
 - Production SIEM protocol, auth, retention, mTLS and certificate authorization are unknown.
 - Fluentd is present in lab, but OpenSearch and central logging are disabled until a manual test-stand
@@ -688,3 +699,5 @@ This section is updated as milestones complete. Initial residual risks:
   storage, IdP and monitoring sources.
 - Existing E02-E06 route-level audit is made durable through sink compatibility, but not every business
   mutation is refactored into a single domain transaction in this stage.
+- Audit export in E07 accepts and audits a bounded request only; generating CSV/files with retention,
+  field-scope and approval policy remains a later decision.

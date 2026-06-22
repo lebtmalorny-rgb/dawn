@@ -153,6 +153,17 @@ Contract fixture создается из официальной API schema ил�
 - audit access is audited;
 - no raw stack trace to client.
 
+E07 evidence maps these bullets to:
+
+- `backend/tests/audit/test_models.py` and `test_taxonomy.py` for mandatory fields and action mapping;
+- `backend/tests/audit/test_audit_redaction.py`, `test_sinks.py` and `test_audit_api.py` for canary
+  redaction across storage, delivery and API;
+- `backend/tests/audit/test_delivery_worker.py` and `test_heartbeat.py` for retry, dead-letter,
+  backlog visibility and heartbeat;
+- `backend/tests/audit/test_audit_api.py` and `frontend/src/App.test.tsx` for `audit.read`/`audit.export`
+  separation and audited audit access;
+- `docs/generated/audit-source-map.md` for external audit sources not covered by portal tests.
+
 ### Deployment/security
 
 - image user/capabilities/mounts;

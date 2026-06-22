@@ -49,6 +49,12 @@ the optional all-in-one Mistral smoke is read-only workflow lookup and does not 
 mutating workflow safety. SIEM delivery, production IAM/PAM/SoD, Vault-backed service identities and
 formal security review remain required before production pilot.
 
+E07 adds the portal audit foundation needed for mutating-PoC evidence: normalized audit schema,
+central sanitizer, durable outbox, local test sink, Fluentd HTTP payload contract, retry/dead-letter,
+heartbeat, audit read/export separation and audited audit access. This is local/contract evidence.
+Production SIEM credentials, mTLS/auth, retention, OpenStack CADF/notification collection and
+host-level FIM/auditd remain external controls before pilot.
+
 ### До production pilot
 
 - corporate PKI and mTLS matrix;

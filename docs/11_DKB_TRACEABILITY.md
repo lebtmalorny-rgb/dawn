@@ -109,6 +109,38 @@ Residual conditions: default Mistral evidence is P0 mock; P2 smoke is read-only 
 workflow safety, SIEM delivery, IAM/PAM/SoD, Vault identities and HA/failover evidence remain external
 gates.
 
+## Обновление требований 2026-06-22: E07 прикладной аудит
+
+E07 добавляет portal-owned audit delivery/search path and generated evidence without claiming full
+infrastructure audit compliance:
+
+- ДКБ-46/47: портал пишет нормализованные события в durable outbox and доставляет их в
+  `LocalTestAuditSink`; `FluentdHttpAuditSink` проверяет JSON payload contract with `tag`, `time` and
+  sanitized `record`. Production SIEM endpoint, protected mTLS/auth channel, retention and SIEM owner
+  review remain external. Доказательства: `backend/tests/audit/test_sinks.py`,
+  `backend/tests/audit/test_delivery_worker.py`, `docs/generated/e07-fluentd-opensearch-lab.md`.
+- ДКБ-48: heartbeat, queue depth, oldest pending age, retry/dead-letter and recovery states are
+  implemented for portal audit delivery. This does not prevent root from disabling host/container
+  logging; FIM/auditd/IaC and SIEM missing-flow alerting remain external evidence.
+- ДКБ-49/49.01-49.08: mandatory portal fields are normalized and documented in
+  `docs/generated/audit-event-schema.json` and `docs/generated/audit-action-dictionary.md`.
+  Доказательства: `backend/tests/audit/test_models.py`, `backend/tests/audit/test_taxonomy.py`.
+- ДКБ-50/50.x: `docs/generated/audit-source-map.md` separates `implemented_by_portal`,
+  `lab_contract_only`, `external_required` and `not_in_scope` sources. Portal audit does not close
+  Keystone/Nova/Neutron/Glance/Cinder/Mistral/Watcher/Masakari, host/container, storage, IdP or
+  monitoring audit coverage.
+- ДКБ-51: recursive sanitizer covers stored audit projection, delivery payload and API/frontend
+  response canaries. Доказательства: `backend/tests/audit/test_audit_redaction.py`,
+  `backend/tests/audit/test_sinks.py`, `backend/tests/audit/test_audit_api.py`,
+  `frontend/src/App.test.tsx`.
+- ДКБ-52: audit responses expose safe error codes and request/correlation IDs; full internal error text
+  must remain in protected sanitized service logs and be correlated externally. E07 does not expose raw
+  stack traces in audit API/UI.
+- ДКБ-53: `audit.read` and `audit.export` are separate capabilities, audit access is itself audited,
+  and the frontend uses backend capabilities only for UX. Direct DB/log/index access remains an
+  external PAM/DB/SIEM control. Доказательства: `backend/tests/audit/test_audit_api.py`,
+  `frontend/src/App.test.tsx`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |
@@ -183,7 +215,7 @@ gates.
 | ДКБ-70 | Образы контейнеров должны находиться в централизованном репозитории организации. | Реализуемо штатно/настройкой (4/4) | Kolla Build + registry + supply chain | E08/E09 | P2 | Собирать/сканировать Kolla images и push в корпоративный registry; настроить Kolla-Ansible на pull из него. | Нужно управление доверенными базовыми образами и подписью/сканированием. | TLS/mTLS matrix and scans; Vault contract/rotation runbook; SBOM/scan; image/SELinux/network evidence. |
 | ДКБ-72 | Не допускается использование файловой системы гипервизоров виртуальными машинами. | Частично / внешние меры (2/4) | Nova/Cinder/Ceph/СХД | E12 | P3/внешний контур | Запретить local file-backed ephemeral disks; использовать boot-from-volume/Cinder/Ceph RBD/remote storage; ограничить instances_path; проверить live migration/snapshot paths. | В vanilla Nova VM disks могут размещаться в /var/lib/nova/instances; полное выполнение требует архитектуры storage. | Gap/waiver; внешний контроль и утвержденное доказательство владельца контура. |
 | ДКБ-76 | Система контейнеризации в ПВ должна соответствовать требованиям, если применимо. | Нужна детализация (0/4) | Kolla Build + registry + supply chain | E08/E09 | P3/внешний контур | В файле указано только заглавное требование без под-требований. Для оценки нужны критерии: runtime, registry, image hardening, network policies, secrets, audit, privileged mode и т.д. | Запросить полный блок ДКБ-76.x. | TLS/mTLS matrix and scans; Vault contract/rotation runbook; SBOM/scan; image/SELinux/network evidence. |
-| ДКБ-77 | Использование любых API и интерфейсов продукта должно быть описано; неиспользуемые API и интерфейсы должны быть заблокированы. | Реализуемо при интеграции/архитектуре (3/4) | Портал + OpenStack/Kolla + firewall | E08/E09 | P1 | Документировать включенные OpenStack services/endpoints/API versions; отключить ненужные сервисы/endpoints в Kolla; firewall; policy deny для неиспользуемых операций. | Нужен конкретный перечень включенных компонентов и техническое блокирование портов/API; E06 docs describe portal-level disabled mutation paths but do not implement firewall/policy blocking. | E06 `docs/generated/api-register.md`, `docs/generated/integration-register.md`, `docs/generated/risk-register.md`, `docs/generated/e06-mistral-smoke.md`, disabled descriptors; TLS/mTLS matrix and scans; Vault contract/rotation runbook; SBOM/scan; image/SELinux/network evidence. |
+| ДКБ-77 | Использование любых API и интерфейсов продукта должно быть описано; неиспользуемые API и интерфейсы должны быть заблокированы. | Реализуемо при интеграции/архитектуре (3/4) | Портал + OpenStack/Kolla + firewall | E08/E09 | P1 | Документировать включенные OpenStack services/endpoints/API versions; отключить ненужные сервисы/endpoints в Kolla; firewall; policy deny для неиспользуемых операций. | Нужен конкретный перечень включенных компонентов и техническое блокирование портов/API; E07 docs describe portal-level audit/operation endpoints and disabled mutation paths but do not implement firewall/policy blocking. | E07 `docs/generated/api-register.md`, `docs/generated/integration-register.md`, `docs/generated/risk-register.md`, `docs/generated/audit-source-map.md`, `docs/generated/e07-fluentd-opensearch-lab.md`, E06 `docs/generated/e06-mistral-smoke.md`, disabled descriptors; TLS/mTLS matrix and scans; Vault contract/rotation runbook; SBOM/scan; image/SELinux/network evidence. |
 | ДКБ-80 | Размещение интерфейсов управления компонентами ПВ в отдельной сетевой зоне. | Реализуемо при интеграции/архитектуре (3/4) | Kolla + Rocky + сетевая инфраструктура | E09 | P3/внешний контур | Аналог ДКБ-42: отдельная management zone/VLAN, internal VIP, firewall, bastion-only admin access. | Нужно подтверждение сетевой схемой и ACL. | Kolla inventory/config; network/VIP/ACL evidence; container inspection; registry digest. |
 | ДКБ-82 | Наличие технической и эксплуатационной документации на продукт. | Реализуемо штатно/настройкой (4/4) | Команда продукта + эксплуатация | E11 | P1 | Использовать официальную документацию OpenStack 2025.1/Kolla-Ansible/Nova/Keystone/Neutron/Barbican; дополнить эксплуатационными регламентами конкретного deployment. | Внутренние runbooks, схемы и регламенты эксплуатации нужно разработать для конкретной инсталляции. | E04 scale report and generated registers; техническая/эксплуатационная документация; приемочный протокол. |
 

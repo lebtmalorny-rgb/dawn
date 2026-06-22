@@ -175,6 +175,23 @@ def test_audit_export_requires_separate_capability_and_csrf() -> None:
     )
 
 
+def test_openapi_documents_audit_paths() -> None:
+    app, _security, _repository = _app()
+
+    openapi_schema = app.openapi()
+    paths = openapi_schema["paths"]
+
+    assert "/api/v1/audit/events" in paths
+    assert "/api/v1/audit/events/{event_id}" in paths
+    assert "/api/v1/audit/export" in paths
+    assert paths["/api/v1/audit/events"]["get"]["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]["$ref"].endswith("/AuditEventListResponse")
+    assert paths["/api/v1/audit/export"]["post"]["responses"]["202"]["content"][
+        "application/json"
+    ]["schema"]["$ref"].endswith("/AuditExportResponse")
+
+
 def _client() -> tuple[TestClient, SecurityServices, AuditRepository]:
     app, security, repository = _app()
     return TestClient(app), security, repository
