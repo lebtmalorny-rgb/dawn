@@ -151,7 +151,12 @@
   implementation; `cd frontend && npm test -- --run src/App.test.tsx` -> `28 passed`;
   `cd frontend && npm run typecheck` -> success; `cd frontend && npm run lint` -> success;
   `git diff --check` -> success.
-- [ ] Documentation, DKB evidence and final verification completed.
+- [x] 2026-06-22: Documentation, DKB evidence and final verification completed. Evidence: commit
+  `7c6462f docs: document E05 resource groups`; final gates:
+  `make lint` -> backend Ruff passed, frontend ESLint passed, secret scan passed;
+  `make typecheck` -> backend mypy passed, frontend TypeScript passed;
+  `make test` -> backend `162 passed`, frontend `28 passed`;
+  `make security` -> secret scan passed; `git diff --check HEAD` -> success.
 
 ## Неожиданные открытия
 
@@ -344,8 +349,8 @@ evidence with an explicit E05 finding.
 ## Итог и остаточные риски
 
 Current state has backend scope, group schema/repository/rule compiler, group API, inventory
-`group_id` filters and frontend read/search/preview UX completed. Remaining E05 work is
-documentation/register evidence and final gates. Known residual risks:
+`group_id` filters, frontend read/search/preview UX, documentation/register evidence and final gates
+completed for the P0 E05 slice. E06 workflows have not been started. Known residual risks:
 
 - P0 mock project scope is not production IAM evidence.
 - Host group semantics need strict tests because hypervisors are not project-owned.
