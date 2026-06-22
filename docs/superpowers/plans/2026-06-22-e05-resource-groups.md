@@ -376,7 +376,8 @@ Expected: import fails because group repository classes do not exist.
 - [ ] **Step 3: Implement repository**
 
 Create frozen Pydantic models in `groups/models.py`: `ResourceGroup`, `GroupMember`,
-`GroupCreate`, `GroupUpdate`, `GroupPage`, `GroupRevisionConflict`, `GroupNotFound`.
+`GroupCreate`, `GroupUpdate`, `GroupPage`. Define repository exception classes
+`GroupRevisionConflict` and `GroupNotFound` in the same module.
 
 Create `GroupRepository` in `groups/repository.py` with methods:
 
