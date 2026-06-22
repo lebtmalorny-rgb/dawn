@@ -130,7 +130,15 @@
   `c3ba59f fix: harden group rule scope and values`; targeted tests
   `tests/groups/test_group_rules.py` -> `10 passed`; scoped Ruff and source mypy passed; spec
   review approved; final code quality review found no Critical/Important/Minor issues.
-- [ ] Group API and group-aware inventory filters implemented and tested.
+- [x] 2026-06-22: Group API, authorization, audit, preview validation and member idempotency
+  implemented and tested. Evidence: commits `9911749 feat: add resource group API`,
+  `5780e21 fix: harden resource group API authorization`,
+  `8d7b1bd fix: persist resource group idempotency keys`; targeted tests
+  `tests/groups/test_group_api.py tests/groups/test_group_repository.py
+  tests/groups/test_group_rules.py tests/groups/test_group_migration.py
+  tests/security/test_security_api.py` -> `54 passed`; scoped Ruff passed; `mypy src` passed;
+  spec review approved; final code quality review found no Critical/Important/Minor issues.
+- [ ] Group-aware inventory filters implemented and tested.
 - [ ] Frontend group UX implemented and tested.
 - [ ] Documentation, DKB evidence and final verification completed.
 
@@ -159,6 +167,17 @@
 - Task 4 hardened the dynamic DSL compiler as the single rule-to-query path: VM rules require project
   scope, current allowlisted fields accept only strings, SQLAlchemy expression objects are rejected as
   values, and prefix search uses escaped SQLAlchemy LIKE semantics.
+- Task 5 initially exposed preview with only `group.read`; review identified this as a potential data
+  disclosure path because preview returns full E04 inventory DTOs. The route now also requires
+  `instance.read` for VM preview and `hypervisor.read` for host preview.
+- Task 5 initially treated `idempotency-key` as presence-only and then revision-evidence-only. Review
+  found no-op add/remove bypass cases, so schema/migration now include
+  `resource_group_idempotency_keys`, storing only HMAC key hashes, request hashes and operation ids.
+  This binds member mutation keys even when the repository operation is a no-op and avoids storing raw
+  idempotency keys.
+- Same-key/same-payload member replay is still re-evaluated against current membership state rather
+  than served from a stored response. This is acceptable for E05 metadata CRUD but must not be copied
+  into future destructive workflow idempotency without stronger stored-result semantics.
 - `make test` runs backend tests from `backend/` and frontend Vitest. A root-level `pytest` also
   collects `tests/test_e015_kolla_layout.py`, which expects future Kolla files and is not part of the
   current project gate.
@@ -177,6 +196,11 @@
   projection. Consequence: inventory receives only a narrow group-filter integration.
 - 2026-06-22: No new frontend dependency for group tables/forms in P0. Alternative: add a table/form
   package. Reason: current PatternFly/Core and semantic HTML are enough for server-paginated PoC.
+- 2026-06-22: Add a dedicated portal-owned idempotency binding table for group member mutations.
+  Alternative: infer idempotency from revision history only. Reason: no-op add/remove operations do
+  not create revisions, but their idempotency keys must still be bound to the original payload.
+  Consequence: migration `0004_resource_groups` includes one extra group-owned table that downgrades
+  before the revision/member/group tables.
 
 ## Детальный план реализации
 
@@ -238,8 +262,8 @@ Implementation sequence:
 
 - `0004_resource_groups` is expand-only: it creates new portal-owned tables and indexes.
 - Old API/UI code ignores new tables, so migration can run before deployment of E05 code.
-- Downgrade drops group indexes and tables in reverse dependency order: members/revisions first, then
-  groups.
+- Downgrade drops group indexes and tables in reverse dependency order:
+  idempotency/revisions/members first, then groups.
 - No OpenStack resource is mutated; rollback deletes only portal-owned group metadata.
 - If API code is rolled back after migration, unused tables remain harmless until downgrade.
 - If migration fails before completion, rerunning Alembic should either resume from the previous
@@ -286,10 +310,15 @@ evidence with an explicit E05 finding.
 
 ## Итог и остаточные риски
 
-Not implemented yet. Current state is design plus plan only. Known risks before implementation:
+Current state has backend scope, group schema/repository/rule compiler and group API completed.
+Remaining E05 work is inventory `group_id` filters, frontend UX, documentation/register evidence and
+final gates. Known residual risks:
 
 - P0 mock project scope is not production IAM evidence.
 - Host group semantics need strict tests because hypervisors are not project-owned.
 - Dynamic rules must remain small and allowlisted until query telemetry justifies additional fields.
+- E05 member idempotency binds keys and rejects same-key/different-payload mutations, but same-key
+  same-payload replay is not served from a stored response snapshot. Do not reuse that model for
+  future destructive workflow operations without stored-result semantics.
 - Browser-level evidence is limited to Vitest unless a Playwright command is introduced in a later
   stage.
