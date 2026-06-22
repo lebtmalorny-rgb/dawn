@@ -11,6 +11,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
 
 from cloud_ui.api import create_app
+from cloud_ui.groups import schema as group_schema
+from cloud_ui.groups.repository import GroupRepository
+from cloud_ui.groups.routes import GroupServices
 from cloud_ui.health import HealthReport
 from cloud_ui.inventory import schema
 from cloud_ui.inventory.cursor import CursorCodec
@@ -131,6 +134,61 @@ def test_hypervisor_list_filters_by_q_query_parameter() -> None:
 
     assert response.status_code == 200
     assert [item["host_name"] for item in response.json()["items"]] == ["compute-z"]
+
+
+def test_instance_list_filters_by_authorized_group() -> None:
+    client, _security = _client()
+    _login(client, "operator", "operator-code")
+
+    response = client.get(
+        "/api/v1/instances?group_id=group-operator-vms&sort=name.asc",
+        headers={"x-request-id": "instances-by-group"},
+    )
+
+    assert response.status_code == 200
+    assert [item["instance_id"] for item in response.json()["items"]] == [
+        "instance-0001",
+        "instance-0003",
+    ]
+
+
+def test_instance_group_filter_requires_group_access() -> None:
+    client, security = _client()
+    _login(client, "operator", "operator-code")
+
+    response = client.get(
+        "/api/v1/instances?group_id=group-other-owner",
+        headers={"x-request-id": "instances-group-denied"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "group_not_found"
+    assert any(
+        event.action == "authorization.denied"
+        and event.actor_id == "mock-user-operator"
+        and event.metadata["reason"] == "group_access_denied"
+        for event in security.audit_sink.events
+    )
+
+
+def test_instance_group_filter_rejects_cursor_from_different_group() -> None:
+    client, _security = _client()
+    _login(client, "operator", "operator-code")
+    first = client.get(
+        "/api/v1/instances?group_id=group-operator-vms&limit=1&sort=name.asc",
+        headers={"x-request-id": "instances-group-cursor-one"},
+    )
+    assert first.status_code == 200
+    cursor = first.json()["next_cursor"]
+    assert cursor
+
+    response = client.get(
+        f"/api/v1/instances?group_id=group-operator-other&limit=1&sort=name.asc&cursor={cursor}",
+        headers={"x-request-id": "instances-group-cursor-two"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "cursor_tampered"
 
 
 def test_instance_list_limit_response_matches_injected_service_max_limit() -> None:
@@ -445,14 +503,22 @@ def _app(
         return HealthReport(status="ok", dependencies={})
 
     security = build_security_services()
+    engine = _engine()
+    inventory_repository = repository or _repository(engine)
+    repository_engine = inventory_repository.engine if repository is None else None
     app = create_app(
         readiness_check=check,
         security_services=security,
         inventory_services=InventoryServices(
-            repository=repository or _repository(_engine()),
+            repository=inventory_repository,
+            engine=repository_engine,
             default_limit=inventory_default_limit,
             max_limit=inventory_max_limit,
             operation_signing_key=operation_signing_key,
+        ),
+        group_services=GroupServices(
+            repository=GroupRepository(engine=engine),
+            inventory_repository=inventory_repository,
         ),
     )
     return app, security
@@ -476,6 +542,7 @@ def _engine() -> Engine:
         poolclass=StaticPool,
     )
     schema.metadata.create_all(engine)
+    group_schema.metadata.create_all(engine)
     _seed_inventory(engine)
     return engine
 
@@ -554,6 +621,23 @@ def _seed_inventory(engine: Engine) -> None:
                 ),
             ],
         )
+        connection.execute(
+            group_schema.resource_groups.insert(),
+            [
+                _group_row("group-operator-vms", "mock-user-operator"),
+                _group_row("group-operator-other", "mock-user-operator"),
+                _group_row("group-other-owner", "mock-user-other"),
+            ],
+        )
+        connection.execute(
+            group_schema.resource_group_members.insert(),
+            [
+                _member_row("group-operator-vms", "vm", "instance-0001"),
+                _member_row("group-operator-vms", "vm", "instance-0003"),
+                _member_row("group-operator-other", "vm", "instance-0002"),
+                _member_row("group-other-owner", "vm", "instance-0003"),
+            ],
+        )
 
 
 def _instance_row(
@@ -592,6 +676,41 @@ def _instance_row(
         "sync_status": "ok",
         "deleted_at": None,
         "change_hash": f"hash-{instance_id}",
+    }
+
+
+def _group_row(group_id: str, owner_subject_id: str) -> dict[str, Any]:
+    now = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+    return {
+        "group_id": group_id,
+        "name": group_id,
+        "description": None,
+        "resource_type": "vm",
+        "scope_type": "project",
+        "scope_id": "project-a",
+        "membership_mode": "explicit",
+        "rule_version": 1,
+        "rule_body_json": None,
+        "owner_subject_id": owner_subject_id,
+        "revision": 1,
+        "created_at": now,
+        "updated_at": now,
+        "deleted_at": None,
+    }
+
+
+def _member_row(group_id: str, resource_type: str, resource_id: str) -> dict[str, Any]:
+    now = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+    return {
+        "group_id": group_id,
+        "resource_type": resource_type,
+        "cloud_id": "synthetic",
+        "region_id": "RegionOne",
+        "resource_id": resource_id,
+        "source": "explicit",
+        "added_by": "mock-user-operator",
+        "added_at": now,
+        "expires_at": None,
     }
 
 

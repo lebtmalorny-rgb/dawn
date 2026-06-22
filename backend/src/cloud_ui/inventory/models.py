@@ -113,6 +113,7 @@ class InstanceFilters(BaseModel):
     host_name: str | None = None
     hypervisor_id: str | None = None
     availability_zone: str | None = None
+    group_id: str | None = None
 
 
 class HypervisorFilters(BaseModel):
@@ -126,3 +127,4 @@ class HypervisorFilters(BaseModel):
     host_name: str | None = None
     availability_zone: str | None = None
     maintenance_status: str | None = None
+    group_id: str | None = None

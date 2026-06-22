@@ -9,6 +9,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.engine import Engine, RowMapping
 
+from cloud_ui.groups import schema as group_schema
 from cloud_ui.inventory import schema
 from cloud_ui.inventory.cursor import CursorCodec, CursorTampered
 from cloud_ui.inventory.models import (
@@ -439,6 +440,16 @@ def _instance_conditions(filters: InstanceFilters) -> list[sa.ColumnElement[bool
                 query,
             )
         )
+    if filters.group_id is not None:
+        conditions.append(
+            _group_member_exists_condition(
+                group_id=filters.group_id,
+                resource_type="vm",
+                cloud_id_column=schema.instances.c.cloud_id,
+                region_id_column=schema.instances.c.region_id,
+                resource_id_column=schema.instances.c.instance_id,
+            )
+        )
     return conditions
 
 
@@ -472,7 +483,36 @@ def _hypervisor_conditions(filters: HypervisorFilters) -> list[sa.ColumnElement[
                 query,
             )
         )
+    if filters.group_id is not None:
+        conditions.append(
+            _group_member_exists_condition(
+                group_id=filters.group_id,
+                resource_type="host",
+                cloud_id_column=schema.hypervisors.c.cloud_id,
+                region_id_column=schema.hypervisors.c.region_id,
+                resource_id_column=schema.hypervisors.c.hypervisor_id,
+            )
+        )
     return conditions
+
+
+def _group_member_exists_condition(
+    *,
+    group_id: str,
+    resource_type: str,
+    cloud_id_column: sa.Column[Any],
+    region_id_column: sa.Column[Any],
+    resource_id_column: sa.Column[Any],
+) -> sa.ColumnElement[bool]:
+    return sa.exists(
+        sa.select(group_schema.resource_group_members.c.group_id).where(
+            group_schema.resource_group_members.c.group_id == group_id,
+            group_schema.resource_group_members.c.resource_type == resource_type,
+            group_schema.resource_group_members.c.cloud_id == cloud_id_column,
+            group_schema.resource_group_members.c.region_id == region_id_column,
+            group_schema.resource_group_members.c.resource_id == resource_id_column,
+        )
+    )
 
 
 def _normalized_query(value: str | None) -> str | None:

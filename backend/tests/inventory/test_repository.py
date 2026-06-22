@@ -7,6 +7,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.engine import Engine
 
+from cloud_ui.groups import schema as group_schema
 from cloud_ui.inventory import schema
 from cloud_ui.inventory.cursor import CursorCodec, CursorTampered
 from cloud_ui.inventory.models import HypervisorFilters, InstanceFilters, InventorySort
@@ -17,6 +18,7 @@ from cloud_ui.inventory.repository import InventoryRepository
 def engine() -> Iterator[Engine]:
     engine = sa.create_engine("sqlite+pysqlite:///:memory:", future=True)
     schema.metadata.create_all(engine)
+    group_schema.metadata.create_all(engine)
     _seed_inventory(engine)
     yield engine
     engine.dispose()
@@ -137,6 +139,114 @@ def test_hypervisors_are_filtered_by_case_insensitive_q(
     )
 
     assert [item.host_name for item in page.items] == ["compute-z"]
+
+
+def test_instances_are_filtered_by_resource_group_with_stable_pagination(
+    repository: InventoryRepository,
+    engine: Engine,
+) -> None:
+    _seed_group_members(
+        engine,
+        group_id="group-vms",
+        members=[
+            ("vm", "dev-cloud", "RegionOne", "instance-0003"),
+            ("vm", "dev-cloud", "RegionOne", "instance-0001"),
+        ],
+    )
+    sort = InventorySort(field="name", direction="asc")
+
+    first_page = repository.list_instances(
+        filters=InstanceFilters(
+            cloud_id="dev-cloud",
+            region_id="RegionOne",
+            group_id="group-vms",
+        ),
+        sort=sort,
+        limit=1,
+        cursor=None,
+    )
+    second_page = repository.list_instances(
+        filters=InstanceFilters(
+            cloud_id="dev-cloud",
+            region_id="RegionOne",
+            group_id="group-vms",
+        ),
+        sort=sort,
+        limit=1,
+        cursor=first_page.next_cursor,
+    )
+
+    assert [item.instance_id for item in first_page.items] == ["instance-0001"]
+    assert [item.instance_id for item in second_page.items] == ["instance-0003"]
+    assert second_page.next_cursor is None
+
+
+def test_hypervisors_are_filtered_by_resource_group(
+    repository: InventoryRepository,
+    engine: Engine,
+) -> None:
+    _seed_group_members(
+        engine,
+        group_id="group-hosts",
+        members=[("host", "dev-cloud", "RegionOne", "hypervisor-0002")],
+    )
+
+    page = repository.list_hypervisors(
+        filters=HypervisorFilters(
+            cloud_id="dev-cloud",
+            region_id="RegionOne",
+            group_id="group-hosts",
+        ),
+        sort=InventorySort(field="host_name", direction="asc"),
+        limit=50,
+        cursor=None,
+    )
+
+    assert [item.hypervisor_id for item in page.items] == ["hypervisor-0002"]
+
+
+def test_cursor_with_different_group_filter_is_rejected(
+    repository: InventoryRepository,
+    engine: Engine,
+) -> None:
+    _seed_group_members(
+        engine,
+        group_id="group-one",
+        members=[
+            ("vm", "dev-cloud", "RegionOne", "instance-0001"),
+            ("vm", "dev-cloud", "RegionOne", "instance-0003"),
+        ],
+    )
+    _seed_group_members(
+        engine,
+        group_id="group-two",
+        members=[("vm", "dev-cloud", "RegionOne", "instance-0003")],
+    )
+    sort = InventorySort(field="name", direction="asc")
+    first_page = repository.list_instances(
+        filters=InstanceFilters(
+            cloud_id="dev-cloud",
+            region_id="RegionOne",
+            group_id="group-one",
+        ),
+        sort=sort,
+        limit=1,
+        cursor=None,
+    )
+
+    with pytest.raises(CursorTampered) as exc_info:
+        repository.list_instances(
+            filters=InstanceFilters(
+                cloud_id="dev-cloud",
+                region_id="RegionOne",
+                group_id="group-two",
+            ),
+            sort=sort,
+            limit=1,
+            cursor=first_page.next_cursor,
+        )
+
+    assert exc_info.value.code == "cursor_tampered"
 
 
 def test_detail_ignores_tombstoned_rows(repository: InventoryRepository) -> None:
@@ -833,6 +943,52 @@ def _hypervisor_row(
 def _insert_instances(engine: Engine, rows: list[dict[str, object]]) -> None:
     with engine.begin() as connection:
         connection.execute(schema.instances.insert(), rows)
+
+
+def _seed_group_members(
+    engine: Engine,
+    *,
+    group_id: str,
+    members: list[tuple[str, str, str, str]],
+) -> None:
+    now = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+    with engine.begin() as connection:
+        connection.execute(
+            group_schema.resource_groups.insert(),
+            {
+                "group_id": group_id,
+                "name": group_id,
+                "description": None,
+                "resource_type": "mixed",
+                "scope_type": "project",
+                "scope_id": "project-0001",
+                "membership_mode": "explicit",
+                "rule_version": 1,
+                "rule_body_json": None,
+                "owner_subject_id": "mock-user-operator",
+                "revision": 1,
+                "created_at": now,
+                "updated_at": now,
+                "deleted_at": None,
+            },
+        )
+        connection.execute(
+            group_schema.resource_group_members.insert(),
+            [
+                {
+                    "group_id": group_id,
+                    "resource_type": resource_type,
+                    "cloud_id": cloud_id,
+                    "region_id": region_id,
+                    "resource_id": resource_id,
+                    "source": "explicit",
+                    "added_by": "mock-user-operator",
+                    "added_at": now,
+                    "expires_at": None,
+                }
+                for resource_type, cloud_id, region_id, resource_id in members
+            ],
+        )
 
 
 def _insert_sync_run(

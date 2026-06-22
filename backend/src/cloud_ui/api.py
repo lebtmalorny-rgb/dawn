@@ -9,7 +9,7 @@ from cloud_ui.groups.routes import GroupServices, build_group_router
 from cloud_ui.health import HealthReport, ReadinessCheck, build_readiness_check
 from cloud_ui.inventory.routes import (
     InventoryServices,
-    build_inventory_router,
+    build_inventory_router_with_groups,
     build_inventory_services,
     unavailable_inventory_services,
 )
@@ -97,6 +97,9 @@ def create_app(
     app.include_router(build_health_router(check), prefix="/api/v1")
     app.include_router(build_security_router(security), prefix="/api/v1")
     app.include_router(build_group_router(groups, security), prefix="/api/v1")
-    app.include_router(build_inventory_router(inventory, security), prefix="/api/v1")
+    app.include_router(
+        build_inventory_router_with_groups(inventory, security, groups),
+        prefix="/api/v1",
+    )
 
     return app

@@ -14,6 +14,9 @@ from starlette.responses import JSONResponse
 
 from cloud_ui.config import DEV_INVENTORY_CURSOR_SIGNING_KEY, Settings
 from cloud_ui.db import create_db_engine
+from cloud_ui.groups.models import ResourceGroup
+from cloud_ui.groups.repository import GroupRepository
+from cloud_ui.groups.routes import GroupServices
 from cloud_ui.inventory.cursor import CursorCodec, CursorTampered
 from cloud_ui.inventory.models import (
     HypervisorFilters,
@@ -48,6 +51,7 @@ INSTANCE_FILTER_PARAMS = frozenset(
         "host_name",
         "hypervisor_id",
         "availability_zone",
+        "group_id",
     }
 )
 HYPERVISOR_FILTER_PARAMS = frozenset(
@@ -58,6 +62,7 @@ HYPERVISOR_FILTER_PARAMS = frozenset(
         "host_name",
         "availability_zone",
         "maintenance_status",
+        "group_id",
     }
 )
 COMMON_LIST_PARAMS = frozenset({"cloud_id", "region_id", "limit", "cursor", "sort"})
@@ -181,6 +186,14 @@ def unavailable_inventory_services() -> InventoryServices:
 
 
 def build_inventory_router(services: InventoryServices, security: SecurityServices) -> APIRouter:
+    return build_inventory_router_with_groups(services, security, None)
+
+
+def build_inventory_router_with_groups(
+    services: InventoryServices,
+    security: SecurityServices,
+    groups: GroupServices | None,
+) -> APIRouter:
     router = APIRouter()
 
     @router.get("/instances", response_model=InstanceListResponse)
@@ -197,6 +210,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         host_name: str | None = Query(default=None),
         hypervisor_id: str | None = Query(default=None),
         availability_zone: str | None = Query(default=None),
+        group_id: str | None = Query(default=None),
     ) -> InstanceListResponse | JSONResponse:
         session = _require_session(security, request)
         if isinstance(session, JSONResponse):
@@ -214,6 +228,16 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         repository = _require_repository(services, request)
         if isinstance(repository, JSONResponse):
             return repository
+        group_error = _require_group_filter_access(
+            groups=groups,
+            security=security,
+            request=request,
+            session=session,
+            group_id=group_id,
+            expected_resource_type="vm",
+        )
+        if group_error is not None:
+            return group_error
 
         query_error = _reject_unsupported_query(
             request,
@@ -237,6 +261,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
                     host_name=host_name,
                     hypervisor_id=hypervisor_id,
                     availability_zone=availability_zone,
+                    group_id=group_id,
                 ),
                 sort=parsed_sort,
                 limit=effective_limit,
@@ -373,6 +398,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         host_name: str | None = Query(default=None),
         availability_zone: str | None = Query(default=None),
         maintenance_status: str | None = Query(default=None),
+        group_id: str | None = Query(default=None),
     ) -> HypervisorListResponse | JSONResponse:
         session = _require_session(security, request)
         if isinstance(session, JSONResponse):
@@ -390,6 +416,16 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
         repository = _require_repository(services, request)
         if isinstance(repository, JSONResponse):
             return repository
+        group_error = _require_group_filter_access(
+            groups=groups,
+            security=security,
+            request=request,
+            session=session,
+            group_id=group_id,
+            expected_resource_type="host",
+        )
+        if group_error is not None:
+            return group_error
 
         query_error = _reject_unsupported_query(
             request,
@@ -413,6 +449,7 @@ def build_inventory_router(services: InventoryServices, security: SecurityServic
                     host_name=host_name,
                     availability_zone=availability_zone,
                     maintenance_status=maintenance_status,
+                    group_id=group_id,
                 ),
                 sort=parsed_sort,
                 limit=effective_limit,
@@ -500,6 +537,70 @@ def _require_inventory_available(
     if services.available:
         return None
     return _inventory_unavailable(request)
+
+
+def _require_group_filter_access(
+    *,
+    groups: GroupServices | None,
+    security: SecurityServices,
+    request: Request,
+    session: SessionRecord,
+    group_id: str | None,
+    expected_resource_type: str,
+) -> JSONResponse | None:
+    if group_id is None:
+        return None
+    repository = _require_group_repository(groups, request)
+    if isinstance(repository, JSONResponse):
+        return repository
+    group = repository.get_group(group_id)
+    if group is None:
+        return _error(404, "group_not_found", "Группа не найдена", _request_id(request))
+    if not _can_access_group(session.subject, group):
+        _record_audit(
+            security,
+            request,
+            action="authorization.denied",
+            event_type="authorization",
+            outcome="failure",
+            target_type="group",
+            target_id=group_id,
+            subject=session.subject,
+            session_reference=session.session_id,
+            metadata={"reason": "group_access_denied"},
+        )
+        return _error(404, "group_not_found", "Группа не найдена", _request_id(request))
+    if not _group_can_filter_resource_type(group, expected_resource_type):
+        return _error(
+            400,
+            "group_resource_type_mismatch",
+            "Тип группы не соответствует inventory filter",
+            _request_id(request),
+        )
+    return None
+
+
+def _require_group_repository(
+    groups: GroupServices | None,
+    request: Request,
+) -> GroupRepository | JSONResponse:
+    if groups is not None and groups.repository is not None:
+        return groups.repository
+    return _error(503, "groups_unavailable", "Group API временно недоступен", _request_id(request))
+
+
+def _can_access_group(subject: Subject, group: ResourceGroup) -> bool:
+    if "portal_admin" in subject.roles:
+        return True
+    return (
+        group.owner_subject_id == subject.subject_id
+        and group.scope_type == subject.scope_type
+        and group.scope_id == subject.scope_id
+    )
+
+
+def _group_can_filter_resource_type(group: ResourceGroup, expected_resource_type: str) -> bool:
+    return group.resource_type == expected_resource_type or group.resource_type == "mixed"
 
 
 def _inventory_unavailable(request: Request) -> JSONResponse:
