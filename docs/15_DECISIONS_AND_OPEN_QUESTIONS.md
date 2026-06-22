@@ -23,6 +23,8 @@
 | D-013 | Первый telemetry datasource path — Prometheus exporter stack: `openstack-exporter` для OpenStack API metrics и `node_exporter` для host metrics. Ceilometer/Gnocchi/Aetos остаются pluggable integrations. |
 | D-014 | Consul используется через штатный Masakari hostmonitor `monitoring_driver=consul` and `matrix.yaml`; портал не принимает самостоятельное решение об эвакуации по Consul Events. |
 | D-015 | `processmonitor` для Kolla/container deployment остается R&D/diagnostic до lab proof; first recovery slice должен опираться на hostmonitor/Consul и Masakari notification state. |
+| D-016 | Первый E06 workflow — `maintenance-host-precheck@1.0.0`, dry-run only, with P0 mock as mandatory evidence and optional read-only all-in-one Mistral smoke. |
+| D-017 | E06 cancel route remains fail-closed until workflow-specific Mistral cancel semantics and partial-effect evidence exist. |
 
 ## Research evidence 2026-06-21
 
@@ -81,6 +83,8 @@ Allowlisted fields/operators, versioning, complexity limit, explain and security
 - Какие Watcher goals/strategies/templates должны быть first-class в первом P2 slice?
 - Разрешается ли automatic Watcher apply вообще, и если да, какие approval gates, max scope and rollback/abort policy обязательны?
 - Какие Masakari recovery workflows доступны оператору: только read/approval или также controlled evacuate/live migration через approved workflow?
+- Какой CSRF refresh/session bootstrap endpoint нужен, чтобы restored browser sessions could submit operations after reload?
+- Должен ли operation detail/cancel быть actor-scoped like operation list or available to system/audit roles through separate capability?
 - Какой уровень детализации нужен для HA timeline: host, process, instance, Nova task, operator approval and external alert?
 - Нужен ли Heat в P2 или после pilot?
 - Какие модули из load balancers, DNS, secrets metadata and bare metal должны войти в первый real-time UX scope?

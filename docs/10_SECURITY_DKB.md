@@ -42,6 +42,13 @@ Mock, комментарий или скрытая UI-кнопка не явля
 - no arbitrary scripts/templates;
 - security review.
 
+E06 P0 implements the first mutating-PoC foundation through `maintenance-host-precheck`: server-side
+allowlist, bounded JSON Schema subset, CSRF/idempotency, target snapshot, operation audit, safe
+Mistral retry lookup and disabled arbitrary workflow names. The default evidence uses a strict mock;
+the optional all-in-one Mistral smoke is read-only workflow lookup and does not prove production
+mutating workflow safety. SIEM delivery, production IAM/PAM/SoD, Vault-backed service identities and
+formal security review remain required before production pilot.
+
 ### До production pilot
 
 - corporate PKI and mTLS matrix;
@@ -118,6 +125,7 @@ Mock, комментарий или скрытая UI-кнопка не явля
 | Container breakout | non-root, drop caps, SELinux, read-only FS, no socket |
 | Stale data causes unsafe action | freshness/precondition checks and targeted refresh |
 | Shared admin credential | user context/delegation, service identity separation |
+| Cursor tampering | signed operation/inventory cursors and safe `400 cursor_tampered` response |
 
 ## Secrets
 
@@ -128,6 +136,7 @@ Mock, комментарий или скрытая UI-кнопка не явля
 - MariaDB/RabbitMQ passwords;
 - TLS private keys;
 - session encryption/signing keys;
+- operation/inventory cursor signing keys;
 - SIEM/Vault credentials;
 - Mistral/OpenStack integration identities.
 

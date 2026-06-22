@@ -93,6 +93,7 @@
 | [docs/generated/network-flow-matrix.md](docs/generated/network-flow-matrix.md) | Planned network flows и явно запрещенные соединения. |
 | [docs/generated/tls-matrix.md](docs/generated/tls-matrix.md) | Черновая TLS/mTLS matrix для E08/E09. |
 | [docs/generated/secret-inventory.md](docs/generated/secret-inventory.md) | Классы секретов без значений, proposed store и lifecycle gaps. |
+| [docs/generated/e06-mistral-smoke.md](docs/generated/e06-mistral-smoke.md) | Opt-in P2 all-in-one Mistral smoke command, required env and evidence limits. |
 | [docs/generated/dkb-implementation-plan.md](docs/generated/dkb-implementation-plan.md) | План evidence по всем 73 требованиям ДКБ. |
 | [docs/adr/](docs/adr/) | ADR-001..ADR-010 по обязательным решениям E00. |
 

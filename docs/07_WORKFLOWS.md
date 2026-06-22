@@ -169,6 +169,43 @@ Heat stack operation использует тот же каталог и operatio
 
 `unknown` используется при потере связи и требует reconciliation; он не преобразуется автоматически в failed.
 
+## E06 P0 implementation
+
+Реализованный первый workflow:
+
+- key/version: `maintenance-host-precheck@1.0.0`;
+- target: host from trusted inventory read model, or explicit host group expanded to concrete host
+  snapshot before operation acceptance;
+- input: `{reason: string, dry_run: true}`;
+- required capability: `workflow.execute.maintenance-host`;
+- approval mode: `none`;
+- cancel policy in definition: `best_effort`, but API cancel is fail-closed until live cancel semantics
+  are proven.
+
+Backend behavior:
+
+- `GET /api/v1/workflow-definitions` returns allowlisted definitions without Mistral workflow names.
+- `POST /api/v1/operations` creates durable operation/outbox/idempotency rows before returning `202`.
+- `GET /api/v1/operations` is actor/scope scoped, signed-cursor paginated and stable sorted by
+  `updated_at.desc`.
+- `GET /api/v1/operations/{operation_id}` returns status, correlation ID, external execution ID and
+  timeline events.
+- Worker dispatch uses the Mistral adapter boundary and searches by correlation after a lost response
+  before attempting another start.
+
+Test evidence is P0 by default: `InMemoryMistralAdapter` proves dispatch, unknown state, lost-response
+duplicate prevention and external execution attachment without contacting OpenStack. Optional P2
+all-in-one smoke is read-only workflow lookup and is skipped unless `DAWN_MISTRAL_SMOKE=1` and the
+explicit test-project configuration are present.
+
+Frontend behavior:
+
+- Operations view is visible through `operation.read`.
+- Submit form is enabled only when `workflow.execute.maintenance-host` and in-memory CSRF from login
+  are present.
+- Detail page shows operation status, timeline, correlation ID and Mistral execution ID when available.
+- Polling is used; SSE remains planned.
+
 ## Безопасность input
 
 - JSON Schema с `additionalProperties=false` по умолчанию;

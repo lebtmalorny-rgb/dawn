@@ -55,6 +55,12 @@
 
 E02 реализует только базовый in-process audit для `session.login` success/failure, `session.logout`, `session.revoke`, `session.timeout`, `session.limit_reached`, `session.required`, `csrf.denied`, `origin.denied`, `authorization.denied` и `openstack.denied`. Durable outbox, delivery state, SIEM/syslog отправка, heartbeat и полный аудит OpenStack/host/storage остаются задачами E07/P3.
 
+E06 добавляет portal-side operation evidence: `operation.accepted` audit event, authorization denial
+events for workflow execution, safe idempotency hash metadata, operation timeline events and worker
+attempt records. Raw `Idempotency-Key`, browser cookies, Mistral tokens and full unredacted workflow
+input are not stored in audit metadata. Это остается локальным portal evidence; durable SIEM delivery,
+external OpenStack/Mistral audit collection and heartbeat still remain E07/P3.
+
 ## Redaction
 
 Запрещено логировать:

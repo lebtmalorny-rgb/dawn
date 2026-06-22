@@ -1,8 +1,8 @@
 # API register
 
-- Stage: E05
+- Stage: E06
 - DKB: ДКБ-77 draft register
-- Status: E05 resource group API, frontend read/search/preview UX and group-aware inventory filters implemented; Keystone/Nova/Placement adapter contracts remain offline/live-smoke pending
+- Status: E06 operation catalog/API/worker/UI, P0 Watcher/Masakari read-status modules and optional read-only Mistral smoke implemented; Keystone/Nova/Placement adapter contracts remain offline/live-smoke pending
 
 ## Portal API
 
@@ -44,28 +44,31 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | `DELETE /groups/{group_id}/members/{resource_type}/{cloud_id}/{region_id}/{resource_id}` | remove explicit member | frontend/API clients | session+CSRF+trusted Origin+capability+idempotency | E05 | `group.member.remove`, denial events | implemented in E05; returns `status=deleted`; idempotency binding rejects same-key/different-payload |
 | `POST /groups/rules/validate` | validate safe group rule AST | frontend/API clients | session+capability | E05 | authorization denial | implemented in E05; capability `group.read`; rejects arbitrary field/operator/value shape |
 | `POST /groups/{group_id}/preview` | preview dynamic rule | frontend | session+capability+scope/owner+inventory read capability | E05 | `group.preview`, denial events | implemented in E05; capability `group.read` plus `instance.read`/`hypervisor.read`; bounded limit max 50 |
-| `GET /workflow-definitions` | workflow catalog | frontend | session+capability | E06 | catalog read policy | capability `workflow.read` |
-| `GET /workflow-definitions/{workflow_key}/versions/{version}` | workflow definition | frontend | session+capability | E06 | catalog read policy | capability `workflow.read` |
-| `POST /workflow-definitions/{workflow_key}/validate-input` | validate input | frontend | session+CSRF+capability | E06 | validation event if protected | capability `workflow.execute.*` |
-| `POST /operations` | submit operation | frontend | session+CSRF+capability+idempotency | E06 | operation accepted/denied | capability `workflow.execute.*` |
-| `GET /operations` | operation list | frontend | session+capability+scope | E06 | protected access policy | capability `operation.read` |
-| `GET /operations/{operation_id}` | operation status | frontend | session+capability+scope | E06 | protected access policy | capability `operation.read` |
-| `POST /operations/{operation_id}/cancel` | cancel operation | frontend | session+CSRF+capability | E06 | cancel request | capability `operation.cancel` |
-| `POST /operations/{operation_id}/retry` | retry operation | frontend | session+CSRF+capability | E06 | retry request | capability `operation.retry` |
+| `GET /workflow-definitions` | allowlisted workflow catalog without Mistral names | frontend | session+capability | E06 | catalog read policy | implemented in E06; capability `operation.read`; initial definition `maintenance-host-precheck@1.0.0` |
+| `GET /workflow-definitions/{workflow_key}/versions/{version}` | workflow definition | frontend | session+capability | E06+ | catalog read policy | planned; not implemented in E06 P0 |
+| `POST /workflow-definitions/{workflow_key}/validate-input` | validate input | frontend | session+CSRF+capability | E06+ | validation event if protected | planned; P0 validates input inside `POST /operations` |
+| `POST /operations` | submit allowlisted operation | frontend | session+trusted Origin+CSRF+capability+idempotency | E06 | `operation.accepted`, authorization denial | implemented in E06; requires `operation.read` plus workflow-specific `workflow.execute.maintenance-host`; durable operation/outbox/idempotency before `202` |
+| `GET /operations` | actor/scope-scoped operation list | frontend | session+capability+scope | E06 | protected access policy | implemented in E06; capability `operation.read`; signed cursor, `updated_at.desc`, max limit 200 |
+| `GET /operations/{operation_id}` | operation status and timeline | frontend | session+capability+scope | E06 | protected access policy | implemented in E06; capability `operation.read`; returns correlation and external execution ID |
+| `POST /operations/{operation_id}/cancel` | cancel operation request | frontend | session+trusted Origin+CSRF+capability | E06 | cancel request/denial | route implemented but fail-closed in E06 P0 with `409 operation_not_cancelable`; uses `operation.read` guard until cancel semantics are proven |
+| `POST /operations/{operation_id}/retry` | retry operation | frontend | session+CSRF+capability | E06+ | retry request | planned; not implemented in E06 P0 |
 | `GET /events/stream` | SSE live event stream | frontend | session+capability+scope | E06+/E10 | stream subscribe/denial | capability `realtime.stream.read` |
 | `GET /events` | polling fallback for live events | frontend | session+capability+scope | E06+/E10 | protected access policy | capability `realtime.stream.read` |
 | `GET /operations/{operation_id}/events` | operation timeline events | frontend | session+capability+scope | E06 | protected access policy | capability `operation.read` |
-| `GET /watcher/goals` | Watcher goals | frontend | session+capability | E06+ | protected access policy | capability `watcher.read` |
-| `GET /watcher/strategies` | Watcher strategies | frontend | session+capability | E06+ | protected access policy | capability `watcher.read` |
-| `GET /watcher/audit-templates` | Watcher audit templates | frontend | session+capability | E06+ | protected access policy | capability `watcher.read` |
-| `GET /watcher/audits` | Watcher audits and continuous audits | frontend | session+capability+scope | E06+ | protected access policy | capability `watcher.read` |
-| `GET /watcher/action-plans` | Watcher action plans | frontend | session+capability+scope | E06+ | protected access policy | capability `watcher.read` |
-| `GET /watcher/actions` | Watcher actions | frontend | session+capability+scope | E06+ | protected access policy | capability `watcher.read` |
-| `GET /watcher/recommendations` | Watcher recommendations with risk/conflict markers | frontend | session+capability+scope | E06+ | protected access policy | capability `watcher.read` |
-| `GET /masakari/segments` | Masakari failover segments | frontend | session+capability+scope | E06+ | protected access policy | capability `masakari.read` |
-| `GET /masakari/segments/{segment_id}/hosts` | Masakari segment hosts | frontend | session+capability+scope | E06+ | protected access policy | capability `masakari.read` |
-| `GET /masakari/notifications` | Masakari notifications | frontend | session+capability+scope | E06+ | protected access policy | capability `masakari.read` |
-| `GET /masakari/recovery-timeline` | HA recovery timeline | frontend | session+capability+scope | E06+ | protected access policy | capability `masakari.read` |
+| `GET /watcher/goals` | Watcher goals status | frontend | session+capability | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read`; static read/status payload |
+| `GET /watcher/strategies` | Watcher strategies status | frontend | session+capability | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read`; no direct apply |
+| `GET /watcher/audit-templates` | Watcher audit templates status | frontend | session+capability | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read`; dry-run template marker |
+| `GET /watcher/audits` | Watcher audits | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read` |
+| `GET /watcher/continuous-audits` | Watcher continuous audit status | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; disabled state marker |
+| `GET /watcher/action-plans` | Watcher action plans | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; direct apply disabled; operation path points to `/api/v1/operations` |
+| `GET /watcher/actions` | Watcher actions | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read` |
+| `GET /watcher/recommendations` | Watcher recommendations with risk/conflict markers | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; `automatic_apply.enabled=false` |
+| `GET /masakari/segments` | Masakari failover segments | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read`; approval gate and Consul matrix markers |
+| `GET /masakari/segments/{segment_id}` | Masakari segment detail | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read` |
+| `GET /masakari/segments/{segment_id}/hosts` | Masakari segment hosts | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read` |
+| `GET /masakari/notifications` | Masakari notifications | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read`; direct recovery disabled |
+| `GET /masakari/notifications/{notification_id}` | Masakari notification detail | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read`; Nova/Masakari conflict marker |
+| `GET /masakari/recovery-timeline` | HA recovery timeline | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read` |
 | `GET /audit/events` | audit search | frontend | session+capability+scope | E07 | audit access audited | capability `audit.read` |
 | `GET /audit/events/{event_id}` | audit event detail | frontend | session+capability+scope | E07 | audit access audited | capability `audit.read` |
 
@@ -76,9 +79,9 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | Keystone Identity API v3 | version discovery and sanitized catalog fixture mapping | observed `v3.14`; E03 contract fixture | E02/E03 | offline adapter contract implemented; optional live smoke pending safe read-only credential | `backend/tests/integrations/test_keystone_adapter.py`; production PKI gap remains |
 | Nova API | read-only instances, hypervisors, compute services, aggregates, server groups | microversion `2.96` | E03/E04 | offline adapter contract implemented; E04 read model/API/UI use synthetic reconciliation evidence; safe live Nova smoke still pending | `backend/tests/integrations/test_nova_adapter.py`, `backend/tests/inventory/test_reconciliation.py`, `docs/generated/e04-scale-report.md`; optional live smoke pending |
 | Placement API | read-only resource providers, inventory, usage | microversion `1.39` | E03/E04 | offline adapter contract implemented; enrichment only | `backend/tests/integrations/test_placement_adapter.py`; optional live smoke pending |
-| Mistral API v2 | workflow execution | endpoint `/v2` | E06 | enabled; internal/public endpoint `https://192.168.10.250:8989/v2` | idempotency/lost response tests |
-| Watcher API v1 | goals/strategies/audit templates/audits/continuous audits/action plans/actions/recommendations | endpoint observed | E06+ | enabled; internal/public endpoint `https://192.168.10.250:9322` | contract fixtures; telemetry datasource freshness tests |
-| Masakari API | segments/hosts/notifications/recovery state | endpoint observed | E06+ | enabled; internal/public endpoint `https://192.168.10.250:15868`; Consul-backed hostmonitor path selected but not deployed on current test node | contract fixtures; hostmonitor Consul matrix fixtures; Nova conflict tests |
+| Mistral API v2 | workflow execution and read-only workflow lookup smoke | endpoint `/v2` | E06 | P0 uses `InMemoryMistralAdapter`; optional all-in-one smoke is skipped by default and performs read-only `GET /v2/workflows/{workflow_name}` only | `backend/tests/operations/test_mistral_mock.py`, `backend/tests/operations/test_operation_worker.py`, `backend/tests/integrations/test_mistral_live_smoke.py`, `docs/generated/e06-mistral-smoke.md` |
+| Watcher API v1 | goals/strategies/audit templates/audits/continuous audits/action plans/actions/recommendations | endpoint observed | E06+ | E06 P0 exposes portal read/status placeholders with automatic apply disabled; live adapter contract pending | `backend/tests/operations/test_watcher_masakari_api.py`; telemetry datasource freshness tests pending |
+| Masakari API | segments/hosts/notifications/recovery state | endpoint observed | E06+ | E06 P0 exposes portal read/status placeholders with approval/conflict/processmonitor markers; live adapter contract pending | `backend/tests/operations/test_watcher_masakari_api.py`; hostmonitor Consul matrix and Nova conflict live tests pending |
 | Telemetry datasource APIs | metrics for capacity, health, Watcher recommendations and Masakari corroboration | Prometheus exporter-backed path first; Ceilometer/Gnocchi/Aetos pending | E10/P3 | Prometheus endpoints/coverage pending; selected exporters are `openstack-exporter` and `node_exporter` | adapter contracts, freshness/coverage/cardinality tests |
 | Heat API | optional stack operations | endpoint observed | optional | reachable via HTTPS service catalog | ADR if included before pilot |
 | SIEM API/syslog | audit delivery | ADR-008 | E07 | pending | delivery/heartbeat/failure tests |
@@ -88,7 +91,12 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 
 This file is only documentation evidence. ДКБ-77 also requires technical blocking: Kolla service enablement, firewall/ACL, HAProxy routing, OpenStack policy deny and disabled unused endpoints. Those controls are E08/E09/E12 evidence.
 
-E05 implements `/api/v1/groups*` and `group_id` filters for `/api/v1/instances` and `/api/v1/hypervisors` behind the portal BFF/API boundary. Service health, topology and capacity modules are not silently linked: E04 exposes explicit disabled descriptors until adapters, policies and tests exist. Search remains a planned E04+/E10 API row and is not enabled in the UI.
+E06 implements `/api/v1/operations*`, `/api/v1/workflow-definitions`, P0 Watcher/Masakari read/status
+endpoints and optional read-only Mistral smoke behind the portal BFF/API boundary. E05 implements
+`/api/v1/groups*` and `group_id` filters for `/api/v1/instances` and `/api/v1/hypervisors`. Service
+health, topology and capacity modules are not silently linked: E04 exposes explicit disabled
+descriptors until adapters, policies and tests exist. Search remains a planned E04+/E10 API row and is
+not enabled in the UI.
 
 Inventory API source of truth is the portal read model populated from OpenStack APIs and reconciliation. Group membership is portal-owned MariaDB metadata and does not mutate OpenStack placement constructs. Synthetic E04/E05 evidence uses deterministic sources and local SQLite; production MariaDB, live Nova comparison and HA/load evidence remain separate gates. Telemetry APIs are enrichment sources and must not be used as inventory authority.
 

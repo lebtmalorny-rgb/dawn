@@ -79,7 +79,8 @@ remains the final authority for future OpenStack mutations.
         "instance.read",
         "hypervisor.read",
         "group.read",
-        "workflow.execute.evacuate-host"
+        "operation.read",
+        "workflow.execute.maintenance-host"
       ],
       "expires_at": "...",
       "policy_revision": "..."
@@ -88,9 +89,9 @@ remains the final authority for future OpenStack mutations.
 Frontend использует ответ для UX. Любой mutating endpoint повторяет проверку.
 
 Note: `GET /api/v1/session` currently returns the sanitized subject only, not a CSRF token. P0
-frontend group mutation wrappers require CSRF and are usable after the login response in the same
-browser session, but restored sessions need an explicit CSRF refresh endpoint before create/update/add
-controls can be safely enabled in the UI.
+frontend mutation paths, including operation submit, require CSRF and are usable after the login
+response in the same browser session. Restored sessions need an explicit CSRF refresh endpoint before
+create/update/add/operation-submit controls can be safely enabled after page reload.
 
 ## Сессии
 
@@ -173,3 +174,5 @@ Shared service-admin credential для выполнения пользовате
 - service role не назначается human subject;
 - portal role не расширяет OpenStack 403;
 - audit reader не получает mutating permissions.
+- `operation.read` alone can list/read operations but cannot submit `maintenance-host-precheck`
+  without `workflow.execute.maintenance-host`.

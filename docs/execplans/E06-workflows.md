@@ -182,7 +182,11 @@ semantics, operation timeline или frontend operation page. Единствен
   src/cloud_ui/config.py src/cloud_ui/api.py tests/operations/test_operation_api.py
   tests/test_config.py` -> all checks passed; `cd backend && .venv/bin/python -m mypy src` ->
   success; `git diff --check` -> success.
-- [ ] 2026-06-22: Documentation/registers/final verification.
+- [x] 2026-06-22: Documentation/registers/final verification completed. Evidence:
+  `make lint` -> success; `make typecheck` -> success; `make test` -> backend `243 passed,
+  1 skipped`, frontend `31 passed`; `make test-integration` -> `21 passed, 1 skipped`;
+  `make security` -> success; `make build` -> success after starting Docker Desktop, built
+  `cloud-ui-frontend:dev` and `cloud-ui-backend:dev`; `git diff --check` -> success.
 
 ## Неожиданные открытия
 
@@ -365,15 +369,15 @@ Implementation details:
 - Add `OperationServices` with operation repository, inventory repository, group repository and catalog.
 - Include operations router under `/api/v1`.
 - Add route response models for definitions, submit response, operation detail, event page and cancel.
-- Add `workflow.execute.maintenance-host` to the P0 operator only if host precheck should be usable by
-  operator; otherwise restrict to `portal_admin`. The first implementation uses `portal_admin` for host
-  target submit and keeps `cloud_operator` forbidden unless requirements change.
+- Add `workflow.execute.maintenance-host` to the P0 operator for the dry-run host precheck path; auditor
+  and viewer roles remain read-only.
 - Validate session, Origin, CSRF, capability, idempotency key, definition, input and target before
   accepting.
 - For host targets, load hypervisor from E04 read model and snapshot host fields.
 - Return `202` only after operation and outbox row are committed.
-- Record `operation.accepted`, `authorization.denied`, `operation.cancel.requested` audit metadata
-  without raw idempotency key or full input body.
+- Record `operation.accepted` and `authorization.denied` audit metadata without raw idempotency key or
+  full input body. Cancel remains fail-closed with `operation_not_cancelable` until Mistral cancel
+  semantics are proven.
 
 Verification:
 

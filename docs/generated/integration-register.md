@@ -1,7 +1,7 @@
 # Integration register
 
-- Stage: E05
-- Status: Keystone/Nova/Placement offline adapter contracts remain implemented; E05 resource groups use portal-owned MariaDB metadata and E04 inventory read model; safe live smoke remains pending
+- Stage: E06
+- Status: E06 operations use portal-owned MariaDB state, strict P0 Mistral mock and P0 Watcher/Masakari read-status modules; optional all-in-one Mistral smoke is read-only and skipped by default
 
 ## Integration summary
 
@@ -11,14 +11,14 @@
 | Keystone | token, scope, roles, service catalog | API/worker -> Keystone | E02/E03 | E03 offline contract tests implemented; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
 | Nova | instances, hypervisors, services, aggregates | worker/API -> Nova | E03/E04/E05 | E03 offline contract tests implemented with microversion `2.96`; E04 read-model reconciliation is proven with deterministic synthetic source; E05 groups read VM/host facts only from the portal read model and do not mutate Nova server groups/aggregates; safe live Nova comparison remains pending until a read-only test credential is available outside git | OpenStack owner |
 | Placement | resource provider inventory/usage | worker/API -> Placement | E03/E04 | E03 offline contract tests implemented with microversion `1.39`; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
-| Mistral | long-running workflow execution | worker -> Mistral | E06 | enabled; endpoint `https://192.168.10.250:8989/v2` | Workflow/platform owner |
-| Watcher | goals, strategies, audits, continuous audits, action plans, actions, recommendations and optimization risk state | worker/API -> Watcher; operations may execute via Mistral | E06+ | enabled; endpoint `https://192.168.10.250:9322`; Prometheus exporter datasource selected first, contract pending | OpenStack owner |
-| Masakari | failover segments, segment hosts, notifications, monitor events and recovery timeline | worker/API -> Masakari; recovery actions may execute via Mistral/Nova workflow; Masakari hostmonitor -> Consul for network health where enabled | E06+ | API/engine enabled; endpoint `https://192.168.10.250:15868`; monitors disabled for AIO lab; Consul not on current test node | OpenStack owner |
+| Mistral | long-running workflow execution | worker -> Mistral | E06 | P0 strict mock implemented for start/get/cancel/list-by-correlation, lost response and duplicate lookup; optional all-in-one smoke requires `DAWN_MISTRAL_SMOKE=1` and performs read-only workflow lookup only | Workflow/platform owner |
+| Watcher | goals, strategies, audits, continuous audits, action plans, actions, recommendations and optimization risk state | worker/API -> Watcher; operations may execute via Mistral | E06+ | P0 portal read/status endpoints implemented with automatic apply disabled and risk markers; live Watcher adapter remains pending | OpenStack owner |
+| Masakari | failover segments, segment hosts, notifications, monitor events and recovery timeline | worker/API -> Masakari; recovery actions may execute via Mistral/Nova workflow; Masakari hostmonitor -> Consul for network health where enabled | E06+ | P0 portal read/status endpoints implemented with approval gate, Consul matrix, processmonitor unsupported and Nova/Masakari conflict markers; live Masakari adapter remains pending | OpenStack owner |
 | Telemetry datasource | capacity/health metrics, Watcher datasource freshness and Masakari incident corroboration | worker/API -> Prometheus query API first; exporters `openstack-exporter` and `node_exporter`; Ceilometer/Gnocchi/Aetos later | E10/P3 | Prometheus exporter path selected; endpoints, retention and coverage pending | Monitoring owner |
 | Heat | optional stacks/workflow module | worker/API -> Heat or via Mistral | after decision | reachable via HTTPS service catalog | Product owner |
 | RabbitMQ `/cloud-ui` | jobs, outbox, events | API/worker/events -> RabbitMQ | E01+ | planned | Messaging owner |
 | OpenStack notifications | read model acceleration | notification transport -> event consumer | E04/E07 | not bound in E04; reconciliation remains correctness authority and event acceleration requires contract/security review | Messaging/OpenStack owner |
-| MariaDB `cloud_ui` | portal state, sessions, read model, resource groups and idempotency bindings | API/worker/events -> MariaDB | E01+ | E05 group schema/repository/API contract implemented with local SQLite tests; production MariaDB deployment, migration run evidence and HA behavior remain pending | DB owner |
+| MariaDB `cloud_ui` | portal state, sessions, read model, resource groups, operations, operation events/outbox and idempotency bindings | API/worker/events -> MariaDB | E01+ | E06 operation schema/repository/API contract implemented with local SQLite tests; production MariaDB deployment, migration run evidence and HA behavior remain pending | DB owner |
 | SIEM/test sink | authoritative audit delivery | audit worker -> SIEM | E07 | unknown | SIEM owner |
 | Vault (SecMan) | secret storage and lifecycle | backend/deploy -> Vault | E08 | product identified; endpoint/auth/path policy unknown | Vault owner |
 | Corporate PKI | TLS/mTLS certificates | deploy/runtime -> PKI | E08/E09 | unknown | PKI owner |
@@ -36,6 +36,10 @@
 - RabbitMQ RPC queues of OpenStack are not consumed directly.
 - Resource groups are portal-owned metadata; group filters use the local read model and do not add
   direct browser/OpenStack integration.
+- Operations are portal-owned durable records; browser requests can select only allowlisted workflow
+  definitions and never submit Mistral workflow names.
+- P0 Mistral evidence is mock-only. P2 all-in-one smoke is read-only workflow lookup and must not be
+  treated as mutating production workflow safety evidence.
 - External integrations that are not available in test must be represented by interface, mock/contract and explicit pending evidence.
 
 ## Current deployment notes

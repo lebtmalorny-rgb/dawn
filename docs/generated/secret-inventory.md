@@ -7,6 +7,7 @@
 | Secret class | Used by | Proposed store | Injection | Rotation owner | Stage | Current status |
 |---|---|---|---|---|---|---|
 | UI session signing/encryption key | backend API | Vault (SecMan) in production; local dummy in P0 | mounted secret/reference | Vault/platform | E02/E08 | pending |
+| Operation/inventory cursor signing keys | backend API | Vault (SecMan) in production; local dummy in P0 | mounted secret/reference | Vault/platform | E04/E06/E08 | E06 adds operation cursor key; production dummy-key rejection implemented |
 | Human OpenStack session token | server-side session only | encrypted DB/session record | runtime only | IAM/OpenStack | E02 | pending ADR-001 |
 | Service application credential | backend integrations | Vault (SecMan) | runtime secret reference | OpenStack/Vault | E03/E08 | pending |
 | MariaDB runtime password | API/worker/events | Kolla secret mechanism/Vault | config secret mount | DB/platform | E01/E09 | pending |

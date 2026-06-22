@@ -1,6 +1,6 @@
 # Актуальный реестр рисков
 
-- Stage: E05 Resource groups
+- Stage: E06 Operations workflow catalog
 - Last updated: 2026-06-22
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
@@ -42,6 +42,16 @@
 | R-027 | Member idempotency model reused for destructive workflows | E05 stores HMAC key binding and request hash, including no-op add/remove, but same-key/same-payload replay is re-evaluated instead of served from a stored response snapshot. | Future destructive operations must store response/result snapshots or use operation table semantics before retry is allowed. | E05/E06 |
 | R-028 | Host group semantics overstate project ownership | Hypervisors are not project-owned in the read model; P0 host/mixed group management requires admin/system-like capability. | Keep host group mutations admin-only until a formal ownership/approval model exists. | E05/E06 |
 
+## Operations/workflow risks
+
+| ID | Риск | Текущее положение | Митигация | Stage |
+|---|---|---|---|---|
+| R-029 | P0 Mistral mock mistaken for production workflow safety | E06 proves durable operation/idempotency/outbox, worker duplicate-prevention and UI through `InMemoryMistralAdapter`. Optional all-in-one smoke is read-only workflow lookup and creates no execution. | Do not claim mutating production safety until approved test workflow, service identity, SIEM delivery, OpenStack policy evidence and rollback/cancel evidence exist. | E06/E08 |
+| R-033 | Cancel UI implies guaranteed abort | E06 exposes cancel route shape but backend returns `409 operation_not_cancelable` until Mistral state/cancel semantics are proven. | Keep cancel fail-closed; enable only per workflow definition/state with tests for partial effects and audit. | E06+ |
+| R-034 | Restored browser session cannot submit operation after reload | `/api/v1/session` does not return CSRF. Frontend disables operation submit unless login response provided in-memory CSRF. | Add explicit CSRF refresh/session bootstrap endpoint before relying on restored-session mutation UX. | E06/E08 |
+| R-035 | Watcher/Masakari P0 placeholders overstate live integration | E06 P0 endpoints expose first-class status/risk/conflict markers but do not call live Watcher/Masakari adapters. | Add typed live adapters, contract fixtures and lab evidence before claiming service integration. | E06/E10 |
+| R-036 | Operation list leaks cross-scope data | E06 list endpoint filters by actor subject and session scope and uses signed cursor. Detail endpoint still relies on `operation.read` policy only. | Add operation ownership/scope checks to detail/cancel before shared operations or cross-operator views are enabled. | E06/E08 |
+
 ## Telemetry and recovery signal risks
 
 | ID | Риск | Текущее положение | Митигация | Stage |
@@ -79,6 +89,6 @@
 
 ## Immediate priority order
 
-1. Finish E05 documentation/evidence and final verification.
+1. Finish E06 documentation/evidence and final verification.
 2. Keep ADR-001/test federation, Vault/SecMan, SIEM delivery and IAM/PAM/SoD evidence as explicit external gaps.
-3. Do not extend E05 into Mistral workflows, live notification binding or production mutating Nova actions.
+3. Do not treat E06 P0 mock or read-only Mistral smoke as proof of production mutating workflow safety.

@@ -12,7 +12,7 @@ import pytest
 @dataclass(frozen=True)
 class MistralSmokeConfig:
     endpoint: str
-    token: str
+    auth_value: str
     workflow_key: str
     workflow_name: str
     test_project_id: str
@@ -38,7 +38,7 @@ def test_all_in_one_mistral_workflow_lookup_smoke(record_property: object) -> No
             workflow_url,
             headers={
                 "accept": "application/json",
-                "x-auth-token": config.token,
+                "x-auth-token": config.auth_value,
                 "x-correlation-id": correlation_id,
             },
         )
@@ -56,7 +56,7 @@ def _load_config() -> MistralSmokeConfig:
 
     required = {
         "DAWN_MISTRAL_ENDPOINT": os.environ.get("DAWN_MISTRAL_ENDPOINT"),
-        "DAWN_MISTRAL_TOKEN": os.environ.get("DAWN_MISTRAL_TOKEN"),
+        "DAWN_MISTRAL_AUTH_VALUE": os.environ.get("DAWN_MISTRAL_AUTH_VALUE"),
         "DAWN_MISTRAL_WORKFLOW_KEY": os.environ.get("DAWN_MISTRAL_WORKFLOW_KEY"),
         "DAWN_MISTRAL_WORKFLOW_NAME": os.environ.get("DAWN_MISTRAL_WORKFLOW_NAME"),
         "DAWN_MISTRAL_TEST_PROJECT_ID": os.environ.get("DAWN_MISTRAL_TEST_PROJECT_ID"),
@@ -77,7 +77,7 @@ def _load_config() -> MistralSmokeConfig:
 
     return MistralSmokeConfig(
         endpoint=_required(required, "DAWN_MISTRAL_ENDPOINT"),
-        token=_required(required, "DAWN_MISTRAL_TOKEN"),
+        auth_value=_required(required, "DAWN_MISTRAL_AUTH_VALUE"),
         workflow_key=_required(required, "DAWN_MISTRAL_WORKFLOW_KEY"),
         workflow_name=_required(required, "DAWN_MISTRAL_WORKFLOW_NAME"),
         test_project_id=_required(required, "DAWN_MISTRAL_TEST_PROJECT_ID"),

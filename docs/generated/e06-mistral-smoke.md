@@ -7,7 +7,7 @@ Status: opt-in, skipped by default.
 ```bash
 DAWN_MISTRAL_SMOKE=1 \
 DAWN_MISTRAL_ENDPOINT=https://mistral.example.invalid:8989 \
-DAWN_MISTRAL_TOKEN=<test-project-token> \
+DAWN_MISTRAL_AUTH_VALUE=<test-project-auth-value> \
 DAWN_MISTRAL_WORKFLOW_KEY=maintenance-host-precheck \
 DAWN_MISTRAL_WORKFLOW_NAME=portal.maintenance_host_precheck.v1 \
 DAWN_MISTRAL_TEST_PROJECT_ID=<test-project-id> \
