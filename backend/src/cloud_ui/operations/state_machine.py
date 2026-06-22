@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from cloud_ui.operations.models import OPERATION_STATUSES, TERMINAL_OPERATION_STATUSES
 
 
-@dataclass(frozen=True)
+@dataclass
 class OperationTransitionError(Exception):
     current: str
     desired: str

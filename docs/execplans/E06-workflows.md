@@ -127,7 +127,12 @@ semantics, operation timeline или frontend operation page. Единствен
   `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations tests/operations` ->
   all checks passed; `cd backend && .venv/bin/python -m mypy src/cloud_ui/operations` -> success;
   `git diff --check` -> success.
-- [ ] 2026-06-22: Operation repository/idempotency/outbox.
+- [x] 2026-06-22: Operation repository/idempotency/outbox implemented and tested. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/operations/test_state_machine.py
+  tests/operations/test_operation_migration.py tests/operations/test_operation_repository.py -q` ->
+  `43 passed`; `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations
+  tests/operations` -> all checks passed; `cd backend && .venv/bin/python -m mypy
+  src/cloud_ui/operations` -> success; `git diff --check` -> success.
 - [ ] 2026-06-22: Workflow catalog/input validation.
 - [ ] 2026-06-22: Submit/detail/cancel API.
 - [ ] 2026-06-22: Mistral mock adapter and worker.
@@ -147,6 +152,9 @@ semantics, operation timeline или frontend operation page. Единствен
   bounded worker service before claiming dispatch/reconciliation evidence.
 - The old `/api/v1/operations/simulated-openstack-action` route is a security-foundation stub and must
   not be treated as the E06 operation API contract.
+- Repository tests found that `workflow_version` must be part of the operation idempotency primary key.
+  Without it, the same actor/key/scope could incorrectly conflict across definition versions. The
+  `0005_operations` migration and runtime schema now include `workflow_version` in the PK.
 
 ## Журнал решений
 

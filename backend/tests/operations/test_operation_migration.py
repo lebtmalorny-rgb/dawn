@@ -66,7 +66,13 @@ EXPECTED_PRIMARY_KEYS = {
     "operation_events": ("event_id",),
     "operation_attempts": ("attempt_id",),
     "operation_outbox": ("outbox_id",),
-    "operation_idempotency_keys": ("actor_subject_id", "workflow_key", "scope_hash", "key_hash"),
+    "operation_idempotency_keys": (
+        "actor_subject_id",
+        "workflow_key",
+        "workflow_version",
+        "scope_hash",
+        "key_hash",
+    ),
 }
 
 EXPECTED_INDEXES = {

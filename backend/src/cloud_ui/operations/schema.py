@@ -156,7 +156,13 @@ operation_idempotency_keys = sa.Table(
     sa.Column("request_hash", sa.String(length=128), nullable=False),
     sa.Column("operation_id", sa.String(length=128), nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-    sa.PrimaryKeyConstraint("actor_subject_id", "workflow_key", "scope_hash", "key_hash"),
+    sa.PrimaryKeyConstraint(
+        "actor_subject_id",
+        "workflow_key",
+        "workflow_version",
+        "scope_hash",
+        "key_hash",
+    ),
     sa.ForeignKeyConstraint(["operation_id"], ["operations.operation_id"], ondelete="CASCADE"),
     sa.Index("ix_operation_idempotency_created", "created_at", "operation_id"),
 )
