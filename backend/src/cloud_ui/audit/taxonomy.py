@@ -92,4 +92,3 @@ def get_action_definition(action: str) -> AuditActionDefinition:
         return _ACTION_INDEX[action]
     except KeyError as exc:
         raise UnknownAuditAction(action) from exc
-

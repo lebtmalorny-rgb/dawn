@@ -20,4 +20,3 @@ class DurableAuditSink(AuditSink):
         stored = self._repository.record_event(event, queue_delivery=True)
         if self._keep_events_for_tests:
             self.events.append(stored)
-

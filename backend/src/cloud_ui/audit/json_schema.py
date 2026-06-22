@@ -24,4 +24,3 @@ def build_audit_event_json_schema() -> dict[str, Any]:
         ],
         "additionalProperties": True,
     }
-

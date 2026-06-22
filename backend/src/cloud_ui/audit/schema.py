@@ -103,4 +103,3 @@ sa.Index(
     audit_delivery_attempts.c.created_at,
     audit_delivery_attempts.c.attempt_id,
 )
-

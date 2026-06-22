@@ -81,4 +81,3 @@ class FluentdHttpAuditSink:
             "time": envelope.get("occurred_at"),
             "record": envelope,
         }
-

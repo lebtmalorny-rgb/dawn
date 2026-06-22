@@ -98,4 +98,3 @@ class AuditEvent(BaseModel):
             "delivery_state": self.delivery_state,
             "metadata": self.metadata,
         }
-
