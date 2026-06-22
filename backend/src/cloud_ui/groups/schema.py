@@ -93,9 +93,9 @@ resource_group_revisions = sa.Table(
         ondelete="CASCADE",
     ),
     sa.Index(
-        "ix_resource_group_revisions_group_revision",
+        "ux_resource_group_revisions_group_revision",
         "group_id",
         "revision",
-        "revision_id",
+        unique=True,
     ),
 )

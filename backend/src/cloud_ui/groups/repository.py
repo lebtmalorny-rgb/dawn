@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import sqlalchemy as sa
 from sqlalchemy.engine import Connection, Engine, RowMapping
+from sqlalchemy.exc import IntegrityError
 
 from cloud_ui.groups import schema
 from cloud_ui.groups.models import GroupMember, GroupNotFound, GroupRevisionConflict, ResourceGroup
@@ -231,11 +232,27 @@ class GroupRepository:
                 "added_at": now,
                 "expires_at": None,
             }
-            connection.execute(schema.resource_group_members.insert().values(member))
-            next_revision = int(current["revision"]) + 1
+            expected_revision = int(current["revision"])
+            try:
+                connection.execute(schema.resource_group_members.insert().values(member))
+            except IntegrityError:
+                existing_after_conflict = _member_row(
+                    connection=connection,
+                    group_id=group_id,
+                    resource_type=resource_type,
+                    cloud_id=cloud_id,
+                    region_id=region_id,
+                    resource_id=resource_id,
+                )
+                if existing_after_conflict is None:
+                    raise
+                return _member_from_mapping(existing_after_conflict)
+
+            next_revision = expected_revision + 1
             _update_revision(
                 connection=connection,
                 group_id=group_id,
+                expected_revision=expected_revision,
                 revision=next_revision,
                 updated_at=now,
             )
@@ -259,7 +276,7 @@ class GroupRepository:
         cloud_id: str,
         region_id: str,
         resource_id: str,
-        actor_id: str = "system",
+        actor_id: str,
     ) -> None:
         now = _now()
         with self._engine.begin() as connection:
@@ -279,10 +296,12 @@ class GroupRepository:
             if result.rowcount != 1:
                 return
 
-            next_revision = int(current["revision"]) + 1
+            expected_revision = int(current["revision"])
+            next_revision = expected_revision + 1
             _update_revision(
                 connection=connection,
                 group_id=group_id,
+                expected_revision=expected_revision,
                 revision=next_revision,
                 updated_at=now,
             )
@@ -315,6 +334,8 @@ class GroupRepository:
             .limit(_limit(limit))
         )
         with self._engine.connect() as connection:
+            if _active_group_row(connection, group_id) is None:
+                raise GroupNotFound(f"group not found: {group_id}")
             rows = list(connection.execute(statement).mappings())
         return [_member_from_mapping(row) for row in rows]
 
@@ -365,17 +386,23 @@ def _update_revision(
     *,
     connection: Connection,
     group_id: str,
+    expected_revision: int,
     revision: int,
     updated_at: datetime,
 ) -> None:
-    connection.execute(
+    result = connection.execute(
         schema.resource_groups.update()
         .where(
             schema.resource_groups.c.group_id == group_id,
+            schema.resource_groups.c.revision == expected_revision,
             schema.resource_groups.c.deleted_at.is_(None),
         )
         .values(revision=revision, updated_at=updated_at)
     )
+    if result.rowcount != 1:
+        raise GroupRevisionConflict(
+            f"group revision conflict: expected {expected_revision}"
+        )
 
 
 def _insert_revision(

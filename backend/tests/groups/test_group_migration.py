@@ -12,7 +12,7 @@ class _FakeOp:
         self.created_table_items: dict[str, tuple[Any, ...]] = {}
         self.created_table_definitions: dict[str, sa.Table] = {}
         self.dropped_tables: list[str] = []
-        self.created_indexes: list[tuple[str, str, tuple[str, ...]]] = []
+        self.created_indexes: list[tuple[str, str, tuple[str, ...], bool]] = []
         self.operations: list[tuple[str, str]] = []
 
     def create_table(self, name: str, *columns: Any, **kwargs: Any) -> None:
@@ -25,8 +25,14 @@ class _FakeOp:
         self.dropped_tables.append(name)
         self.operations.append(("drop_table", name))
 
-    def create_index(self, name: str, table_name: str, columns: list[str]) -> None:
-        self.created_indexes.append((name, table_name, tuple(columns)))
+    def create_index(
+        self,
+        name: str,
+        table_name: str,
+        columns: list[str],
+        unique: bool = False,
+    ) -> None:
+        self.created_indexes.append((name, table_name, tuple(columns), unique))
         self.operations.append(("create_index", name))
 
     def drop_index(self, name: str, table_name: str) -> None:
@@ -88,23 +94,27 @@ EXPECTED_INDEXES = {
     "ix_resource_groups_owner_scope_name": (
         "resource_groups",
         ("owner_subject_id", "scope_type", "scope_id", "deleted_at", "name", "group_id"),
+        False,
     ),
     "ix_resource_group_members_group_page": (
         "resource_group_members",
         ("group_id", "added_at", "resource_type", "cloud_id", "region_id", "resource_id"),
+        False,
     ),
     "ix_resource_group_members_resource_lookup": (
         "resource_group_members",
         ("resource_type", "cloud_id", "region_id", "resource_id", "group_id"),
+        False,
     ),
-    "ix_resource_group_revisions_group_revision": (
+    "ux_resource_group_revisions_group_revision": (
         "resource_group_revisions",
-        ("group_id", "revision", "revision_id"),
+        ("group_id", "revision"),
+        True,
     ),
 }
 
 EXPECTED_DROP_INDEX_OPERATIONS = [
-    ("drop_index", "ix_resource_group_revisions_group_revision"),
+    ("drop_index", "ux_resource_group_revisions_group_revision"),
     ("drop_index", "ix_resource_group_members_resource_lookup"),
     ("drop_index", "ix_resource_group_members_group_page"),
     ("drop_index", "ix_resource_groups_owner_scope_name"),
@@ -152,7 +162,7 @@ def _assert_table_nullability(fake_op: _FakeOp, table_name: str) -> None:
     )
 
 
-def _runtime_index_specs(schema: Any) -> dict[str, tuple[str, tuple[str, ...]]]:
+def _runtime_index_specs(schema: Any) -> dict[str, tuple[str, tuple[str, ...], bool]]:
     tables = [
         schema.resource_groups,
         schema.resource_group_members,
@@ -163,6 +173,7 @@ def _runtime_index_specs(schema: Any) -> dict[str, tuple[str, tuple[str, ...]]]:
         index.name: (
             index.table.name,
             tuple(column.name for column in index.expressions),
+            bool(index.unique),
         )
         for table in tables
         for index in table.indexes
@@ -225,14 +236,14 @@ def test_group_migration_creates_tables_indexes_and_reversible_order(
     ]
 
     assert {
-        name: (table_name, columns)
-        for name, table_name, columns in fake_op.created_indexes
+        name: (table_name, columns, unique)
+        for name, table_name, columns, unique in fake_op.created_indexes
     } == EXPECTED_INDEXES
     assert [
         operation for operation in fake_op.operations if operation[0] == "drop_index"
     ] == EXPECTED_DROP_INDEX_OPERATIONS
     assert fake_op.operations.index(
-        ("drop_index", "ix_resource_group_revisions_group_revision")
+        ("drop_index", "ux_resource_group_revisions_group_revision")
     ) < fake_op.operations.index(("drop_table", "resource_group_revisions"))
     assert fake_op.operations.index(
         ("drop_index", "ix_resource_group_members_resource_lookup")

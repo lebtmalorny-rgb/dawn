@@ -84,15 +84,16 @@ def upgrade() -> None:
         ),
     )
     op.create_index(
-        "ix_resource_group_revisions_group_revision",
+        "ux_resource_group_revisions_group_revision",
         "resource_group_revisions",
-        ["group_id", "revision", "revision_id"],
+        ["group_id", "revision"],
+        unique=True,
     )
 
 
 def downgrade() -> None:
     op.drop_index(
-        "ix_resource_group_revisions_group_revision",
+        "ux_resource_group_revisions_group_revision",
         table_name="resource_group_revisions",
     )
     op.drop_table("resource_group_revisions")
