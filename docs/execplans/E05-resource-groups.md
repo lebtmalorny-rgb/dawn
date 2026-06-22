@@ -116,7 +116,15 @@
   `tests/groups/test_group_migration.py tests/inventory/test_inventory_migration.py` -> `3 passed`;
   scoped Ruff and mypy passed; spec review approved; final code quality review found no
   Critical/Important/Minor issues.
-- [ ] Group repository and rule compiler implemented and tested.
+- [x] 2026-06-22: Group repository and explicit membership implemented and tested. Evidence:
+  commits `7733a6d feat: add resource group repository`,
+  `5789aee docs: clarify E05 repository exceptions`,
+  `a4a43f4 fix: harden resource group repository writes`,
+  `29326c1 fix: keep no-op group updates idempotent`; targeted tests
+  `tests/groups/test_group_migration.py tests/groups/test_group_repository.py` -> `16 passed`;
+  scoped Ruff and mypy passed; spec review approved; final code quality review found no
+  Critical/Important issues.
+- [ ] Group rule compiler implemented and tested.
 - [ ] Group API and group-aware inventory filters implemented and tested.
 - [ ] Frontend group UX implemented and tested.
 - [ ] Documentation, DKB evidence and final verification completed.
@@ -138,6 +146,11 @@
 - Task 2 review recommended deciding in Task 3 whether revision history needs a unique
   `(group_id, revision)` constraint. This is not blocking for the schema slice but should be
   considered when repository write semantics land.
+- Task 3 added unique revision history and repository-level checks for no-op updates, duplicate
+  member-add races, stale membership revision writes and deleted group member-list access.
+- Task 3 code quality review noted a Minor double-delete race: `delete_group()` can still surface a
+  low-level uniqueness error in a narrow concurrent double-delete case because the API contract does
+  not yet include expected revision for delete. Revisit this when E05 API delete semantics are added.
 - `make test` runs backend tests from `backend/` and frontend Vitest. A root-level `pytest` also
   collects `tests/test_e015_kolla_layout.py`, which expects future Kolla files and is not part of the
   current project gate.
