@@ -4,6 +4,8 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from starlette.middleware.base import RequestResponseEndpoint
 
 from cloud_ui.config import get_settings
+from cloud_ui.groups.repository import GroupRepository
+from cloud_ui.groups.routes import GroupServices, build_group_router
 from cloud_ui.health import HealthReport, ReadinessCheck, build_readiness_check
 from cloud_ui.inventory.routes import (
     InventoryServices,
@@ -39,6 +41,7 @@ def create_app(
     readiness_check: ReadinessCheck | None = None,
     security_services: SecurityServices | None = None,
     inventory_services: InventoryServices | None = None,
+    group_services: GroupServices | None = None,
 ) -> FastAPI:
     check = readiness_check
     if check is None:
@@ -58,9 +61,20 @@ def create_app(
         else:
             inventory = build_inventory_services(settings)
 
+    groups = group_services
+    if groups is None:
+        group_repository = (
+            GroupRepository(engine=inventory.engine) if inventory.engine is not None else None
+        )
+        groups = GroupServices(
+            repository=group_repository,
+            inventory_repository=inventory.repository,
+        )
+
     app = FastAPI(title="Cloud UI API", version="0.1.0")
     app.state.security_services = security
     app.state.inventory_services = inventory
+    app.state.group_services = groups
     if inventory.engine is not None:
         app.state.inventory_engine = inventory.engine
 
@@ -82,6 +96,7 @@ def create_app(
     app.include_router(build_health_router(check))
     app.include_router(build_health_router(check), prefix="/api/v1")
     app.include_router(build_security_router(security), prefix="/api/v1")
+    app.include_router(build_group_router(groups, security), prefix="/api/v1")
     app.include_router(build_inventory_router(inventory, security), prefix="/api/v1")
 
     return app
