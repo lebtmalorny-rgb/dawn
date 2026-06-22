@@ -13,11 +13,13 @@ from cloud_ui.inventory.routes import (
     build_inventory_services,
     unavailable_inventory_services,
 )
+from cloud_ui.masakari.routes import build_masakari_router
 from cloud_ui.operations.catalog import build_builtin_workflow_catalog
 from cloud_ui.operations.repository import OperationRepository
 from cloud_ui.operations.routes import OperationServices, build_operation_router
 from cloud_ui.security.dependencies import SecurityServices, build_security_services
 from cloud_ui.security.routes import build_security_router
+from cloud_ui.watcher.routes import build_watcher_router
 
 
 def build_health_router(check: ReadinessCheck) -> APIRouter:
@@ -115,6 +117,8 @@ def create_app(
     app.include_router(build_health_router(check), prefix="/api/v1")
     app.include_router(build_security_router(security), prefix="/api/v1")
     app.include_router(build_operation_router(operations, security), prefix="/api/v1")
+    app.include_router(build_watcher_router(security), prefix="/api/v1")
+    app.include_router(build_masakari_router(security), prefix="/api/v1")
     app.include_router(build_group_router(groups, security), prefix="/api/v1")
     app.include_router(
         build_inventory_router_with_groups(inventory, security, groups),

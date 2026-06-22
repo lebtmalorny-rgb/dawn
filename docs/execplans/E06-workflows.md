@@ -156,7 +156,14 @@ semantics, operation timeline или frontend operation page. Единствен
   `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations tests/operations
   src/cloud_ui/api.py` -> all checks passed; `cd backend && .venv/bin/python -m mypy src` ->
   success; `git diff --check` -> success.
-- [ ] 2026-06-22: Watcher/Masakari modules.
+- [x] 2026-06-22: Watcher/Masakari modules implemented as read/status APIs with disabled
+  mutation paths and risk/conflict markers. Evidence: `cd backend && .venv/bin/python -m pytest
+  tests/operations tests/security/test_security_api.py -q` -> `89 passed`;
+  `cd backend && .venv/bin/python -m pytest tests/operations/test_watcher_masakari_api.py -q` ->
+  `5 passed`; `cd backend && .venv/bin/python -m ruff check src/cloud_ui/watcher
+  src/cloud_ui/masakari src/cloud_ui/api.py tests/operations/test_watcher_masakari_api.py` ->
+  all checks passed; `cd backend && .venv/bin/python -m mypy src` -> success;
+  `git diff --check` -> success.
 - [ ] 2026-06-22: Frontend operations UX.
 - [ ] 2026-06-22: Documentation/registers/final verification.
 
@@ -186,6 +193,9 @@ semantics, operation timeline или frontend operation page. Единствен
 - Group targets are accepted only as expansion inputs. The operation stores concrete host targets with
   `source_group_id` and `source_group_revision`, so later membership changes do not alter the operation
   snapshot. Evidence: `test_submit_group_target_expands_and_freezes_member_snapshot`.
+- FastAPI cannot derive a response field from route return annotations such as
+  `dict[str, Any] | JSONResponse`. Watcher/Masakari routes therefore follow the existing backend
+  pattern and declare explicit Pydantic `response_model` schemas for public API responses.
 
 ## Журнал решений
 
