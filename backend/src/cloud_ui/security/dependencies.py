@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from cloud_ui.config import Settings
-from cloud_ui.security.audit import InMemoryAuditSink
+from cloud_ui.security.audit import AuditSink, InMemoryAuditSink
 from cloud_ui.security.clock import ManualClock
 from cloud_ui.security.identity import IdentityProvider
 from cloud_ui.security.mock_identity import build_mock_identity_provider
@@ -18,7 +18,7 @@ CookieSameSite = Literal["lax", "strict"]
 class SecurityServices:
     identity_provider: IdentityProvider
     session_manager: SessionManager
-    audit_sink: InMemoryAuditSink
+    audit_sink: AuditSink
     policy_service: PolicyService
     clock: ManualClock
     session_cookie_secure: bool
@@ -26,7 +26,11 @@ class SecurityServices:
     trusted_origins: frozenset[str]
 
 
-def build_security_services(settings: Settings | None = None) -> SecurityServices:
+def build_security_services(
+    settings: Settings | None = None,
+    *,
+    audit_sink: AuditSink | None = None,
+) -> SecurityServices:
     clock = ManualClock()
     session_cookie_samesite: CookieSameSite
     if settings is None:
@@ -52,7 +56,7 @@ def build_security_services(settings: Settings | None = None) -> SecurityService
     return SecurityServices(
         identity_provider=identity_provider,
         session_manager=session_manager,
-        audit_sink=InMemoryAuditSink(),
+        audit_sink=audit_sink or InMemoryAuditSink(),
         policy_service=PolicyService(),
         clock=clock,
         session_cookie_secure=session_cookie_secure,

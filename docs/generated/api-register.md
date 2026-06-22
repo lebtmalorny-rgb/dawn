@@ -1,8 +1,8 @@
 # API register
 
-- Stage: E06
+- Stage: E07
 - DKB: ДКБ-77 draft register
-- Status: E06 operation catalog/API/worker/UI, P0 Watcher/Masakari read-status modules and optional read-only Mistral smoke implemented; Keystone/Nova/Placement adapter contracts remain offline/live-smoke pending
+- Status: E07 audit search/detail/export API, durable audit delivery contract and frontend audit view implemented; production SIEM/OpenSearch deployment, Keystone/Nova/Placement live smoke and technical blocking of unused OpenStack APIs remain external/pending
 
 ## Portal API
 
@@ -71,6 +71,7 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | `GET /masakari/recovery-timeline` | HA recovery timeline | frontend | session+capability+scope | E06 | protected access policy | implemented in E06 P0; guarded by `operation.read` |
 | `GET /audit/events` | audit search | frontend | session+capability+scope | E07 | audit access audited | capability `audit.read` |
 | `GET /audit/events/{event_id}` | audit event detail | frontend | session+capability+scope | E07 | audit access audited | capability `audit.read` |
+| `POST /audit/export` | bounded audit export request | frontend/API clients | session+trusted Origin+CSRF+capability | E07 | `audit.export.requested`, denial events | capability `audit.export`; P0 returns request id only and does not write CSV/files |
 
 ## External APIs used by portal
 
@@ -84,19 +85,21 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | Masakari API | segments/hosts/notifications/recovery state | endpoint observed | E06+ | E06 P0 exposes portal read/status placeholders with approval/conflict/processmonitor markers; live adapter contract pending | `backend/tests/operations/test_watcher_masakari_api.py`; hostmonitor Consul matrix and Nova conflict live tests pending |
 | Telemetry datasource APIs | metrics for capacity, health, Watcher recommendations and Masakari corroboration | Prometheus exporter-backed path first; Ceilometer/Gnocchi/Aetos pending | E10/P3 | Prometheus endpoints/coverage pending; selected exporters are `openstack-exporter` and `node_exporter` | adapter contracts, freshness/coverage/cardinality tests |
 | Heat API | optional stack operations | endpoint observed | optional | reachable via HTTPS service catalog | ADR if included before pilot |
-| SIEM API/syslog | audit delivery | ADR-008 | E07 | pending | delivery/heartbeat/failure tests |
+| SIEM API/syslog/Fluentd HTTP | audit delivery | ADR-008 | E07/E08 | E07 local test sink and Fluentd HTTP payload contract implemented; production SIEM endpoint/auth/mTLS/retention pending | `backend/tests/audit/test_sinks.py`, `backend/tests/audit/test_delivery_worker.py`, `backend/tests/audit/test_heartbeat.py`, `docs/generated/e07-fluentd-opensearch-lab.md` |
 | Vault API (SecMan) | secret lifecycle | ADR-009 | E08 | product identified; endpoint/auth/path policy pending | contract, rotation runbook |
 
 ## DKB-77 position
 
 This file is only documentation evidence. ДКБ-77 also requires technical blocking: Kolla service enablement, firewall/ACL, HAProxy routing, OpenStack policy deny and disabled unused endpoints. Those controls are E08/E09/E12 evidence.
 
-E06 implements `/api/v1/operations*`, `/api/v1/workflow-definitions`, P0 Watcher/Masakari read/status
+E07 implements `/api/v1/audit/events`, `/api/v1/audit/events/{event_id}` and
+`/api/v1/audit/export` behind `audit.read`/`audit.export`, server-side filtering, cursor pagination
+and audited access. E06 implements `/api/v1/operations*`, `/api/v1/workflow-definitions`, P0 Watcher/Masakari read/status
 endpoints and optional read-only Mistral smoke behind the portal BFF/API boundary. E05 implements
 `/api/v1/groups*` and `group_id` filters for `/api/v1/instances` and `/api/v1/hypervisors`. Service
 health, topology and capacity modules are not silently linked: E04 exposes explicit disabled
-descriptors until adapters, policies and tests exist. Search remains a planned E04+/E10 API row and is
-not enabled in the UI.
+descriptors until adapters, policies and tests exist. Global search remains a planned E04+/E10 API row
+and is not enabled in the UI.
 
 Inventory API source of truth is the portal read model populated from OpenStack APIs and reconciliation. Group membership is portal-owned MariaDB metadata and does not mutate OpenStack placement constructs. Synthetic E04/E05 evidence uses deterministic sources and local SQLite; production MariaDB, live Nova comparison and HA/load evidence remain separate gates. Telemetry APIs are enrichment sources and must not be used as inventory authority.
 

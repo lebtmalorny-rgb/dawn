@@ -94,6 +94,11 @@
 | [docs/generated/tls-matrix.md](docs/generated/tls-matrix.md) | Черновая TLS/mTLS matrix для E08/E09. |
 | [docs/generated/secret-inventory.md](docs/generated/secret-inventory.md) | Классы секретов без значений, proposed store и lifecycle gaps. |
 | [docs/generated/e06-mistral-smoke.md](docs/generated/e06-mistral-smoke.md) | Opt-in P2 all-in-one Mistral smoke command, required env and evidence limits. |
+| [docs/generated/audit-event-schema.json](docs/generated/audit-event-schema.json) | E07 sanitized audit delivery envelope JSON Schema. |
+| [docs/generated/audit-action-dictionary.md](docs/generated/audit-action-dictionary.md) | E07 portal audit actions and ДКБ-49 field mapping. |
+| [docs/generated/audit-sample-events.md](docs/generated/audit-sample-events.md) | E07 sanitized sample audit events and Fluentd HTTP wrapper example. |
+| [docs/generated/audit-source-map.md](docs/generated/audit-source-map.md) | E07 portal/external audit source map for ДКБ-46-53 and ДКБ-50 gaps. |
+| [docs/generated/e07-fluentd-opensearch-lab.md](docs/generated/e07-fluentd-opensearch-lab.md) | Manual all-in-one Fluentd/OpenSearch evidence path, observed pre-state and rollback. |
 | [docs/generated/dkb-implementation-plan.md](docs/generated/dkb-implementation-plan.md) | План evidence по всем 73 требованиям ДКБ. |
 | [docs/adr/](docs/adr/) | ADR-001..ADR-010 по обязательным решениям E00. |
 

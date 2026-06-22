@@ -1,7 +1,7 @@
 # Integration register
 
-- Stage: E06
-- Status: E06 operations use portal-owned MariaDB state, strict P0 Mistral mock and P0 Watcher/Masakari read-status modules; optional all-in-one Mistral smoke is read-only and skipped by default
+- Stage: E07
+- Status: E07 adds portal audit repository/outbox, local test sink, Fluentd HTTP payload contract, audit search/export API and lab runbook; production SIEM/OpenSearch auth, mTLS, retention and live deployment remain pending
 
 ## Integration summary
 
@@ -19,7 +19,7 @@
 | RabbitMQ `/cloud-ui` | jobs, outbox, events | API/worker/events -> RabbitMQ | E01+ | planned | Messaging owner |
 | OpenStack notifications | read model acceleration | notification transport -> event consumer | E04/E07 | not bound in E04; reconciliation remains correctness authority and event acceleration requires contract/security review | Messaging/OpenStack owner |
 | MariaDB `cloud_ui` | portal state, sessions, read model, resource groups, operations, operation events/outbox and idempotency bindings | API/worker/events -> MariaDB | E01+ | E06 operation schema/repository/API contract implemented with local SQLite tests; production MariaDB deployment, migration run evidence and HA behavior remain pending | DB owner |
-| SIEM/test sink | authoritative audit delivery | audit worker -> SIEM | E07 | unknown | SIEM owner |
+| SIEM/test sink | authoritative audit delivery | audit worker -> local test sink / Fluentd HTTP contract / SIEM | E07/E08 | E07 implements `LocalTestAuditSink`, Fluentd HTTP payload contract, retry/dead-letter and heartbeat tests; all-in-one has `fluentd` running but OpenSearch/central logging disabled; production SIEM endpoint/auth/mTLS/retention pending | SIEM owner |
 | Vault (SecMan) | secret storage and lifecycle | backend/deploy -> Vault | E08 | product identified; endpoint/auth/path policy unknown | Vault owner |
 | Corporate PKI | TLS/mTLS certificates | deploy/runtime -> PKI | E08/E09 | unknown | PKI owner |
 | Corporate registry | image storage/signing/scanning | deploy -> registry | E08/E09 | unknown | Supply-chain owner |
@@ -51,3 +51,7 @@
 - Kolla build tooling is available in `/root/venvs/kolla-epoxy`: `kolla-build` `20.4.0`, Podman `5.2.2`, Python `podman` package `5.8.0`, and `/etc/kolla/kolla-build.conf`.
 - `/root/openrc` and `/root/openrc.sh` reference unreachable `192.168.10.50` and should not be used for evidence until corrected.
 - SecMan is Vault; treat it as one integration, not two separate secret managers.
+- E07 lab observation: Kolla `fluentd` container is running on all-in-one `192.168.10.14`, while
+  `/etc/kolla/globals.yml` has `enable_central_logging: "no"`, `enable_opensearch: "no"` and
+  `enable_opensearch_dashboards: "no"`. Manual enablement/rollback is documented in
+  `docs/generated/e07-fluentd-opensearch-lab.md`.

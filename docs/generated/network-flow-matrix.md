@@ -1,7 +1,7 @@
 # Network flow matrix
 
-- Stage: E00
-- Status: draft; actual CIDR/VLAN/ACL evidence pending
+- Stage: E07
+- Status: draft; E07 adds local/contract audit delivery and lab Fluentd/OpenSearch runbook; actual production CIDR/VLAN/ACL/mTLS evidence remains pending
 
 ## Zones
 
@@ -33,7 +33,8 @@
 | Masakari hostmonitor | Consul | HTTPS/TCP by Consul deployment | network health checks for recovery matrix | E10/P3 | Consul ACL/TLS, monitor coverage, matrix review | pending; Consul not on current test node |
 | Worker/API | Prometheus datasource | HTTPS | metrics for capacity/health/Watcher datasource/Masakari corroboration | E10/P3 | role/capability, contract tests, freshness and rate limits | pending |
 | Prometheus | `openstack-exporter`/`node_exporter` | HTTP/HTTPS by deployment | scrape OpenStack and host metrics | E10/P3 | exporter auth/TLS/network ACL, scrape interval, cardinality limits | pending |
-| Audit worker | SIEM/test sink | TLS/mTLS by matrix | audit delivery | E07/E08 | delivery ack, heartbeat, retry/DLQ | pending |
+| Audit worker | local test sink | in-process | deterministic audit delivery tests | E07 | sanitized payload, ack, retry/dead-letter, heartbeat | implemented in tests only; no network flow |
+| Audit worker | Fluentd/SIEM test sink | TLS/mTLS by matrix for production; lab endpoint manual | audit delivery | E07/E08 | delivery ack, heartbeat, retry/DLQ, protected authorized channel | E07 payload contract implemented; lab Fluentd present; production endpoint/auth/mTLS pending |
 | API/deploy | Vault (SecMan) | TLS/mTLS by matrix | secret retrieval/lifecycle | E08 | no secrets in Git/image/log, rotation runbook | pending |
 | Deploy | Registry | TLS/mTLS by policy | image push/pull | E08/E09 | digest, SBOM, scan, signature | pending |
 | Platform admins | Hosts/Kolla | SSH via bastion/PAM | deployment/operations | E09/E12 | personal accounts, auditd/PAM/session recording | external pending |
@@ -56,3 +57,6 @@
 - `http://192.168.10.50:5000/v3` is unreachable from Ansible host.
 - OpenStack host `192.168.10.14` has VIP `192.168.10.250/32` on `br0`.
 - Current lab OpenStack API endpoints are HTTPS after Kolla TLS enablement. Production PKI, mTLS, rotation/revocation and portal-specific network ACL evidence remain E08/E09 gaps.
+- E07 lab observation: all-in-one `192.168.10.14` has Kolla `fluentd` container running, but
+  central logging, OpenSearch and OpenSearch Dashboards are disabled in `/etc/kolla/globals.yml`.
+  No portal/browser flow to Fluentd/OpenSearch is introduced.

@@ -102,6 +102,7 @@ def build_mock_identity_provider() -> MockIdentityProvider:
                     capabilities=frozenset(
                         {
                             "audit.read",
+                            "audit.export",
                             "instance.read",
                             "instance.refresh",
                             "hypervisor.read",

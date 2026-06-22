@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dawn.local/schemas/cloud-ui-audit-event-1.json",
+  "title": "Cloud UI Audit Event Delivery Envelope",
+  "description": "Sanitized portal audit event envelope emitted by cloud-ui events to a local test sink or Fluentd HTTP-compatible sink.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_version",
+    "sink_id",
+    "occurred_at",
+    "actor",
+    "action",
+    "event_type",
+    "outcome",
+    "target",
+    "scope",
+    "source",
+    "request_id",
+    "correlation_id",
+    "operation_id",
+    "external_execution_id",
+    "service",
+    "component",
+    "safe_error_code",
+    "delivery_state",
+    "metadata"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sink_id": {
+      "type": "string",
+      "minLength": 1,
+      "examples": ["local-test", "fluentd-http"]
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp serialized with second precision."
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "display",
+        "authentication_method",
+        "session_reference"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "examples": ["human", "service", "anonymous"]
+        },
+        "id": {
+          "type": "string"
+        },
+        "display": {
+          "type": "string"
+        },
+        "authentication_method": {
+          "type": "string"
+        },
+        "session_reference": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "action": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["success", "failure", "unknown"]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "id": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cloud_id",
+        "region_id",
+        "project_id",
+        "scope_type",
+        "scope_id"
+      ],
+      "properties": {
+        "cloud_id": {
+          "type": ["string", "null"]
+        },
+        "region_id": {
+          "type": ["string", "null"]
+        },
+        "project_id": {
+          "type": ["string", "null"]
+        },
+        "scope_type": {
+          "type": ["string", "null"]
+        },
+        "scope_id": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ip", "trusted_proxy_chain"],
+      "properties": {
+        "ip": {
+          "type": ["string", "null"]
+        },
+        "trusted_proxy_chain": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "correlation_id": {
+      "type": "string"
+    },
+    "operation_id": {
+      "type": ["string", "null"]
+    },
+    "external_execution_id": {
+      "type": ["string", "null"]
+    },
+    "service": {
+      "type": "string"
+    },
+    "component": {
+      "type": ["string", "null"]
+    },
+    "safe_error_code": {
+      "type": ["string", "null"]
+    },
+    "delivery_state": {
+      "type": "string",
+      "enum": [
+        "not_queued",
+        "pending",
+        "claimed",
+        "delivered",
+        "retry_wait",
+        "dead_letter"
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Allowlisted and recursively sanitized metadata. Passwords, tokens, cookies, authorization headers, private keys, database URLs and workflow secret values are replaced before storage and delivery.",
+      "additionalProperties": true
+    }
+  }
+}

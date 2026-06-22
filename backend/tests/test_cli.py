@@ -22,6 +22,15 @@ def test_cli_accepts_worker_once_flag() -> None:
     assert args.once is True
 
 
+def test_cli_accepts_events_once_flag() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["events", "--once"])
+
+    assert args.command == "events"
+    assert args.once is True
+
+
 def test_smoke_does_not_require_runtime_settings(
     capsys: Any,
     monkeypatch: Any,
@@ -108,6 +117,24 @@ def test_worker_once_dispatches_to_bounded_runner(monkeypatch: Any) -> None:
 
     assert main(["worker", "--once"]) == 3
     assert called == ["worker-once"]
+
+
+def test_events_once_dispatches_to_bounded_audit_delivery_runner(monkeypatch: Any) -> None:
+    class FakeSettings:
+        log_level = "INFO"
+
+    called: list[str] = []
+
+    def fake_run_audit_delivery_once() -> int:
+        called.append("events-once")
+        return 4
+
+    monkeypatch.setattr("cloud_ui.cli.get_settings", lambda: FakeSettings())
+    monkeypatch.setattr("cloud_ui.cli.configure_logging", lambda _level: None)
+    monkeypatch.setattr("cloud_ui.cli.run_audit_delivery_once", fake_run_audit_delivery_once)
+
+    assert main(["events", "--once"]) == 4
+    assert called == ["events-once"]
 
 
 def test_inventory_sync_synthetic_returns_nonzero_on_partial(

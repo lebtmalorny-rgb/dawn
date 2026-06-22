@@ -136,6 +136,11 @@ body {
   gap: 0.25rem;
 }
 
+.cloud-ui-audit-header {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .cloud-ui-muted,
 .cloud-ui-empty {
   color: #4f5255;
@@ -252,6 +257,14 @@ body {
 .cloud-ui-table[data-density="compact"] th,
 .cloud-ui-table[data-density="compact"] td {
   padding: 0.375rem 0.5rem;
+}
+
+.cloud-ui-audit-table {
+  min-width: 1180px;
+}
+
+.cloud-ui-audit-table code {
+  white-space: pre-wrap;
 }
 
 .cloud-ui-table-action {

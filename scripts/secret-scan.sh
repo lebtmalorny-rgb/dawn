@@ -31,6 +31,9 @@ trap 'rm -f "$pattern_file" "$allow_file" "$match_file"' EXIT
   printf '%s\n' '^\./deploy/env\.example:[[:digit:]]+:MYSQL_PASSWORD=cloud_ui_dev$'
   printf '%s\n' '^\./deploy/env\.example:[[:digit:]]+:MYSQL_ROOT_PASSWORD=cloud_ui_root_dev$'
   printf '%s\n' '^\./deploy/env\.example:[[:digit:]]+:RABBITMQ_DEFAULT_PASS=cloud_ui_dev$'
+  printf '%s\n' '^\./backend/src/cloud_ui/audit/redaction\.py:[[:digit:]]+:[[:space:]]+"BEGIN PRIVATE KEY",$'
+  printf '%s\n' '^\./backend/tests/audit/test_audit_redaction\.py:[[:digit:]]+:[[:space:]]+"-----BEGIN PRIVATE KEY-----DKB_CANARY_KEY",$'
+  printf '%s\n' '^\./docs/execplans/E07-audit\.md:[[:digit:]]+:[[:space:]]+- `private_key=-----BEGIN PRIVATE KEY-----DKB_CANARY_KEY`$'
 } > "$allow_file"
 
 report_matches() {

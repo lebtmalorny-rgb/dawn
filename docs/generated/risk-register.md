@@ -1,6 +1,6 @@
 # Актуальный реестр рисков
 
-- Stage: E06 Operations workflow catalog
+- Stage: E07 Application audit
 - Last updated: 2026-06-22
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
@@ -71,6 +71,9 @@
 | R-044 | ДКБ-69 conflicts with Python runtime | Backend and OpenStack services require interpreters. | Minimal runtime, SBOM/scan, non-root, formal waiver/exception. | E08/E12 |
 | R-045 | ДКБ-72 storage architecture external | Portal cannot prove no hypervisor filesystem use. | Storage owner must provide Cinder/Ceph/Nova path evidence. | E12 |
 | R-046 | AIO lab evidence may not transfer to HA deployment | Current lab is all-in-one; production Kolla HA behavior differs. | E09/E10 must run HA/failover/load evidence in representative environment. | E09/E10 |
+| R-047 | E07 local audit sink mistaken for production SIEM | E07 proves durable portal audit, local delivery and Fluentd HTTP payload shape, not production SIEM retention or protected channel. | Keep ADR-008 open; require SIEM endpoint/auth/mTLS/retention evidence before pilot. | E07/E08 |
+| R-048 | Fluentd running without OpenSearch/central logging | All-in-one has Kolla `fluentd` container, but `enable_central_logging`, `enable_opensearch` and `enable_opensearch_dashboards` are `"no"`. | Treat Fluentd/OpenSearch deployment as manual runbook/evidence only; do not claim current OpenSearch delivery. | E07/E09 |
+| R-049 | Portal audit source map overstates full ДКБ-50 coverage | Portal covers its own actions; Keystone/Nova/Neutron/Glance/Cinder/Mistral/Watcher/Masakari, host/container, storage, IdP and monitoring sources are external. | Maintain `docs/generated/audit-source-map.md`; require external owner evidence for full ДКБ-50. | E07/E12 |
 
 ## E03 adapter contract risks
 
@@ -89,6 +92,6 @@
 
 ## Immediate priority order
 
-1. Finish E06 documentation/evidence and final verification.
-2. Keep ADR-001/test federation, Vault/SecMan, SIEM delivery and IAM/PAM/SoD evidence as explicit external gaps.
-3. Do not treat E06 P0 mock or read-only Mistral smoke as proof of production mutating workflow safety.
+1. Finish E07 final verification and keep local/contract audit delivery separate from production SIEM evidence.
+2. Keep ADR-001/test federation, ADR-008 production SIEM, Vault/SecMan, IAM/PAM/SoD and host audit evidence as explicit external gaps.
+3. Do not treat E06 P0 mock, read-only Mistral smoke or E07 local audit sink as proof of production mutating workflow safety.
