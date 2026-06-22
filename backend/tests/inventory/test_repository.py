@@ -151,6 +151,9 @@ def test_instances_are_filtered_by_resource_group_with_stable_pagination(
         members=[
             ("vm", "dev-cloud", "RegionOne", "instance-0003"),
             ("vm", "dev-cloud", "RegionOne", "instance-0001"),
+            ("host", "dev-cloud", "RegionOne", "instance-0001"),
+            ("vm", "other-cloud", "RegionOne", "instance-0003"),
+            ("vm", "dev-cloud", "OtherRegion", "instance-0001"),
         ],
     )
     sort = InventorySort(field="name", direction="asc")
@@ -181,28 +184,47 @@ def test_instances_are_filtered_by_resource_group_with_stable_pagination(
     assert second_page.next_cursor is None
 
 
-def test_hypervisors_are_filtered_by_resource_group(
+def test_hypervisors_are_filtered_by_resource_group_with_stable_pagination(
     repository: InventoryRepository,
     engine: Engine,
 ) -> None:
     _seed_group_members(
         engine,
         group_id="group-hosts",
-        members=[("host", "dev-cloud", "RegionOne", "hypervisor-0002")],
+        members=[
+            ("host", "dev-cloud", "RegionOne", "hypervisor-0002"),
+            ("host", "dev-cloud", "RegionOne", "hypervisor-0001"),
+            ("vm", "dev-cloud", "RegionOne", "hypervisor-0002"),
+            ("host", "other-cloud", "RegionOne", "hypervisor-0001"),
+            ("host", "dev-cloud", "OtherRegion", "hypervisor-0002"),
+        ],
     )
 
-    page = repository.list_hypervisors(
+    sort = InventorySort(field="host_name", direction="asc")
+    first_page = repository.list_hypervisors(
         filters=HypervisorFilters(
             cloud_id="dev-cloud",
             region_id="RegionOne",
             group_id="group-hosts",
         ),
-        sort=InventorySort(field="host_name", direction="asc"),
-        limit=50,
+        sort=sort,
+        limit=1,
         cursor=None,
     )
+    second_page = repository.list_hypervisors(
+        filters=HypervisorFilters(
+            cloud_id="dev-cloud",
+            region_id="RegionOne",
+            group_id="group-hosts",
+        ),
+        sort=sort,
+        limit=1,
+        cursor=first_page.next_cursor,
+    )
 
-    assert [item.hypervisor_id for item in page.items] == ["hypervisor-0002"]
+    assert [item.hypervisor_id for item in first_page.items] == ["hypervisor-0001"]
+    assert [item.hypervisor_id for item in second_page.items] == ["hypervisor-0002"]
+    assert second_page.next_cursor is None
 
 
 def test_cursor_with_different_group_filter_is_rejected(

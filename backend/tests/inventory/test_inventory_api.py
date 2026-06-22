@@ -19,7 +19,12 @@ from cloud_ui.inventory import schema
 from cloud_ui.inventory.cursor import CursorCodec
 from cloud_ui.inventory.repository import InventoryRepository
 from cloud_ui.inventory.routes import InventoryServices
+from cloud_ui.security.audit import InMemoryAuditSink
+from cloud_ui.security.clock import ManualClock
 from cloud_ui.security.dependencies import SecurityServices, build_security_services
+from cloud_ui.security.identity import LoginRequest, LoginResult, Subject
+from cloud_ui.security.rbac import PolicyService
+from cloud_ui.security.sessions import SessionManager
 
 
 def test_instance_list_requires_session() -> None:
@@ -167,6 +172,64 @@ def test_instance_group_filter_requires_group_access() -> None:
         event.action == "authorization.denied"
         and event.actor_id == "mock-user-operator"
         and event.metadata["reason"] == "group_access_denied"
+        for event in security.audit_sink.events
+    )
+
+
+def test_instance_group_filter_requires_group_read_capability() -> None:
+    client, security = _client(
+        subject=Subject(
+            subject_id="mock-user-operator",
+            display_name="Inventory Only",
+            subject_type="human",
+            scope_type="project",
+            scope_id="project-a",
+            roles=frozenset({"inventory_reader"}),
+            capabilities=frozenset({"instance.read"}),
+        )
+    )
+    _login(client, "custom", "custom-code")
+
+    response = client.get(
+        "/api/v1/instances?group_id=group-operator-vms",
+        headers={"x-request-id": "instances-group-without-group-read"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden"
+    assert any(
+        event.action == "authorization.denied"
+        and event.actor_id == "mock-user-operator"
+        and event.metadata["capability"] == "group.read"
+        for event in security.audit_sink.events
+    )
+
+
+def test_hypervisor_group_filter_requires_group_read_capability() -> None:
+    client, security = _client(
+        subject=Subject(
+            subject_id="mock-user-admin",
+            display_name="Host Inventory Only",
+            subject_type="human",
+            scope_type="system",
+            scope_id=None,
+            roles=frozenset({"portal_admin"}),
+            capabilities=frozenset({"hypervisor.read"}),
+        )
+    )
+    _login(client, "custom", "custom-code")
+
+    response = client.get(
+        "/api/v1/hypervisors?group_id=group-admin-hosts",
+        headers={"x-request-id": "hypervisors-group-without-group-read"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden"
+    assert any(
+        event.action == "authorization.denied"
+        and event.actor_id == "mock-user-admin"
+        and event.metadata["capability"] == "group.read"
         for event in security.audit_sink.events
     )
 
@@ -482,12 +545,14 @@ def _client(
     inventory_max_limit: int = 200,
     operation_signing_key: str = "dev-inventory-operation-signing-key",
     raise_server_exceptions: bool = True,
+    subject: Subject | None = None,
 ) -> tuple[TestClient, SecurityServices]:
     app, security = _app(
         repository=repository,
         inventory_default_limit=inventory_default_limit,
         inventory_max_limit=inventory_max_limit,
         operation_signing_key=operation_signing_key,
+        subject=subject,
     )
     return TestClient(app, raise_server_exceptions=raise_server_exceptions), security
 
@@ -498,11 +563,12 @@ def _app(
     inventory_default_limit: int = 50,
     inventory_max_limit: int = 200,
     operation_signing_key: str = "dev-inventory-operation-signing-key",
+    subject: Subject | None = None,
 ) -> tuple[FastAPI, SecurityServices]:
     def check() -> HealthReport:
         return HealthReport(status="ok", dependencies={})
 
-    security = build_security_services()
+    security = _custom_security(subject) if subject is not None else build_security_services()
     engine = _engine()
     inventory_repository = repository or _repository(engine)
     repository_engine = inventory_repository.engine if repository is None else None
@@ -532,6 +598,30 @@ def _login(client: TestClient, login: str, credential: str) -> str:
     )
     assert response.status_code == 200
     return str(response.json()["csrf"])
+
+
+class _CustomIdentityProvider:
+    def __init__(self, subject: Subject) -> None:
+        self._subject = subject
+
+    def authenticate(self, request: LoginRequest) -> LoginResult:
+        assert request.login == "custom"
+        assert request.credential == "custom-code"
+        return LoginResult(subject=self._subject, authentication_method="mock")
+
+
+def _custom_security(subject: Subject) -> SecurityServices:
+    clock = ManualClock()
+    return SecurityServices(
+        identity_provider=_CustomIdentityProvider(subject),
+        session_manager=SessionManager(clock=clock),
+        audit_sink=InMemoryAuditSink(),
+        policy_service=PolicyService(),
+        clock=clock,
+        session_cookie_secure=False,
+        session_cookie_samesite="lax",
+        trusted_origins=frozenset({"http://localhost", "http://127.0.0.1", "http://testserver"}),
+    )
 
 
 def _engine() -> Engine:
@@ -627,6 +717,12 @@ def _seed_inventory(engine: Engine) -> None:
                 _group_row("group-operator-vms", "mock-user-operator"),
                 _group_row("group-operator-other", "mock-user-operator"),
                 _group_row("group-other-owner", "mock-user-other"),
+                _group_row(
+                    "group-admin-hosts",
+                    "mock-user-admin",
+                    resource_type="host",
+                    scope_id="project-a",
+                ),
             ],
         )
         connection.execute(
@@ -636,6 +732,7 @@ def _seed_inventory(engine: Engine) -> None:
                 _member_row("group-operator-vms", "vm", "instance-0003"),
                 _member_row("group-operator-other", "vm", "instance-0002"),
                 _member_row("group-other-owner", "vm", "instance-0003"),
+                _member_row("group-admin-hosts", "host", "hypervisor-0001"),
             ],
         )
 
@@ -679,15 +776,21 @@ def _instance_row(
     }
 
 
-def _group_row(group_id: str, owner_subject_id: str) -> dict[str, Any]:
+def _group_row(
+    group_id: str,
+    owner_subject_id: str,
+    *,
+    resource_type: str = "vm",
+    scope_id: str = "project-a",
+) -> dict[str, Any]:
     now = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
     return {
         "group_id": group_id,
         "name": group_id,
         "description": None,
-        "resource_type": "vm",
+        "resource_type": resource_type,
         "scope_type": "project",
-        "scope_id": "project-a",
+        "scope_id": scope_id,
         "membership_mode": "explicit",
         "rule_version": 1,
         "rule_body_json": None,

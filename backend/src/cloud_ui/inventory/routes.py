@@ -550,6 +550,16 @@ def _require_group_filter_access(
 ) -> JSONResponse | None:
     if group_id is None:
         return None
+    denied = _require_capability(
+        security,
+        request,
+        session,
+        "group.read",
+        target_type="group",
+        target_id=group_id,
+    )
+    if denied is not None:
+        return denied
     repository = _require_group_repository(groups, request)
     if isinstance(repository, JSONResponse):
         return repository
