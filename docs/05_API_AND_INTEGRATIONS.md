@@ -6,7 +6,9 @@
 - JSON, UTF-8, UTC timestamps.
 - OpenAPI — обязательный контракт.
 - Auth через server-side session cookie.
-- Mutating requests требуют CSRF и `Idempotency-Key`.
+- Mutating requests требуют CSRF. `Idempotency-Key` обязателен для retry-safe operation/member
+  contracts where specified; P0 metadata CRUD без `operation_id` фиксируется как ограничение и не
+  должен копироваться в destructive workflow APIs.
 - Каждый ответ содержит или принимает correlation/request ID.
 - Ошибки имеют единый объект с `code`, `title`, безопасным `detail`, `request_id`, optional field errors.
 - Не возвращать stack trace, token, credential или raw request body.
@@ -46,11 +48,16 @@ Readiness проверяет критические зависимости с к
     POST /api/v1/instances/{...}/refresh
 
 Refresh является rate-limited operation и не превращает list endpoint в fan-out.
+List поддерживает optional `group_id`; backend сначала проверяет `instance.read`, затем `group.read`
+и owner/scope доступ к группе, после чего применяет server-side filter в read model.
 
 ### Hypervisors
 
     GET /api/v1/hypervisors
     GET /api/v1/hypervisors/{cloud_id}/{region_id}/{hypervisor_id}
+
+List поддерживает optional `group_id` с тем же route-level group access check. Host group доступ не
+выводится из project ownership и требует утвержденной admin/system-like политики при изменениях.
 
 ### Service health
 
@@ -74,16 +81,23 @@ Topology returns bounded graph pages or expansions, not an unbounded full cloud 
 
 ### Resource groups
 
-    GET    /api/v1/resource-groups
-    POST   /api/v1/resource-groups
-    GET    /api/v1/resource-groups/{group_id}
-    PATCH  /api/v1/resource-groups/{group_id}
-    DELETE /api/v1/resource-groups/{group_id}
-    POST   /api/v1/resource-groups/{group_id}/members
-    DELETE /api/v1/resource-groups/{group_id}/members/{member_id}
-    POST   /api/v1/resource-groups/{group_id}/preview
+    GET    /api/v1/groups
+    POST   /api/v1/groups
+    GET    /api/v1/groups/{group_id}
+    PATCH  /api/v1/groups/{group_id}
+    DELETE /api/v1/groups/{group_id}
+    GET    /api/v1/groups/{group_id}/members
+    POST   /api/v1/groups/{group_id}/members
+    DELETE /api/v1/groups/{group_id}/members/{resource_type}/{cloud_id}/{region_id}/{resource_id}
+    POST   /api/v1/groups/rules/validate
+    POST   /api/v1/groups/{group_id}/preview
 
-Preview dynamic rule возвращает ограниченную страницу и explain, но не принимает SQL.
+List/detail/preview требуют `group.read`; create/update/delete/member mutations требуют
+`group.manage`, trusted Origin и CSRF. Member add/remove дополнительно требуют `Idempotency-Key`,
+сохраняют key binding без raw key и возвращают `operation_id`. Preview dynamic rule возвращает
+ограниченную страницу, `count_estimate`, `explain` и warnings, но не принимает SQL/Jinja/Python/regex.
+VM preview дополнительно требует `instance.read`, host preview — `hypervisor.read`, чтобы `group.read`
+не раскрывал inventory DTO без соответствующего права.
 
 ### Workflow catalog
 

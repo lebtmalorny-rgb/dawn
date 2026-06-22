@@ -1,12 +1,12 @@
 # API register
 
-- Stage: E04
+- Stage: E05
 - DKB: ДКБ-77 draft register
-- Status: E04 inventory read-model API and UI implemented for instances/hypervisors with synthetic scale evidence; Keystone/Nova/Placement adapter contracts remain offline/live-smoke pending
+- Status: E05 resource group API, frontend read/search/preview UX and group-aware inventory filters implemented; Keystone/Nova/Placement adapter contracts remain offline/live-smoke pending
 
 ## Portal API
 
-All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side session cookie and correlation/request ID. Mutating APIs require CSRF and `Idempotency-Key` where applicable.
+All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side session cookie and correlation/request ID. Mutating APIs require CSRF; `Idempotency-Key` is required where the endpoint contract states retry-safe operation/member semantics.
 
 | API | Purpose | Consumer | Auth | Stage | Audit | Blocking/disable mechanism |
 |---|---|---|---|---|---|---|
@@ -21,10 +21,10 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | `POST /admin/role-bindings` | P0 role binding policy probe | frontend/admin future | session+CSRF+capability | E02 | authorization denial | implemented only as security contract path; full admin UI remains planned |
 | `POST /operations/simulated-openstack-action` | P0 OpenStack-deny finality probe | security tests | session+CSRF+capability | E02 | portal denial or OpenStack denial | implemented only as security contract path; real operations start in E06 |
 | `GET /inventory/modules` | inventory navigation descriptors and disabled module contracts | frontend | session | E04 | protected access policy | implemented in E04; enabled modules are capability-aware, future modules return explicit disabled descriptors |
-| `GET /instances` | paged instance list from portal read model | frontend | session+capability | E04 | aggregate inventory read policy | implemented in E04; capability `instance.read`; server-side filters/sort/pagination, max limit 200 |
+| `GET /instances` | paged instance list from portal read model, optional `group_id` filter | frontend | session+capability; `group_id` additionally requires `group.read` and group scope access | E04/E05 | aggregate inventory read policy; group access denial | implemented in E04; E05 adds group filter; capability `instance.read`; server-side filters/sort/pagination, max limit 200 |
 | `GET /instances/{cloud_id}/{region_id}/{instance_id}` | instance detail from portal read model | frontend | session+capability+scope | E04 | protected access policy | implemented in E04; capability `instance.read` |
 | `POST /instances/{...}/refresh` | targeted refresh request contract | frontend/API clients | session+CSRF+capability+idempotency | E04 | `instance.refresh.requested` | implemented in E04 as protected request contract; returns `operation_id`; no Nova mutation/workflow execution |
-| `GET /hypervisors` | paged hypervisor list from portal read model | frontend | session+capability | E04 | aggregate inventory read policy | implemented in E04; capability `hypervisor.read`; server-side filters/sort/pagination, max limit 200 |
+| `GET /hypervisors` | paged hypervisor list from portal read model, optional `group_id` filter | frontend | session+capability; `group_id` additionally requires `group.read` and group scope access | E04/E05 | aggregate inventory read policy; group access denial | implemented in E04; E05 adds group filter; capability `hypervisor.read`; server-side filters/sort/pagination, max limit 200 |
 | `GET /hypervisors/{cloud_id}/{region_id}/{hypervisor_id}` | hypervisor detail from portal read model | frontend | session+capability+scope | E04 | protected access policy | implemented in E04; capability `hypervisor.read` |
 | `GET /compute-services` | paged Nova compute service health | frontend | session+capability | E04+ | aggregate health read policy | disabled descriptor only in E04; future capability `compute_service.read` |
 | `GET /network-agents` | paged Neutron agent health | frontend | session+capability | E04+ | aggregate health read policy | disabled descriptor only in E04; future capability `network_agent.read` |
@@ -34,14 +34,16 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 | `GET /capacity/summary` | aggregated capacity dashboard data | frontend | session+capability+scope | E04+/E10 | aggregate read policy | disabled descriptor only in E04; future capability `capacity.read` |
 | `GET /capacity/timeseries` | downsampled metric series | frontend | session+capability+scope | E10 | aggregate read policy | capability `capacity.read` |
 | `GET /search` | global capability-aware search | frontend | session+capability+scope | E04+/E10 | protected access policy | capability `search.read` |
-| `GET /resource-groups` | group list | frontend | session+capability | E05 | group read policy | capability `group.read` |
-| `POST /resource-groups` | create group | frontend | session+CSRF+capability | E05 | group create | capability `group.manage` |
-| `GET /resource-groups/{group_id}` | group detail | frontend | session+capability+scope | E05 | group read | capability `group.read` |
-| `PATCH /resource-groups/{group_id}` | update group | frontend | session+CSRF+capability+revision | E05 | group update | capability `group.manage` |
-| `DELETE /resource-groups/{group_id}` | delete group | frontend | session+CSRF+capability | E05 | group delete | capability `group.manage` |
-| `POST /resource-groups/{group_id}/members` | add members | frontend | session+CSRF+capability | E05 | membership update | capability `group.manage` |
-| `DELETE /resource-groups/{group_id}/members/{member_id}` | remove member | frontend | session+CSRF+capability | E05 | membership update | capability `group.manage` |
-| `POST /resource-groups/{group_id}/preview` | preview dynamic rule | frontend | session+CSRF+capability | E05 | group preview | capability `group.read` |
+| `GET /groups` | group list | frontend | session+capability+scope | E05 | group read policy | implemented in E05; capability `group.read`; limit max 200 |
+| `POST /groups` | create group | frontend/API clients | session+CSRF+trusted Origin+capability | E05 | `group.create`, denial events | implemented in E05; capability `group.manage`; VM groups project-scoped; host/mixed require admin/system-like policy |
+| `GET /groups/{group_id}` | group detail | frontend | session+capability+scope/owner | E05 | group read policy | implemented in E05; unauthorized scope returns safe 404 |
+| `PATCH /groups/{group_id}` | update group metadata | frontend/API clients | session+CSRF+trusted Origin+capability+revision | E05 | `group.update`, denial events | implemented in E05; stale revision returns `409 group_revision_conflict` |
+| `DELETE /groups/{group_id}` | soft-delete group | frontend/API clients | session+CSRF+trusted Origin+capability | E05 | `group.delete`, denial events | implemented in E05; no OpenStack side effect |
+| `GET /groups/{group_id}/members` | explicit/imported member list | frontend | session+capability+scope/owner | E05 | group read policy | implemented in E05; max limit 200 |
+| `POST /groups/{group_id}/members` | add explicit member | frontend/API clients | session+CSRF+trusted Origin+capability+idempotency | E05 | `group.member.add`, denial events | implemented in E05; capability `group.manage`; validates VM project scope or host admin; returns `operation_id` |
+| `DELETE /groups/{group_id}/members/{resource_type}/{cloud_id}/{region_id}/{resource_id}` | remove explicit member | frontend/API clients | session+CSRF+trusted Origin+capability+idempotency | E05 | `group.member.remove`, denial events | implemented in E05; returns `status=deleted`; idempotency binding rejects same-key/different-payload |
+| `POST /groups/rules/validate` | validate safe group rule AST | frontend/API clients | session+capability | E05 | authorization denial | implemented in E05; capability `group.read`; rejects arbitrary field/operator/value shape |
+| `POST /groups/{group_id}/preview` | preview dynamic rule | frontend | session+capability+scope/owner+inventory read capability | E05 | `group.preview`, denial events | implemented in E05; capability `group.read` plus `instance.read`/`hypervisor.read`; bounded limit max 50 |
 | `GET /workflow-definitions` | workflow catalog | frontend | session+capability | E06 | catalog read policy | capability `workflow.read` |
 | `GET /workflow-definitions/{workflow_key}/versions/{version}` | workflow definition | frontend | session+capability | E06 | catalog read policy | capability `workflow.read` |
 | `POST /workflow-definitions/{workflow_key}/validate-input` | validate input | frontend | session+CSRF+capability | E06 | validation event if protected | capability `workflow.execute.*` |
@@ -86,9 +88,9 @@ All portal APIs use prefix `/api/v1`, JSON UTF-8, UTC timestamps, server-side se
 
 This file is only documentation evidence. ДКБ-77 also requires technical blocking: Kolla service enablement, firewall/ACL, HAProxy routing, OpenStack policy deny and disabled unused endpoints. Those controls are E08/E09/E12 evidence.
 
-E04 implements `/api/v1/instances`, `/api/v1/hypervisors` and `/api/v1/inventory/modules` behind the portal BFF/API boundary. Service health, topology and capacity modules are not silently linked: E04 exposes explicit disabled descriptors until adapters, policies and tests exist. Search remains a planned E04+/E10 API row and is not enabled in the E04 UI.
+E05 implements `/api/v1/groups*` and `group_id` filters for `/api/v1/instances` and `/api/v1/hypervisors` behind the portal BFF/API boundary. Service health, topology and capacity modules are not silently linked: E04 exposes explicit disabled descriptors until adapters, policies and tests exist. Search remains a planned E04+/E10 API row and is not enabled in the UI.
 
-Inventory API source of truth is the portal read model populated from OpenStack APIs and reconciliation. Synthetic E04 evidence uses a deterministic source and local SQLite; production MariaDB, live Nova comparison and HA/load evidence remain separate gates. Telemetry APIs are enrichment sources and must not be used as inventory authority.
+Inventory API source of truth is the portal read model populated from OpenStack APIs and reconciliation. Group membership is portal-owned MariaDB metadata and does not mutate OpenStack placement constructs. Synthetic E04/E05 evidence uses deterministic sources and local SQLite; production MariaDB, live Nova comparison and HA/load evidence remain separate gates. Telemetry APIs are enrichment sources and must not be used as inventory authority.
 
 ## Current endpoint observations
 

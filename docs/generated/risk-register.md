@@ -1,7 +1,7 @@
 # Актуальный реестр рисков
 
-- Stage: E04 Inventory read model and UI
-- Last updated: 2026-06-21
+- Stage: E05 Resource groups
+- Last updated: 2026-06-22
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
 ## Снятые или суженные решениями риски
@@ -31,6 +31,16 @@
 | R-021 | Stale read model приведет к неверному действию | E04 API/UI expose freshness, stale/partial warnings and sync status; frontend refresh affordance is intentionally inert until the mutating frontend CSRF/idempotency flow is complete. | Future mutating workflows must perform freshness/precondition checks before Nova/Mistral actions and audit the result. | E04/E06 |
 | R-022 | Notification transport assumptions unreliable | ADR-003 оставляет transport/payload/permissions unknown; E04 does not bind to real notifications. | Notifications accelerate only; full reconciliation remains correctness authority until E07 contract and security evidence exist. | E03/E04/E07 |
 | R-023 | Large topology/search leaks protected resource existence | E04 exposes future topology/capacity/service-health modules only as disabled descriptors with capability metadata. | Implement backend scope filtering, redaction and partial counts before enabling real topology/search endpoints. | E04/E10 |
+
+## Resource group risks
+
+| ID | Риск | Текущее положение | Митигация | Stage |
+|---|---|---|---|---|
+| R-024 | P0 group ownership mistaken for production IAM/SoD evidence | E05 uses trusted mock subject `scope_type/scope_id` for project-scoped VM groups and system-like admin paths for host/mixed groups. | Production federation/Keystone/IAM mapping must replace P0 mock scope and provide SoD evidence before pilot. | E05/E08/E12 |
+| R-025 | Dynamic group DSL becomes arbitrary query/code path | E05 compiler accepts only allowlisted JSON AST fields/operators, bounded depth and scalar values; no SQL/Jinja/Python/regex. | Add new fields only with schema/tests/index evidence and update ADR-010/risk register. | E05+ |
+| R-026 | Frontend group mutation controls lack CSRF on restored sessions | `/api/v1/session` does not return CSRF; E05 frontend exposes typed mutation wrappers but visible UI is list/detail/search/preview/filter only. | Add explicit CSRF refresh/session bootstrap contract before enabling create/update/add/remove controls after page reload. | E05/E06 |
+| R-027 | Member idempotency model reused for destructive workflows | E05 stores HMAC key binding and request hash, including no-op add/remove, but same-key/same-payload replay is re-evaluated instead of served from a stored response snapshot. | Future destructive operations must store response/result snapshots or use operation table semantics before retry is allowed. | E05/E06 |
+| R-028 | Host group semantics overstate project ownership | Hypervisors are not project-owned in the read model; P0 host/mixed group management requires admin/system-like capability. | Keep host group mutations admin-only until a formal ownership/approval model exists. | E05/E06 |
 
 ## Telemetry and recovery signal risks
 
@@ -69,6 +79,6 @@
 
 ## Immediate priority order
 
-1. Finish E04 documentation/evidence and self-review after final verification.
+1. Finish E05 documentation/evidence and final verification.
 2. Keep ADR-001/test federation, Vault/SecMan, SIEM delivery and IAM/PAM/SoD evidence as explicit external gaps.
-3. Do not extend E04 into dynamic groups, Mistral workflows, live notification binding or production mutating Nova actions.
+3. Do not extend E05 into Mistral workflows, live notification binding or production mutating Nova actions.

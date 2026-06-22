@@ -1,7 +1,7 @@
 # Integration register
 
-- Stage: E04
-- Status: Keystone/Nova/Placement offline adapter contracts remain implemented; E04 inventory read model/API/UI and synthetic reconciliation evidence added; safe live smoke remains pending
+- Stage: E05
+- Status: Keystone/Nova/Placement offline adapter contracts remain implemented; E05 resource groups use portal-owned MariaDB metadata and E04 inventory read model; safe live smoke remains pending
 
 ## Integration summary
 
@@ -9,7 +9,7 @@
 |---|---|---|---|---|---|
 | Corporate IdP | human identity and MFA | portal API -> IdP/Keystone federation | E02/P1 | unknown | IAM owner |
 | Keystone | token, scope, roles, service catalog | API/worker -> Keystone | E02/E03 | E03 offline contract tests implemented; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
-| Nova | instances, hypervisors, services, aggregates | worker/API -> Nova | E03/E04 | E03 offline contract tests implemented with microversion `2.96`; E04 read-model reconciliation is proven with deterministic synthetic source; safe live Nova comparison remains pending until a read-only test credential is available outside git | OpenStack owner |
+| Nova | instances, hypervisors, services, aggregates | worker/API -> Nova | E03/E04/E05 | E03 offline contract tests implemented with microversion `2.96`; E04 read-model reconciliation is proven with deterministic synthetic source; E05 groups read VM/host facts only from the portal read model and do not mutate Nova server groups/aggregates; safe live Nova comparison remains pending until a read-only test credential is available outside git | OpenStack owner |
 | Placement | resource provider inventory/usage | worker/API -> Placement | E03/E04 | E03 offline contract tests implemented with microversion `1.39`; safe live smoke remains pending until a read-only test credential is available outside git | OpenStack owner |
 | Mistral | long-running workflow execution | worker -> Mistral | E06 | enabled; endpoint `https://192.168.10.250:8989/v2` | Workflow/platform owner |
 | Watcher | goals, strategies, audits, continuous audits, action plans, actions, recommendations and optimization risk state | worker/API -> Watcher; operations may execute via Mistral | E06+ | enabled; endpoint `https://192.168.10.250:9322`; Prometheus exporter datasource selected first, contract pending | OpenStack owner |
@@ -18,7 +18,7 @@
 | Heat | optional stacks/workflow module | worker/API -> Heat or via Mistral | after decision | reachable via HTTPS service catalog | Product owner |
 | RabbitMQ `/cloud-ui` | jobs, outbox, events | API/worker/events -> RabbitMQ | E01+ | planned | Messaging owner |
 | OpenStack notifications | read model acceleration | notification transport -> event consumer | E04/E07 | not bound in E04; reconciliation remains correctness authority and event acceleration requires contract/security review | Messaging/OpenStack owner |
-| MariaDB `cloud_ui` | portal state, sessions, read model | API/worker/events -> MariaDB | E01+ | E04 schema/repository/API contract implemented; local automated tests use SQLite, production MariaDB deployment and migration evidence remain pending | DB owner |
+| MariaDB `cloud_ui` | portal state, sessions, read model, resource groups and idempotency bindings | API/worker/events -> MariaDB | E01+ | E05 group schema/repository/API contract implemented with local SQLite tests; production MariaDB deployment, migration run evidence and HA behavior remain pending | DB owner |
 | SIEM/test sink | authoritative audit delivery | audit worker -> SIEM | E07 | unknown | SIEM owner |
 | Vault (SecMan) | secret storage and lifecycle | backend/deploy -> Vault | E08 | product identified; endpoint/auth/path policy unknown | Vault owner |
 | Corporate PKI | TLS/mTLS certificates | deploy/runtime -> PKI | E08/E09 | unknown | PKI owner |
@@ -34,6 +34,8 @@
 - Each adapter needs timeout, retry policy, microversion, typed errors, metrics and contract tests.
 - No OpenStack service DB is accessed.
 - RabbitMQ RPC queues of OpenStack are not consumed directly.
+- Resource groups are portal-owned metadata; group filters use the local read model and do not add
+  direct browser/OpenStack integration.
 - External integrations that are not available in test must be represented by interface, mock/contract and explicit pending evidence.
 
 ## Current deployment notes

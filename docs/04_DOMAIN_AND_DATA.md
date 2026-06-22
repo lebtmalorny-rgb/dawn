@@ -101,6 +101,10 @@ Topology queries use graph-shaped projections built from read model tables, not 
 
 ### Resource group
 
+E05 реализует resource groups как portal-owned metadata в MariaDB. Это не Nova server group,
+не host aggregate и не Placement side effect: группа не меняет размещение или состояние OpenStack
+ресурса сама по себе.
+
 - `group_id`;
 - `name`, `description`;
 - `resource_type`: `vm`, `host`, `mixed`;
@@ -110,6 +114,19 @@ Topology queries use graph-shaped projections built from read model tables, not 
 - owner и ACL/capability references;
 - revision;
 - timestamps.
+
+E05 P0 правила владения:
+
+- VM group всегда project-scoped; `scope_id` берется из server-side subject scope либо, для
+  `portal_admin`, из явно указанного project scope.
+- VM member может быть добавлен только если `instances.project_id == resource_groups.scope_id` в
+  trusted inventory read model.
+- Host groups не являются project-owned; создание и изменение host/mixed групп требует P0
+  admin/system-like capability.
+- `mixed + dynamic` запрещен до отдельной семантики rule evaluation для разных resource types.
+- Удаление группы soft-delete; deleted group недоступна для list/detail/member operations.
+- Revision увеличивается при изменениях metadata/membership, а `resource_group_revisions` хранит
+  snapshot evidence для optimistic concurrency и аудита.
 
 ### Group member
 
@@ -123,6 +140,22 @@ Topology queries use graph-shaped projections built from read model tables, not 
 - optional expiry.
 
 Dynamic membership вычисляется предсказуемым query compiler, а не произвольным SQL/Jinja/Python.
+Текущий DSL допускает только allowlisted поля и операторы для `vm`/`host`, ограничивает глубину AST,
+запрещает дополнительные свойства и компилируется в SQLAlchemy expressions с bound values.
+
+### Resource group idempotency key
+
+Для retry-safe explicit membership mutations E05 хранит отдельные bindings:
+
+- `group_id`, `actor_id`, `action`;
+- HMAC-hash `idempotency-key`, не исходный header;
+- request hash;
+- deterministic `operation_id`;
+- timestamps.
+
+Запись создается даже для no-op add/remove, поэтому повтор с тем же key и другим payload получает
+`409 idempotency_key_conflict`. Same-key/same-payload replay возвращает стабильный metadata result,
+но не является моделью для будущих destructive workflows без сохраненного response snapshot.
 
 ### Portal role и permission
 
