@@ -12,7 +12,7 @@ resource_groups = sa.Table(
     sa.Column("description", sa.String(length=1024), nullable=True),
     sa.Column("resource_type", sa.String(length=32), nullable=False),
     sa.Column("scope_type", sa.String(length=32), nullable=False),
-    sa.Column("scope_id", sa.String(length=128), nullable=True),
+    sa.Column("scope_id", sa.String(length=128), nullable=False),
     sa.Column("membership_mode", sa.String(length=32), nullable=False),
     sa.Column("rule_version", sa.Integer(), nullable=False),
     sa.Column("rule_body_json", sa.JSON(), nullable=True),
