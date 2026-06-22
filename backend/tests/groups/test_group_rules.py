@@ -32,6 +32,27 @@ def test_valid_vm_rule_compiles_to_project_scoped_conditions() -> None:
     assert "instances.status IN ('ACTIVE', 'SHUTOFF')" in sql
 
 
+def test_vm_rule_requires_project_scope() -> None:
+    compiler = GroupRuleCompiler()
+
+    _assert_rule_error(
+        compiler,
+        resource_type="vm",
+        scope_type="system",
+        scope_id=None,
+        rule={"field": "status", "op": "eq", "value": "ACTIVE"},
+        code="invalid_scope",
+    )
+    _assert_rule_error(
+        compiler,
+        resource_type="vm",
+        scope_type="domain",
+        scope_id="domain-a",
+        rule={"field": "status", "op": "eq", "value": "ACTIVE"},
+        code="invalid_scope",
+    )
+
+
 def test_unknown_field_operator_and_extra_properties_are_rejected() -> None:
     compiler = GroupRuleCompiler()
 
@@ -72,6 +93,31 @@ def test_unknown_field_operator_and_extra_properties_are_rejected() -> None:
     assert str(compiled).count("OR 1=1") == 0
 
 
+def test_string_fields_reject_non_string_values() -> None:
+    compiler = GroupRuleCompiler()
+
+    _assert_rule_error(
+        compiler,
+        rule={"field": "status", "op": "eq", "value": True},
+        code="invalid_value",
+    )
+    _assert_rule_error(
+        compiler,
+        rule={"field": "status", "op": "eq", "value": float("nan")},
+        code="invalid_value",
+    )
+    _assert_rule_error(
+        compiler,
+        rule={"field": "status", "op": "in", "value": ["ACTIVE", True]},
+        code="invalid_value",
+    )
+    _assert_rule_error(
+        compiler,
+        rule={"field": "status", "op": "prefix", "value": 1},
+        code="invalid_value",
+    )
+
+
 def test_depth_node_and_in_value_limits_are_enforced() -> None:
     _assert_rule_error(
         GroupRuleCompiler(max_depth=2),
@@ -108,6 +154,75 @@ def test_sqlalchemy_expression_values_are_rejected() -> None:
         rule={"field": "status", "op": "in", "value": [sa.literal_column("CURRENT_USER")]},
         code="invalid_value",
     )
+
+
+def test_exists_rule_uses_no_value_payload() -> None:
+    compiler = GroupRuleCompiler()
+    compiled = compiler.compile(
+        resource_type="host",
+        scope_type="system",
+        scope_id=None,
+        rule={"field": "maintenance_status", "op": "exists"},
+    )
+
+    assert compiled.explain == ["maintenance_status exists"]
+    sql = str(compiled.condition.compile(compile_kwargs={"literal_binds": True}))
+    assert "hypervisors.maintenance_status IS NOT NULL" in sql
+
+    _assert_rule_error(
+        compiler,
+        resource_type="host",
+        scope_type="system",
+        scope_id=None,
+        rule={"field": "maintenance_status", "op": "exists", "value": True},
+        code="invalid_value",
+    )
+
+
+def test_any_rule_compiles_with_clear_explain() -> None:
+    compiler = GroupRuleCompiler()
+    compiled = compiler.compile(
+        resource_type="vm",
+        scope_type="project",
+        scope_id="project-a",
+        rule={
+            "any": [
+                {"field": "status", "op": "eq", "value": "ACTIVE"},
+                {"field": "status", "op": "eq", "value": "SHUTOFF"},
+            ]
+        },
+    )
+
+    assert compiled.explain == ["any (status eq ACTIVE; status eq SHUTOFF)"]
+    sql = str(compiled.condition.compile(compile_kwargs={"literal_binds": True}))
+    assert "instances.project_id = 'project-a'" in sql
+    assert "instances.status = 'ACTIVE'" in sql
+    assert "instances.status = 'SHUTOFF'" in sql
+    assert " OR " in sql
+
+
+def test_not_rule_compiles_with_clear_group_explain() -> None:
+    compiler = GroupRuleCompiler()
+    compiled = compiler.compile(
+        resource_type="vm",
+        scope_type="project",
+        scope_id="project-a",
+        rule={
+            "not": {
+                "all": [
+                    {"field": "status", "op": "eq", "value": "ERROR"},
+                    {"field": "host_name", "op": "prefix", "value": "compute-"},
+                ]
+            }
+        },
+    )
+
+    assert compiled.explain == ["not (all (status eq ERROR; host_name prefix compute-))"]
+    sql = str(compiled.condition.compile(compile_kwargs={"literal_binds": True}))
+    assert "instances.project_id = 'project-a'" in sql
+    assert "NOT" in sql
+    assert "instances.status = 'ERROR'" in sql
+    assert "instances.host_name LIKE 'compute-' || '%' ESCAPE '/'" in sql
 
 
 def test_host_rule_uses_host_allowlist_only() -> None:

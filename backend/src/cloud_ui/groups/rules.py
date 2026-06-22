@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import sqlalchemy as sa
 
@@ -10,10 +10,9 @@ from cloud_ui.inventory import schema as inventory_schema
 
 _ALLOWED_OPERATORS = frozenset({"eq", "in", "prefix", "exists"})
 _LOGICAL_KEYS = frozenset({"all", "any", "not"})
-_LEAF_KEYS = frozenset({"field", "op", "value"})
+_EXISTS_LEAF_KEYS = frozenset({"field", "op"})
+_VALUE_LEAF_KEYS = frozenset({"field", "op", "value"})
 _SCOPE_TYPES = frozenset({"project", "domain", "system"})
-
-JsonScalar = str | int | float | bool | None
 
 _VM_FIELDS: Mapping[str, sa.Column[Any]] = {
     "project_id": inventory_schema.instances.c.project_id,
@@ -44,6 +43,14 @@ class CompiledGroupRule:
     explain: list[str]
 
 
+@dataclass(frozen=True)
+class _CompiledNode:
+    condition: sa.ColumnElement[bool]
+    explain: list[str]
+    summary: str
+    node_count: int
+
+
 class GroupRuleCompiler:
     def __init__(self, max_depth: int = 4, max_nodes: int = 32, max_in_values: int = 20) -> None:
         if max_depth < 1:
@@ -67,19 +74,21 @@ class GroupRuleCompiler:
     ) -> CompiledGroupRule:
         fields = _fields_for_resource_type(resource_type)
         self._validate_scope(scope_type=scope_type, scope_id=scope_id)
-        condition, explain, _node_count = self._compile_node(
+        if resource_type == "vm" and (scope_type != "project" or scope_id is None):
+            raise GroupRuleError("invalid_scope", "VM group rules require project scope")
+
+        compiled = self._compile_node(
             rule,
             fields=fields,
             depth=1,
             node_count=0,
         )
+        condition = compiled.condition
 
-        if resource_type == "vm" and scope_type == "project":
-            if scope_id is None:
-                raise GroupRuleError("invalid_scope", "project VM group requires scope_id")
+        if resource_type == "vm":
             condition = sa.and_(inventory_schema.instances.c.project_id == scope_id, condition)
 
-        return CompiledGroupRule(condition=condition, explain=explain)
+        return CompiledGroupRule(condition=condition, explain=compiled.explain)
 
     def _compile_node(
         self,
@@ -88,7 +97,7 @@ class GroupRuleCompiler:
         fields: Mapping[str, sa.Column[Any]],
         depth: int,
         node_count: int,
-    ) -> tuple[sa.ColumnElement[bool], list[str], int]:
+    ) -> _CompiledNode:
         if depth > self._max_depth:
             raise GroupRuleError("max_depth_exceeded")
         node_count += 1
@@ -111,6 +120,7 @@ class GroupRuleCompiler:
                 depth=depth,
                 node_count=node_count,
                 combinator=sa.and_,
+                label="all",
             )
         if keys == {"any"}:
             return self._compile_group(
@@ -119,18 +129,38 @@ class GroupRuleCompiler:
                 depth=depth,
                 node_count=node_count,
                 combinator=sa.or_,
+                label="any",
             )
         if keys == {"not"}:
-            child_condition, child_explain, node_count = self._compile_node(
+            child = self._compile_node(
                 rule_node["not"],
                 fields=fields,
                 depth=depth + 1,
                 node_count=node_count,
             )
-            return sa.not_(child_condition), [f"not ({item})" for item in child_explain], node_count
-        if keys == _LEAF_KEYS:
-            condition, explain = self._compile_leaf(rule_node, fields=fields)
-            return condition, explain, node_count
+            summary = f"not ({child.summary})"
+            return _CompiledNode(
+                condition=sa.not_(child.condition),
+                explain=[summary],
+                summary=summary,
+                node_count=child.node_count,
+            )
+        if keys == _VALUE_LEAF_KEYS:
+            condition, summary = self._compile_leaf(rule_node, fields=fields, has_value=True)
+            return _CompiledNode(
+                condition=condition,
+                explain=[summary],
+                summary=summary,
+                node_count=node_count,
+            )
+        if keys == _EXISTS_LEAF_KEYS:
+            condition, summary = self._compile_leaf(rule_node, fields=fields, has_value=False)
+            return _CompiledNode(
+                condition=condition,
+                explain=[summary],
+                summary=summary,
+                node_count=node_count,
+            )
 
         raise GroupRuleError("invalid_node")
 
@@ -142,33 +172,47 @@ class GroupRuleCompiler:
         depth: int,
         node_count: int,
         combinator: Any,
-    ) -> tuple[sa.ColumnElement[bool], list[str], int]:
+        label: Literal["all", "any"],
+    ) -> _CompiledNode:
         if not isinstance(raw_children, list) or len(raw_children) == 0:
             raise GroupRuleError("invalid_value")
 
-        conditions: list[sa.ColumnElement[bool]] = []
-        explain: list[str] = []
+        children: list[_CompiledNode] = []
         for child in raw_children:
-            child_condition, child_explain, node_count = self._compile_node(
+            compiled_child = self._compile_node(
                 child,
                 fields=fields,
                 depth=depth + 1,
                 node_count=node_count,
             )
-            conditions.append(child_condition)
-            explain.extend(child_explain)
+            children.append(compiled_child)
+            node_count = compiled_child.node_count
 
-        return combinator(*conditions), explain, node_count
+        conditions = [child.condition for child in children]
+        child_summaries = _join_summaries(children)
+        if label == "any":
+            summary = f"any ({child_summaries})"
+            explain = [summary]
+        else:
+            summary = f"all ({child_summaries})"
+            explain = [item for child in children for item in child.explain]
+
+        return _CompiledNode(
+            condition=combinator(*conditions),
+            explain=explain,
+            summary=summary,
+            node_count=node_count,
+        )
 
     def _compile_leaf(
         self,
         node: Mapping[str, Any],
         *,
         fields: Mapping[str, sa.Column[Any]],
-    ) -> tuple[sa.ColumnElement[bool], list[str]]:
+        has_value: bool,
+    ) -> tuple[sa.ColumnElement[bool], str]:
         field = node["field"]
         operator = node["op"]
-        value = node["value"]
         if not isinstance(field, str) or not isinstance(operator, str):
             raise GroupRuleError("invalid_value")
         if field not in fields:
@@ -177,20 +221,23 @@ class GroupRuleCompiler:
             raise GroupRuleError("unknown_operator")
 
         column = fields[field]
+        if operator == "exists":
+            if has_value:
+                raise GroupRuleError("invalid_value")
+            return column.is_not(None), f"{field} exists"
+        if not has_value:
+            raise GroupRuleError("invalid_node")
+
+        value = node["value"]
         if operator == "eq":
-            scalar = _validate_json_scalar(value)
-            return column == scalar, [f"{field} eq {_format_value(scalar)}"]
+            scalar = _validate_string_value(value)
+            return column == scalar, f"{field} eq {_format_value(scalar)}"
         if operator == "in":
             values = _validate_in_values(value, max_values=self._max_in_values)
-            return column.in_(values), [f"{field} in {len(values)} values"]
+            return column.in_(values), f"{field} in {len(values)} values"
         if operator == "prefix":
-            if not isinstance(value, str):
-                raise GroupRuleError("invalid_value")
-            return column.startswith(value, autoescape=True), [f"{field} prefix {value}"]
-        if operator == "exists":
-            if value is not True:
-                raise GroupRuleError("invalid_value")
-            return column.is_not(None), [f"{field} exists"]
+            prefix = _validate_string_value(value)
+            return column.startswith(prefix, autoescape=True), f"{field} prefix {prefix}"
 
         raise GroupRuleError("unknown_operator")
 
@@ -217,25 +264,27 @@ def _has_extra_logical_keys(keys: frozenset[str]) -> bool:
 
 
 def _has_extra_leaf_keys(keys: frozenset[str]) -> bool:
-    return _LEAF_KEYS < keys
+    return bool(keys & _EXISTS_LEAF_KEYS) and not keys <= _VALUE_LEAF_KEYS
 
 
-def _validate_in_values(value: object, *, max_values: int) -> list[JsonScalar]:
+def _validate_in_values(value: object, *, max_values: int) -> list[str]:
     if not isinstance(value, list) or len(value) == 0:
         raise GroupRuleError("invalid_value")
     if len(value) > max_values:
         raise GroupRuleError("too_many_values")
 
-    return [_validate_json_scalar(item) for item in value]
+    return [_validate_string_value(item) for item in value]
 
 
-def _validate_json_scalar(value: object) -> JsonScalar:
-    if value is None or isinstance(value, str | int | float | bool):
+def _validate_string_value(value: object) -> str:
+    if isinstance(value, str):
         return value
     raise GroupRuleError("invalid_value")
 
 
-def _format_value(value: JsonScalar) -> str:
-    if value is None:
-        return "null"
-    return str(value)
+def _format_value(value: str) -> str:
+    return value
+
+
+def _join_summaries(children: list[_CompiledNode]) -> str:
+    return "; ".join(child.summary for child in children)
