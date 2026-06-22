@@ -277,6 +277,56 @@ class OperationRepository:
                 raise OutboxItemNotFound(outbox_id)
             return _outbox_from_mapping(row)
 
+    def record_attempt(
+        self,
+        *,
+        operation_id: str,
+        adapter_action: str,
+        outcome: str,
+        external_execution_id: str | None = None,
+        safe_error_code: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        now = self._now()
+        with self._engine.begin() as connection:
+            if _operation_row(connection, operation_id) is None:
+                raise OperationNotFound(f"operation not found: {operation_id}")
+            attempt_number = _next_attempt_number(connection, operation_id)
+            connection.execute(
+                schema.operation_attempts.insert().values(
+                    attempt_id=f"{operation_id}-attempt-{attempt_number:06d}",
+                    operation_id=operation_id,
+                    attempt_number=attempt_number,
+                    adapter_action=adapter_action,
+                    outcome=outcome,
+                    external_execution_id=external_execution_id,
+                    safe_error_code=safe_error_code,
+                    metadata_json=metadata or {},
+                    created_at=now,
+                )
+            )
+
+    def attach_external_execution(
+        self,
+        *,
+        operation_id: str,
+        external_execution_id: str,
+    ) -> Operation:
+        now = self._now()
+        with self._engine.begin() as connection:
+            current = _operation_row(connection, operation_id)
+            if current is None:
+                raise OperationNotFound(f"operation not found: {operation_id}")
+            existing_external_id = _optional_string(current["external_execution_id"])
+            if existing_external_id is not None and existing_external_id != external_execution_id:
+                raise OperationRepositoryError("external execution id already attached")
+            connection.execute(
+                schema.operations.update()
+                .where(schema.operations.c.operation_id == operation_id)
+                .values(external_execution_id=external_execution_id, updated_at=now)
+            )
+            return _operation_by_id(connection, operation_id)
+
 
 def _operation_by_id(connection: Connection, operation_id: str) -> Operation:
     row = _operation_row(connection, operation_id)
@@ -358,6 +408,17 @@ def _append_event(
             created_at=created_at,
         )
     )
+
+
+def _next_attempt_number(connection: Connection, operation_id: str) -> int:
+    existing_count = int(
+        connection.execute(
+            sa.select(sa.func.count())
+            .select_from(schema.operation_attempts)
+            .where(schema.operation_attempts.c.operation_id == operation_id)
+        ).scalar_one()
+    )
+    return existing_count + 1
 
 
 def _next_event_id(connection: Connection, operation_id: str) -> str:

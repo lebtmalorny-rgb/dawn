@@ -13,6 +13,15 @@ def test_cli_accepts_expected_commands() -> None:
         assert args.command == command
 
 
+def test_cli_accepts_worker_once_flag() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(["worker", "--once"])
+
+    assert args.command == "worker"
+    assert args.once is True
+
+
 def test_smoke_does_not_require_runtime_settings(
     capsys: Any,
     monkeypatch: Any,
@@ -81,6 +90,24 @@ def test_inventory_sync_synthetic_dispatches_to_runner(monkeypatch: Any) -> None
 
     assert main(["inventory-sync-synthetic"]) == 2
     assert called == ["inventory-sync-synthetic"]
+
+
+def test_worker_once_dispatches_to_bounded_runner(monkeypatch: Any) -> None:
+    class FakeSettings:
+        log_level = "INFO"
+
+    called: list[str] = []
+
+    def fake_run_operation_worker_once() -> int:
+        called.append("worker-once")
+        return 3
+
+    monkeypatch.setattr("cloud_ui.cli.get_settings", lambda: FakeSettings())
+    monkeypatch.setattr("cloud_ui.cli.configure_logging", lambda _level: None)
+    monkeypatch.setattr("cloud_ui.cli.run_operation_worker_once", fake_run_operation_worker_once)
+
+    assert main(["worker", "--once"]) == 3
+    assert called == ["worker-once"]
 
 
 def test_inventory_sync_synthetic_returns_nonzero_on_partial(

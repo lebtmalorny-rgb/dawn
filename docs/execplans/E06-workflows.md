@@ -144,7 +144,12 @@ semantics, operation timeline или frontend operation page. Единствен
   `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations tests/operations
   src/cloud_ui/api.py` -> all checks passed; `cd backend && .venv/bin/python -m mypy src` ->
   success; `git diff --check` -> success.
-- [ ] 2026-06-22: Mistral mock adapter and worker.
+- [x] 2026-06-22: Mistral mock adapter and worker implemented and tested. Evidence:
+  `cd backend && .venv/bin/python -m pytest tests/operations tests/test_cli.py -q` ->
+  `77 passed`; `cd backend && .venv/bin/python -m ruff check src/cloud_ui/operations
+  tests/operations src/cloud_ui/api.py src/cloud_ui/cli.py tests/test_cli.py` -> all checks
+  passed; `cd backend && .venv/bin/python -m mypy src` -> success; `git diff --check` ->
+  success.
 - [ ] 2026-06-22: Group target snapshot.
 - [ ] 2026-06-22: Watcher/Masakari modules.
 - [ ] 2026-06-22: Frontend operations UX.
@@ -170,6 +175,9 @@ semantics, operation timeline или frontend operation page. Единствен
 - The first cancel API is deliberately fail-closed with `operation_not_cancelable` until worker state
   and Mistral cancel semantics land. This exposes the route shape without pretending cancel is safe for
   all states.
+- The P0 `InMemoryMistralAdapter` now proves the core duplicate-prevention rule: if a start response is
+  lost after Mistral creates an execution, the worker finds the execution by operation correlation and
+  does not call start again. Evidence: `test_worker_handles_lost_response_without_duplicate_execution`.
 
 ## Журнал решений
 

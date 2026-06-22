@@ -13,6 +13,10 @@ from cloud_ui.inventory.reconciliation import InventoryReconciler
 from cloud_ui.inventory.repository import InventoryRepository
 from cloud_ui.inventory.synthetic import SyntheticInventorySource
 from cloud_ui.logging import configure_logging
+from cloud_ui.operations.catalog import build_builtin_workflow_catalog
+from cloud_ui.operations.mistral import InMemoryMistralAdapter
+from cloud_ui.operations.repository import OperationRepository
+from cloud_ui.operations.worker import OperationWorker
 from cloud_ui.worker import run_loop
 
 
@@ -20,15 +24,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cloud-ui")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for command_name in (
-        "api",
-        "worker",
-        "events",
-        "db-upgrade",
-        "inventory-sync-synthetic",
-        "smoke",
-    ):
+    for command_name in ("api", "events", "db-upgrade", "inventory-sync-synthetic", "smoke"):
         subparsers.add_parser(command_name)
+    worker_parser = subparsers.add_parser("worker")
+    worker_parser.add_argument("--once", action="store_true")
 
     return parser
 
@@ -98,6 +97,28 @@ def run_inventory_sync_synthetic() -> int:
     return 0
 
 
+def run_operation_worker_once() -> int:
+    settings = get_settings()
+    engine = create_db_engine(settings.database_url.unicode_string())
+    try:
+        result = OperationWorker(
+            repository=OperationRepository(engine=engine),
+            catalog=build_builtin_workflow_catalog(environment=settings.environment),
+            mistral=InMemoryMistralAdapter(),
+        ).run_once()
+    finally:
+        engine.dispose()
+
+    if result.processed:
+        print(
+            "operation worker processed: "
+            f"operation_id={result.operation_id} status={result.status}"
+        )
+    else:
+        print("operation worker idle")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -112,6 +133,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "api":
         run_api()
     elif args.command == "worker":
+        if args.once:
+            return run_operation_worker_once()
         run_loop("worker")
     elif args.command == "events":
         run_loop("events")
