@@ -124,7 +124,12 @@
   `tests/groups/test_group_migration.py tests/groups/test_group_repository.py` -> `16 passed`;
   scoped Ruff and mypy passed; spec review approved; final code quality review found no
   Critical/Important issues.
-- [ ] Group rule compiler implemented and tested.
+- [x] 2026-06-22: Group rule compiler implemented and tested. Evidence: commits
+  `30db54f feat: add safe group rule compiler`,
+  `4b47f76 fix: restrict group rule values to JSON scalars`,
+  `c3ba59f fix: harden group rule scope and values`; targeted tests
+  `tests/groups/test_group_rules.py` -> `10 passed`; scoped Ruff and source mypy passed; spec
+  review approved; final code quality review found no Critical/Important/Minor issues.
 - [ ] Group API and group-aware inventory filters implemented and tested.
 - [ ] Frontend group UX implemented and tested.
 - [ ] Documentation, DKB evidence and final verification completed.
@@ -151,6 +156,9 @@
 - Task 3 code quality review noted a Minor double-delete race: `delete_group()` can still surface a
   low-level uniqueness error in a narrow concurrent double-delete case because the API contract does
   not yet include expected revision for delete. Revisit this when E05 API delete semantics are added.
+- Task 4 hardened the dynamic DSL compiler as the single rule-to-query path: VM rules require project
+  scope, current allowlisted fields accept only strings, SQLAlchemy expression objects are rejected as
+  values, and prefix search uses escaped SQLAlchemy LIKE semantics.
 - `make test` runs backend tests from `backend/` and frontend Vitest. A root-level `pytest` also
   collects `tests/test_e015_kolla_layout.py`, which expects future Kolla files and is not part of the
   current project gate.
