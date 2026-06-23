@@ -231,6 +231,26 @@ Evidence: `backend/tests/security/test_e08_container_hardening.py`,
 `docs/generated/e08-container-hardening.md`, `docs/generated/risk-register.md` and ExecPlan
 `docs/execplans/E08-container-hardening.md`.
 
+## Обновление требований 2026-06-23: E08 supply chain
+
+E08.6 добавляет локальный reproducible supply-chain gate для двух portal-owned images без заявления
+production registry/signing compliance:
+
+- ДКБ-69: `backend/Dockerfile` and `frontend/Dockerfile` now pin base images by digest, and
+  `make sbom` records local Docker SBOM summaries for `cloud-ui-backend:dev` and
+  `cloud-ui-frontend:dev`. Python backend still requires an interpreter, and inherited base images may
+  contain shell/package-manager components; this remains a formal waiver/gap.
+- ДКБ-70: `make sbom` builds local images and records local image IDs plus SBOM table SHA-256 values.
+  This is not corporate registry push, production pull-by-digest enforcement, image signing or
+  provenance verification. Those controls remain E09/external supply-chain evidence.
+- ДКБ-76/77/80: local image source and SBOM evidence now has repository tests. Full Kolla build,
+  registry ACL/network and deployment digest evidence remains E09.
+
+Evidence: `backend/tests/security/test_e08_supply_chain.py`, `Makefile`,
+`scripts/generate-sbom.sh`, `backend/Dockerfile`, `frontend/Dockerfile`,
+`docs/generated/e08-supply-chain.md`, `docs/generated/risk-register.md` and ExecPlan
+`docs/execplans/E08-supply-chain.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

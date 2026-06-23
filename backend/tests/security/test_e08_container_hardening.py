@@ -92,10 +92,14 @@ def test_frontend_writable_tmpfs_paths_are_owned_by_nginx_runtime_user() -> None
 
 def test_backend_runtime_dockerfile_is_non_root_and_installs_only_wheels() -> None:
     dockerfile = _read("backend/Dockerfile")
+    builder_lines = _stage_lines(dockerfile, "builder")
+    runtime_lines = _stage_lines(dockerfile, "runtime")
     runtime = "\n".join(_stage_lines(dockerfile, "runtime"))
 
-    assert "FROM python:3.11-slim AS builder" in dockerfile
-    assert "FROM python:3.11-slim AS runtime" in dockerfile
+    assert builder_lines[0].startswith("FROM python:3.11-slim")
+    assert builder_lines[0].endswith(" AS builder")
+    assert runtime_lines[0].startswith("FROM python:3.11-slim")
+    assert runtime_lines[0].endswith(" AS runtime")
     assert "python -m pip wheel --no-cache-dir --wheel-dir /wheels ." in dockerfile
     assert "COPY --from=builder /wheels /wheels" in runtime
     assert "USER cloudui" in runtime
@@ -106,11 +110,15 @@ def test_backend_runtime_dockerfile_is_non_root_and_installs_only_wheels() -> No
 
 def test_frontend_runtime_dockerfile_excludes_node_toolchain() -> None:
     dockerfile = _read("frontend/Dockerfile")
+    build_lines = _stage_lines(dockerfile, "build")
+    runtime_lines = _stage_lines(dockerfile, "runtime")
     runtime = "\n".join(_stage_lines(dockerfile, "runtime"))
     normalized_runtime = runtime.lower()
 
-    assert "FROM node:24-alpine AS build" in dockerfile
-    assert "FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime" in dockerfile
+    assert build_lines[0].startswith("FROM node:24-alpine")
+    assert build_lines[0].endswith(" AS build")
+    assert runtime_lines[0].startswith("FROM nginxinc/nginx-unprivileged:1.27-alpine")
+    assert runtime_lines[0].endswith(" AS runtime")
     assert "COPY --from=build /app/dist /usr/share/nginx/html" in runtime
     assert "nginx-unprivileged" in normalized_runtime or "USER 101" in runtime
     assert "npm " not in normalized_runtime

@@ -3,7 +3,7 @@ BACKEND_VENV := backend/.venv
 BACKEND_PY := $(BACKEND_VENV)/bin/python
 COMPOSE ?= docker compose
 
-.PHONY: bootstrap format lint typecheck test test-integration test-load build up down reset smoke security
+.PHONY: bootstrap format lint typecheck test test-integration test-load build up down reset smoke security sbom
 
 bootstrap:
 	$(PYTHON) -m venv $(BACKEND_VENV)
@@ -51,3 +51,6 @@ smoke:
 
 security:
 	./scripts/secret-scan.sh
+
+sbom: build
+	./scripts/generate-sbom.sh
