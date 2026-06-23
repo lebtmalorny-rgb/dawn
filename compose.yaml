@@ -1,3 +1,23 @@
+x-cloud-ui-backend-hardening: &cloud-ui-backend-hardening
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+
+x-cloud-ui-frontend-hardening: &cloud-ui-frontend-hardening
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=16m
+    - /var/cache/nginx:rw,noexec,nosuid,size=32m,uid=101,gid=101,mode=755
+    - /var/run:rw,noexec,nosuid,size=4m,uid=101,gid=101,mode=755
+
 services:
   db:
     image: mariadb:11.4
@@ -25,6 +45,7 @@ services:
       retries: 12
 
   api:
+    <<: *cloud-ui-backend-hardening
     image: cloud-ui-backend:dev
     build:
       context: ./backend
@@ -50,6 +71,7 @@ services:
       - "8080:8080"
 
   worker:
+    <<: *cloud-ui-backend-hardening
     image: cloud-ui-backend:dev
     command: ["cloud-ui", "worker"]
     environment:
@@ -66,6 +88,7 @@ services:
         condition: service_healthy
 
   events:
+    <<: *cloud-ui-backend-hardening
     image: cloud-ui-backend:dev
     command: ["cloud-ui", "events"]
     environment:
@@ -82,6 +105,7 @@ services:
         condition: service_healthy
 
   frontend:
+    <<: *cloud-ui-frontend-hardening
     image: cloud-ui-frontend:dev
     build:
       context: ./frontend

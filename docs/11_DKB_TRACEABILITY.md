@@ -209,6 +209,28 @@ Evidence: `backend/tests/security/test_security_api.py`,
 `docs/generated/risk-register.md`, `docs/generated/secret-inventory.md` and ExecPlan
 `docs/execplans/E08-session-token-protection.md`.
 
+## Обновление требований 2026-06-23: E08 container hardening
+
+E08.5 добавляет проверяемые controls для portal-owned app containers in local compose, не заявляя
+полное production-закрытие образов или SELinux:
+
+- ДКБ-65: `compose.yaml` теперь задает read-only root filesystem, dropped capabilities,
+  `no-new-privileges` and controlled tmpfs paths для `api`, `worker`, `events`, `frontend`. Rocky
+  SELinux enforcing mode, labels and denial evidence остаются E09/external host proof.
+- ДКБ-69: backend/frontend Dockerfile tests фиксируют build/runtime separation and non-root runtime
+  evidence. Python backend still requires an interpreter, and inherited base images may still contain
+  shell/package-manager components; this remains a formal waiver/gap, not a closed requirement.
+- ДКБ-70: this slice does not push images to a corporate registry and does not create digest/signing
+  evidence. Registry and provenance proof remain E08.6/E09.
+- ДКБ-76/77/80: app containers no longer expose default writable root/capability posture in local
+  compose, and tests reject Docker/Podman socket or host-root mounts. Full Kolla network/container
+  runtime evidence remains E09.
+
+Evidence: `backend/tests/security/test_e08_container_hardening.py`,
+`compose.yaml`, `backend/Dockerfile`, `frontend/Dockerfile`,
+`docs/generated/e08-container-hardening.md`, `docs/generated/risk-register.md` and ExecPlan
+`docs/execplans/E08-container-hardening.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

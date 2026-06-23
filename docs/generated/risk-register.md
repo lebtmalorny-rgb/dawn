@@ -1,6 +1,6 @@
 # Актуальный реестр рисков
 
-- Stage: E08 session/token protection
+- Stage: E08 container hardening
 - Last updated: 2026-06-23
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
@@ -68,7 +68,7 @@
 | R-041 | ДКБ-22.02 mTLS scope unclear | E08 expands `docs/generated/tls-matrix.md` with per-flow TLS/mTLS, CA/source, identity, authorization, rotation owner, negative test and residual-gap fields. E08 also adds `docs/generated/e08-threat-model.md` to map weak-channel threats to controls/evidence. Vault server TLS contract, adapter CA verification tests and lab runbook are implemented, but live corporate PKI/mTLS decisions remain pending. | Per-flow owner decision, production PKI evidence, client certificate authorization, negative certificate tests, rotation/revoke evidence. | E08/E09 |
 | R-042 | ДКБ-50 full audit cannot be portal-only | Portal audit is scoped; host/libvirt/storage/IdP/SIEM sources external. | E07 creates portal audit; E12 maps external sources and gaps. | E07/E12 |
 | R-043 | ДКБ-55/56 Vault does not cover all Kolla secrets | E08 defines the portal Vault/SecMan contract, synthetic lab paths and `192.168.10.15` runbook; production SecMan endpoint/auth and full Kolla/service secret rotation remain open. | Separate Vault ADR/runbook execution, deployment pipeline integration and rotation/revoke evidence for Kolla, MariaDB, RabbitMQ and OpenStack service secrets. | E08/E09 |
-| R-044 | ДКБ-69 conflicts with Python runtime | Backend and OpenStack services require interpreters. | Minimal runtime, SBOM/scan, non-root, formal waiver/exception. | E08/E12 |
+| R-044 | ДКБ-69 conflicts with Python runtime | E08.5 adds repository tests and compose hardening for portal app containers: non-root runtime, read-only root filesystem, `cap_drop: ALL`, `no-new-privileges`, controlled tmpfs and no socket/host-root mounts. Backend still requires Python and inherited base images may include shell/package-manager components. | Keep formal waiver/exception for Python interpreter and inherited runtime tools; add SBOM/vulnerability/signing evidence in E08.6/E09; validate SELinux labels on Rocky host. Evidence: `backend/tests/security/test_e08_container_hardening.py`, `docs/generated/e08-container-hardening.md`. | E08/E12 |
 | R-045 | ДКБ-72 storage architecture external | Portal cannot prove no hypervisor filesystem use. | Storage owner must provide Cinder/Ceph/Nova path evidence. | E12 |
 | R-046 | AIO lab evidence may not transfer to HA deployment | Current lab is all-in-one; production Kolla HA behavior differs. | E09/E10 must run HA/failover/load evidence in representative environment. | E09/E10 |
 | R-047 | E07 local audit sink mistaken for production SIEM | E07 proves durable portal audit, local delivery and Fluentd HTTP payload shape, not production SIEM retention or protected channel. | Keep ADR-008 open; require SIEM endpoint/auth/mTLS/retention evidence before pilot. | E07/E08 |
@@ -92,8 +92,9 @@
 
 ## Immediate priority order
 
-1. Continue E08 hardening slices without treating session bootstrap, matrix or runbook evidence as live production proof.
+1. Continue E08 hardening slices without treating session bootstrap, container hardening, matrix or runbook evidence as live production proof.
 2. Keep ADR-001/test federation, ADR-008 production SIEM, Vault/SecMan, IAM/PAM/SoD, PKI/mTLS,
    host audit and storage evidence as explicit external gaps.
 3. Do not treat E06 P0 mock, read-only Mistral smoke, E07 local audit sink, E08 CSRF bootstrap,
-   Vault adapter contract or E08 TLS matrix as proof of production mutating workflow safety.
+   container hardening, Vault adapter contract or E08 TLS matrix as proof of production mutating
+   workflow safety or full DKB compliance.
