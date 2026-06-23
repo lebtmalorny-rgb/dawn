@@ -1307,7 +1307,8 @@ vault status
 vault secrets list
 vault audit list
 vault kv get -field=value kv/cloud-ui/local/session >/dev/null
-vault kv get kv/other-service/local/test
+negative_path="kv/other-service/local/test"
+if vault kv get "$negative_path" >/dev/null 2>&1; then echo "negative-read=unexpected-success"; else echo "negative-read=denied"; fi
 ```
 
 Expected:
@@ -1316,7 +1317,9 @@ Expected:
 - KV v2 mounted at `kv/`;
 - file audit enabled;
 - allowed synthetic portal path read succeeds;
-- unrelated path read fails for portal policy token.
+- unrelated path read records only `negative-read=denied`;
+- `negative-read=unexpected-success` is a security finding. Do not capture the command output,
+  because a mis-scoped token could disclose secret material.
 
 ## Rollback
 
@@ -1419,11 +1422,12 @@ If the user approves inspection, use the existing approved SSH prefix and run no
 Run:
 
 ```bash
-ssh -o StrictHostKeyChecking=no root@192.168.10.15 'command -v vault || true; systemctl is-active vault || true; ss -ltnp | grep ":8200\|:8201" || true; test -f /etc/vault.d/vault.hcl && sudo sed -n "1,160p" /etc/vault.d/vault.hcl || true'
+ssh -o StrictHostKeyChecking=no root@192.168.10.15 'command -v vault || true; systemctl is-active vault || true; systemctl status vault --no-pager --lines=0 || true; ss -ltnp | grep ":8200\|:8201" || true; sudo test -f /etc/vault.d/vault.hcl && sudo stat -c "%U %G %a %n" /etc/vault.d/vault.hcl || true'
 ```
 
-Expected: command returns observed state. If Vault is absent, record `not installed` and stop unless
-the user separately approves deployment.
+Expected: command returns observed service/listener state and config file ownership/mode only. Do not
+print `/etc/vault.d/vault.hcl` content. If Vault is absent, record `not installed` and stop unless the
+user separately approves deployment.
 
 - [ ] **Step 3: Ask for explicit deployment approval if Vault is absent**
 

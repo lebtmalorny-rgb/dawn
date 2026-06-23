@@ -46,7 +46,8 @@ vault status
 vault secrets list
 vault audit list
 vault kv get -field=value kv/cloud-ui/local/session >/dev/null
-vault kv get kv/other-service/local/test
+negative_path="kv/other-service/local/test"
+if vault kv get "$negative_path" >/dev/null 2>&1; then echo "negative-read=unexpected-success"; else echo "negative-read=denied"; fi
 ```
 
 Expected outcomes:
@@ -55,7 +56,8 @@ Expected outcomes:
 - `vault secrets list` shows KV v2 mounted at `kv/`.
 - `vault audit list` shows the file audit device.
 - The allowed synthetic portal path read succeeds without printing the value.
-- The unrelated path read fails for the portal policy token.
+- The unrelated path read records only `negative-read=denied`.
+- `negative-read=unexpected-success` is a security finding. Do not capture the command output, because a mis-scoped token could disclose secret material.
 - No output contains real secret values, root token, unseal keys, client token or private key material.
 
 ## Rollback
