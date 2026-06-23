@@ -67,6 +67,12 @@ export type LoginResult = {
   expires_at: string;
 };
 
+export type CsrfBootstrap = {
+  subject: Subject;
+  csrf: string;
+  expires_at: string;
+};
+
 export type Capabilities = {
   scope: { type: string; id: string | null };
   capabilities: string[];
@@ -280,6 +286,15 @@ function isCurrentSession(payload: unknown): payload is CurrentSession {
 }
 
 function isLoginResult(payload: unknown): payload is LoginResult {
+  return (
+    isPlainRecord(payload) &&
+    isSubject(payload.subject) &&
+    typeof payload.csrf === "string" &&
+    typeof payload.expires_at === "string"
+  );
+}
+
+function isCsrfBootstrap(payload: unknown): payload is CsrfBootstrap {
   return (
     isPlainRecord(payload) &&
     isSubject(payload.subject) &&
@@ -696,6 +711,17 @@ export async function fetchCurrentSession(): Promise<CurrentSession | null> {
   }
 
   throw new Error("Сессия недоступна");
+}
+
+export async function fetchCsrf(): Promise<CsrfBootstrap> {
+  const response = await fetch("/api/v1/session/csrf");
+  const payload: unknown = await response.json();
+
+  if (response.ok && isCsrfBootstrap(payload)) {
+    return payload;
+  }
+
+  throw new Error("CSRF недоступен");
 }
 
 export async function login(

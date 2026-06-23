@@ -81,6 +81,61 @@ def test_session_and_capability_responses_have_security_headers() -> None:
         assert response.headers["cache-control"] == "no-store"
 
 
+def test_restored_session_can_bootstrap_csrf_without_secret_leakage() -> None:
+    client, security = _client()
+    login_csrf, session_id = _login_with_cookie(client)
+    client.cookies.clear()
+    client.cookies.set("cloud_ui_session", session_id)
+
+    response = client.get("/api/v1/session/csrf", headers={"x-request-id": "csrf-bootstrap"})
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    payload = response.json()
+    assert payload["csrf"] == login_csrf
+    assert payload["subject"]["subject_id"] == "mock-user-operator"
+    assert payload["expires_at"] == "2026-06-21T15:00:00Z"
+    payload_repr = repr(payload).lower()
+    for forbidden in ("openstack", "vault", "application_credential", "password", "private_key"):
+        assert forbidden not in payload_repr
+    for event in security.audit_sink.events:
+        assert login_csrf not in repr(event.metadata)
+
+    logout_response = client.post(
+        "/api/v1/session/logout",
+        headers={"x-request-id": "logout-with-restored-csrf", "x-csrf-token": payload["csrf"]},
+    )
+    assert logout_response.status_code == 204
+
+
+def test_csrf_bootstrap_denies_request_without_session() -> None:
+    client, _security = _client()
+
+    response = client.get("/api/v1/session/csrf", headers={"x-request-id": "csrf-no-session"})
+
+    assert response.status_code == 401
+    payload = response.json()
+    assert payload["error"]["code"] == "not_authenticated"
+    assert "csrf" not in payload["error"]
+
+
+def test_csrf_bootstrap_denies_revoked_session() -> None:
+    client, _security = _client()
+    csrf, session_id = _login_with_cookie(client)
+    client.post(
+        "/api/v1/session/logout",
+        headers={"x-request-id": "logout-before-bootstrap", "x-csrf-token": csrf},
+    )
+    client.cookies.set("cloud_ui_session", session_id)
+
+    response = client.get("/api/v1/session/csrf", headers={"x-request-id": "csrf-revoked"})
+
+    assert response.status_code == 401
+    payload = response.json()
+    assert payload["error"]["code"] == "not_authenticated"
+    assert "csrf" not in payload["error"]
+
+
 def test_login_failure_returns_safe_error_and_audit_event() -> None:
     client, security = _client()
 

@@ -32,6 +32,7 @@ import {
   type Subject,
   fetchCapabilities,
   fetchAuditEvents,
+  fetchCsrf,
   fetchCurrentSession,
   fetchGroup,
   fetchGroupMembers,
@@ -314,13 +315,19 @@ export function App() {
           csrf: null,
         });
         fetchCapabilities()
-          .then((capabilities) => {
+          .then(async (capabilities) => {
+            let csrf: string | null = null;
+            try {
+              csrf = (await fetchCsrf()).csrf;
+            } catch {
+              csrf = null;
+            }
             if (mounted) {
               setAuthState({
                 type: "authenticated",
                 subject: session.subject,
                 capabilities,
-                csrf: null,
+                csrf,
               });
             }
           })
