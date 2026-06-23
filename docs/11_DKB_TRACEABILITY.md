@@ -251,6 +251,34 @@ Evidence: `backend/tests/security/test_e08_supply_chain.py`, `Makefile`,
 `docs/generated/e08-supply-chain.md`, `docs/generated/risk-register.md` and ExecPlan
 `docs/execplans/E08-supply-chain.md`.
 
+## Обновление требований 2026-06-23: E08 DKB gaps/waivers
+
+E08.7 добавляет consolidated draft gap/waiver register without claiming approval or compliance closure:
+
+- ДКБ-07: service-account conflict вынесен в `formal_waiver_required` with IAM/PAM owner role,
+  review/expiry and compensating controls. Human federation can remain the target path, but Kolla,
+  OpenStack, OS and integration service accounts require a formal exception and non-interactive
+  controls.
+- ДКБ-22.02: TLS/mTLS matrix evidence is linked to a production PKI/mTLS gap. Corporate CA,
+  certificate rotation, client identity authorization and negative certificate tests remain external.
+- ДКБ-48/50: portal audit evidence remains scoped to portal-owned events. Host/container/libvirt/
+  network/storage/IdP/OpenStack audit sources, SIEM missing-flow alerts and protected SIEM retention
+  remain external evidence.
+- ДКБ-55/56: Vault/SecMan adapter contract, policy artifact and lab runbook are not production
+  SecMan acceptance. Full Kolla, MariaDB, RabbitMQ, OpenStack service, SIEM, PKI and portal secret
+  issue/rotation/revoke evidence remains required.
+- ДКБ-65: local compose hardening does not prove Rocky SELinux/AppArmor enforcing labels, denials or
+  host policy. These remain E09/external deployment evidence.
+- ДКБ-69/70: local container hardening, digest pins and SBOM narrow supply-chain risk but do not close
+  the Python interpreter/shell conflict, corporate registry, signature, scanner and provenance
+  requirements. ДКБ-69 explicitly remains not closed and requires a formal waiver for Python backend.
+- ДКБ-72/77/80: storage path, unused-interface blocking and management-zone placement require storage,
+  Kolla/firewall/policy and network owner evidence. Repository documentation alone is not enough.
+
+Evidence: `backend/tests/security/test_e08_dkb_gaps.py`,
+`docs/generated/e08-dkb-gaps-waivers.md`, `docs/generated/risk-register.md` and ExecPlan
+`docs/execplans/E08-dkb-gaps-waivers.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |
