@@ -41,6 +41,13 @@ _CLOUD_UI_ENVIRONMENT_NAMES = {
     "CLOUD_UI_AUDIT_DEFAULT_LIMIT",
     "CLOUD_UI_AUDIT_MAX_LIMIT",
     "CLOUD_UI_AUDIT_CURSOR_SIGNING_KEY",
+    "CLOUD_UI_SECRETS_PROVIDER",
+    "CLOUD_UI_VAULT_ADDR",
+    "CLOUD_UI_VAULT_TOKEN_FILE",
+    "CLOUD_UI_VAULT_CA_BUNDLE",
+    "CLOUD_UI_VAULT_TIMEOUT_SECONDS",
+    "CLOUD_UI_VAULT_MAX_ATTEMPTS",
+    "CLOUD_UI_VAULT_ALLOWED_PREFIX",
 }
 
 
@@ -138,4 +145,48 @@ def test_settings_reject_dev_audit_cursor_key_in_production() -> None:
             mock_identity_enabled=False,
             inventory_cursor_signing_key="production-inventory-cursor-key",
             operation_cursor_signing_key="production-operation-cursor-key",
+        )
+
+
+def test_settings_accept_vault_secret_provider(tmp_path) -> None:
+    token_path = tmp_path / "vault-token"
+    token_path.write_text("synthetic-token", encoding="utf-8")
+
+    settings = Settings(
+        database_url="mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui",
+        rabbitmq_url="amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui",
+        secrets_provider="vault",
+        vault_addr="https://192.168.10.15:8200",
+        vault_token_file=token_path,
+        vault_allowed_prefix="kv/data/cloud-ui/local/",
+    )
+
+    assert settings.secrets_provider == "vault"
+    assert settings.vault_addr is not None
+    assert settings.vault_addr.unicode_string() == "https://192.168.10.15:8200/"
+    assert settings.vault_token_file == token_path
+    assert settings.vault_allowed_prefix == "kv/data/cloud-ui/local/"
+
+
+def test_settings_reject_local_secret_provider_in_production() -> None:
+    with pytest.raises(ValidationError, match="local secret provider"):
+        Settings(
+            database_url="mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui",
+            rabbitmq_url="amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui",
+            environment="production",
+            identity_provider="external",
+            mock_identity_enabled=False,
+            inventory_cursor_signing_key="production-inventory-cursor-key",
+            operation_cursor_signing_key="production-operation-cursor-key",
+            audit_cursor_signing_key="production-audit-cursor-key",
+            secrets_provider="local",
+        )
+
+
+def test_settings_require_vault_endpoint_and_token_file_when_vault_enabled() -> None:
+    with pytest.raises(ValidationError, match="Vault address and token file"):
+        Settings(
+            database_url="mysql+pymysql://cloud_ui:cloud_ui_dev@db:3306/cloud_ui",
+            rabbitmq_url="amqp://cloud_ui:cloud_ui_dev@rabbitmq:5672/%2Fcloud-ui",
+            secrets_provider="vault",
         )

@@ -141,6 +141,27 @@ infrastructure audit compliance:
   external PAM/DB/SIEM control. Доказательства: `backend/tests/audit/test_audit_api.py`,
   `frontend/src/App.test.tsx`.
 
+## Обновление требований 2026-06-22: E08 Vault/SecMan
+
+E08 добавляет контракт Vault/SecMan для портальных секретов и generated evidence для lab deployment,
+не заявляя production-закрытие SecMan/PKI:
+
+- ДКБ-22.02/24: для Vault зафиксирован server TLS contract, CA verification на уровне adapter tests и
+  lab runbook для постоянного Vault на Ansible host `192.168.10.15`. mTLS остается решением владельца
+  контура; lab CA не считается corporate PKI evidence.
+- ДКБ-13/51: `SecretProvider`/Vault adapter and readiness tests проверяют typed safe errors and
+  redaction, а evidence/runbook запрещают сохранять root token, unseal keys, client token, private keys
+  or real secret values.
+- ДКБ-55: добавлены portal Vault/SecMan path contract, policy artifact
+  `docs/generated/e08-vault-policy.hcl`, local/test adapter contract and lab runbook. Production
+  SecMan endpoint/auth method still requires owner approval and live evidence.
+- ДКБ-56: secret inventory теперь разделяет lifecycle для portal session, cursor, OpenStack, SIEM and
+  Vault auth classes. Full Kolla/service secret rotation for MariaDB, RabbitMQ, OpenStack service
+  credentials, certificates and deploy pipeline remains open.
+
+Residual gaps: corporate PKI, mTLS, HA Vault topology, backup/restore, auto-unseal/HSM, break-glass,
+production endpoint/auth and Kolla/service rotation are not closed by E08 Task 4 documentation.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

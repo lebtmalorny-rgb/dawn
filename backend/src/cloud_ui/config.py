@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import AnyUrl, Field, model_validator
@@ -9,6 +10,7 @@ IdentityProviderName = Literal["mock", "external"]
 SessionLimitPolicyName = Literal["deny", "disconnect_oldest"]
 SameSiteName = Literal["lax", "strict"]
 AuditSinkTypeName = Literal["local", "fluentd_http"]
+SecretProviderName = Literal["local", "vault"]
 DEV_INVENTORY_CURSOR_SIGNING_KEY = "dev-inventory-cursor-key"
 DEV_OPERATION_CURSOR_SIGNING_KEY = "dev-operation-cursor-key"
 DEV_AUDIT_CURSOR_SIGNING_KEY = "dev-audit-cursor-key"
@@ -64,6 +66,13 @@ class Settings(BaseSettings):
         default=DEV_AUDIT_CURSOR_SIGNING_KEY,
         min_length=16,
     )
+    secrets_provider: SecretProviderName = Field(default="local")
+    vault_addr: AnyUrl | None = None
+    vault_token_file: Path | None = None
+    vault_ca_bundle: Path | None = None
+    vault_timeout_seconds: float = Field(default=2.0, gt=0)
+    vault_max_attempts: int = Field(default=2, ge=1, le=5)
+    vault_allowed_prefix: str = Field(default="kv/data/cloud-ui/local/", min_length=1)
 
     @model_validator(mode="after")
     def reject_unsafe_production_settings(self) -> "Settings":
@@ -86,6 +95,12 @@ class Settings(BaseSettings):
             and self.audit_cursor_signing_key == DEV_AUDIT_CURSOR_SIGNING_KEY
         ):
             raise ValueError("Production cannot use the development audit cursor signing key")
+        if self.environment == "production" and self.secrets_provider == "local":
+            raise ValueError("Production cannot use the local secret provider")
+        if self.secrets_provider == "vault" and (
+            self.vault_addr is None or self.vault_token_file is None
+        ):
+            raise ValueError("Vault address and token file are required when Vault is enabled")
         return self
 
 
