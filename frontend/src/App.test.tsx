@@ -912,6 +912,68 @@ test("submits host precheck through BFF with csrf and idempotency key", async ()
   expect(storageSet).not.toHaveBeenCalled();
 });
 
+test("restored session bootstraps csrf before submitting host precheck", async () => {
+  const user = userEvent.setup();
+  const storageSet = vi.spyOn(Storage.prototype, "setItem");
+  const fetchMock = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/v1/session") {
+        return jsonResponse(operatorSessionPayload);
+      }
+      if (url === "/api/v1/health/ready") {
+        return jsonResponse(readyPayload);
+      }
+      if (url === "/api/v1/capabilities") {
+        return jsonResponse(
+          capabilitiesPayload([
+            "operation.read",
+            "workflow.execute.maintenance-host",
+          ]),
+        );
+      }
+      if (url === "/api/v1/session/csrf") {
+        return jsonResponse({
+          subject: operatorSessionPayload.subject,
+          csrf: "restored-csrf-value",
+          expires_at: "2026-06-21T15:00:00Z",
+        });
+      }
+      if (url === "/api/v1/workflow-definitions?limit=50") {
+        return jsonResponse(workflowDefinitionsPayload());
+      }
+      if (url === "/api/v1/operations") {
+        const headers = init?.headers as Record<string, string>;
+        expect(init?.method).toBe("POST");
+        expect(headers["x-csrf-token"]).toBe("restored-csrf-value");
+        expect(headers["idempotency-key"]).toEqual(expect.any(String));
+        return jsonResponse({ operation_id: "op-precheck-1", status: "accepted" }, 202);
+      }
+      if (url === "/api/v1/operations/op-precheck-1") {
+        return jsonResponse(operationDetailPayload({ status: "running" }));
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    },
+  );
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  await waitFor(() => {
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input) === "/api/v1/session/csrf"),
+    ).toBe(true);
+  });
+  await user.type(await screen.findByLabelText("Хост"), "compute-a");
+  fireEvent.change(screen.getByLabelText("Причина"), {
+    target: { value: "Плановое обслуживание" },
+  });
+  await user.click(screen.getByRole("button", { name: "Запустить precheck" }));
+
+  expect(await screen.findByText("Статус: running")).toBeInTheDocument();
+  expect(storageSet).not.toHaveBeenCalled();
+});
+
 test("operation detail route renders timeline without direct OpenStack calls", async () => {
   window.history.replaceState(
     {},
@@ -1257,6 +1319,13 @@ test("instances page fetches server-side page from BFF with URL filters", async 
     if (url === "/api/v1/capabilities") {
       return jsonResponse(capabilitiesPayload(["instance.read"]));
     }
+    if (url === "/api/v1/session/csrf") {
+      return jsonResponse({
+        subject: operatorSessionPayload.subject,
+        csrf: "restored-csrf-value",
+        expires_at: "2026-06-21T15:00:00Z",
+      });
+    }
     if (url === "/api/v1/inventory/modules") {
       return jsonResponse(inventoryModulesPayload());
     }
@@ -1589,11 +1658,14 @@ test("next cursor pagination updates URL and fetches one next BFF page", async (
   expect(window.location.search).toBe(
     "?view=instances&sort=name.asc&cursor=cursor-next",
   );
-  expect(fetchMock).toHaveBeenCalledTimes(6);
-  expect(fetchMock).toHaveBeenCalledWith(
+  const instanceFetches = fetchMock.mock.calls.filter(([input]) =>
+    String(input).startsWith("/api/v1/instances?"),
+  );
+  expect(instanceFetches).toHaveLength(2);
+  expect(instanceFetches[1]).toEqual([
     "/api/v1/instances?limit=50&cursor=cursor-next&sort=name.asc",
     expect.objectContaining({ signal: expect.any(Object) }),
-  );
+  ]);
 });
 
 test("columns and density round trip through URL and control visible table state", async () => {

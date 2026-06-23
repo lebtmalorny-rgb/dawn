@@ -1,6 +1,6 @@
 # Актуальный реестр рисков
 
-- Stage: E08 threat/TLS evidence
+- Stage: E08 session/token protection
 - Last updated: 2026-06-23
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
@@ -38,7 +38,7 @@
 |---|---|---|---|---|
 | R-024 | P0 group ownership mistaken for production IAM/SoD evidence | E05 uses trusted mock subject `scope_type/scope_id` for project-scoped VM groups and system-like admin paths for host/mixed groups. | Production federation/Keystone/IAM mapping must replace P0 mock scope and provide SoD evidence before pilot. | E05/E08/E12 |
 | R-025 | Dynamic group DSL becomes arbitrary query/code path | E05 compiler accepts only allowlisted JSON AST fields/operators, bounded depth and scalar values; no SQL/Jinja/Python/regex. | Add new fields only with schema/tests/index evidence and update ADR-010/risk register. | E05+ |
-| R-026 | Frontend group mutation controls lack CSRF on restored sessions | `/api/v1/session` does not return CSRF; E05 frontend exposes typed mutation wrappers but visible UI is list/detail/search/preview/filter only. | Add explicit CSRF refresh/session bootstrap contract before enabling create/update/add/remove controls after page reload. | E05/E06 |
+| R-026 | Frontend group mutation controls lack CSRF on restored sessions | E08.4 adds `/api/v1/session/csrf` and frontend restored-session CSRF bootstrap, so future group mutation controls can reuse the same BFF-only CSRF path. Visible group UI remains list/detail/search/preview/filter only in this slice. | Before enabling create/update/add/remove controls, add group-specific frontend tests for restored-session CSRF, idempotency keys, stale revision denial and backend authorization. | E05/E08 |
 | R-027 | Member idempotency model reused for destructive workflows | E05 stores HMAC key binding and request hash, including no-op add/remove, but same-key/same-payload replay is re-evaluated instead of served from a stored response snapshot. | Future destructive operations must store response/result snapshots or use operation table semantics before retry is allowed. | E05/E06 |
 | R-028 | Host group semantics overstate project ownership | Hypervisors are not project-owned in the read model; P0 host/mixed group management requires admin/system-like capability. | Keep host group mutations admin-only until a formal ownership/approval model exists. | E05/E06 |
 
@@ -48,7 +48,7 @@
 |---|---|---|---|---|
 | R-029 | P0 Mistral mock mistaken for production workflow safety | E06 proves durable operation/idempotency/outbox, worker duplicate-prevention and UI through `InMemoryMistralAdapter`. Optional all-in-one smoke is read-only workflow lookup and creates no execution. | Do not claim mutating production safety until approved test workflow, service identity, SIEM delivery, OpenStack policy evidence and rollback/cancel evidence exist. | E06/E08 |
 | R-033 | Cancel UI implies guaranteed abort | E06 exposes cancel route shape but backend returns `409 operation_not_cancelable` until Mistral state/cancel semantics are proven. | Keep cancel fail-closed; enable only per workflow definition/state with tests for partial effects and audit. | E06+ |
-| R-034 | Restored browser session cannot submit operation after reload | `/api/v1/session` does not return CSRF. Frontend disables operation submit unless login response provided in-memory CSRF. | Add explicit CSRF refresh/session bootstrap endpoint before relying on restored-session mutation UX. | E06/E08 |
+| R-034 | Restored browser session cannot submit operation after reload | E08.4 adds `GET /api/v1/session/csrf`, safe `401` denial for missing/revoked sessions and frontend restore-flow CSRF bootstrap. Existing operation submit can now use restored CSRF after reload without browser storage. | Production session persistence/key lifecycle, Vault/SecMan rotation ownership and Keystone/IdP lifetime alignment remain open. Evidence: `backend/tests/security/test_security_api.py`, `frontend/src/App.test.tsx`, `docs/generated/e08-session-token-protection.md`. | E06/E08 |
 | R-035 | Watcher/Masakari P0 placeholders overstate live integration | E06 P0 endpoints expose first-class status/risk/conflict markers but do not call live Watcher/Masakari adapters. | Add typed live adapters, contract fixtures and lab evidence before claiming service integration. | E06/E10 |
 | R-036 | Operation list leaks cross-scope data | E06 list endpoint filters by actor subject and session scope and uses signed cursor. Detail endpoint still relies on `operation.read` policy only. | Add operation ownership/scope checks to detail/cancel before shared operations or cross-operator views are enabled. | E06/E08 |
 
@@ -92,8 +92,8 @@
 
 ## Immediate priority order
 
-1. Continue E08 hardening slices without treating matrix/runbook evidence as live production proof.
+1. Continue E08 hardening slices without treating session bootstrap, matrix or runbook evidence as live production proof.
 2. Keep ADR-001/test federation, ADR-008 production SIEM, Vault/SecMan, IAM/PAM/SoD, PKI/mTLS,
    host audit and storage evidence as explicit external gaps.
-3. Do not treat E06 P0 mock, read-only Mistral smoke, E07 local audit sink, E08 Vault adapter
-   contract or E08 TLS matrix as proof of production mutating workflow safety.
+3. Do not treat E06 P0 mock, read-only Mistral smoke, E07 local audit sink, E08 CSRF bootstrap,
+   Vault adapter contract or E08 TLS matrix as proof of production mutating workflow safety.

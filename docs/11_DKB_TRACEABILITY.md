@@ -185,6 +185,30 @@ Evidence: `backend/tests/security/test_e08_security_docs.py`, `docs/generated/e0
 `docs/generated/tls-matrix.md`, `docs/generated/risk-register.md`,
 `docs/generated/network-flow-matrix.md` and ExecPlan `docs/execplans/E08-threat-model-tls.md`.
 
+## Обновление требований 2026-06-23: E08 session/token protection
+
+E08.4 добавляет безопасный CSRF bootstrap для восстановленной server-side browser session без
+заявления production-закрытия durable session storage или Vault rotation:
+
+- ДКБ-13/51: `GET /api/v1/session/csrf` возвращает только subject, CSRF and expiration для
+  authenticated BFF/API session. Тесты проверяют, что payload не содержит OpenStack/Vault/password/
+  private-key indicators, raw CSRF не пишется в audit metadata, а frontend не сохраняет CSRF/session
+  data в `localStorage` или `sessionStorage`.
+- ДКБ-20/21: logout/revoke/timeout semantics remain server-side. Missing, revoked or expired sessions
+  do not receive CSRF and return safe `401`; restored valid sessions can submit the existing operation
+  path only after receiving the CSRF value.
+- ДКБ-46-53: denial paths keep using sanitized session/audit events; the bootstrap endpoint itself does
+  not add a raw-token audit event. SIEM delivery, host audit and full external source coverage remain
+  E07/E12 evidence, not closed by this slice.
+- ДКБ-55/56: session/cursor key lifecycle still depends on Vault/SecMan ownership, rotation and
+  deployment evidence. E08.4 documents CSRF as a per-session runtime value, not a long-lived
+  Vault-managed secret.
+
+Evidence: `backend/tests/security/test_security_api.py`,
+`frontend/src/App.test.tsx`, `docs/generated/e08-session-token-protection.md`,
+`docs/generated/risk-register.md`, `docs/generated/secret-inventory.md` and ExecPlan
+`docs/execplans/E08-session-token-protection.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

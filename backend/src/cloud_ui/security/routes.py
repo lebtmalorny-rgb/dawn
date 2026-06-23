@@ -50,6 +50,12 @@ class CurrentSessionResponse(BaseModel):
     subject: SubjectPayload
 
 
+class CsrfBootstrapResponse(BaseModel):
+    subject: SubjectPayload
+    csrf: str
+    expires_at: datetime
+
+
 class CapabilitiesResponse(BaseModel):
     scope: dict[str, str | None]
     capabilities: list[str]
@@ -155,6 +161,17 @@ def build_security_router(services: SecurityServices) -> APIRouter:
         if isinstance(session, JSONResponse):
             return session
         return CurrentSessionResponse(subject=_subject_payload(session.subject))
+
+    @router.get("/session/csrf", response_model=CsrfBootstrapResponse)
+    def session_csrf(request: Request) -> CsrfBootstrapResponse | JSONResponse:
+        session = _require_session(services, request)
+        if isinstance(session, JSONResponse):
+            return session
+        return CsrfBootstrapResponse(
+            subject=_subject_payload(session.subject),
+            csrf=session.csrf,
+            expires_at=session.absolute_expires_at,
+        )
 
     @router.get("/capabilities", response_model=CapabilitiesResponse)
     def capabilities(request: Request) -> CapabilitiesResponse | JSONResponse:
