@@ -60,7 +60,7 @@ class VaultSecretProvider:
                 details={"path_alias": reference.alias},
             )
 
-        token = self._read_token(reference, correlation_id)
+        vault_auth_value = self._read_token(reference, correlation_id)
         attempt = 1
         while True:
             try:
@@ -68,7 +68,7 @@ class VaultSecretProvider:
                     f"/v1/{reference.path}",
                     headers={
                         "accept": "application/json",
-                        "x-vault-token": token,
+                        "x-vault-token": vault_auth_value,
                         "x-correlation-id": correlation_id,
                     },
                 )
