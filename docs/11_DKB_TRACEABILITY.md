@@ -279,6 +279,29 @@ Evidence: `backend/tests/security/test_e08_dkb_gaps.py`,
 `docs/generated/e08-dkb-gaps-waivers.md`, `docs/generated/risk-register.md` and ExecPlan
 `docs/execplans/E08-dkb-gaps-waivers.md`.
 
+## Обновление требований 2026-06-23: E08 security review
+
+E08.8 добавляет итоговый automated security review по `templates/SECURITY_REVIEW_TEMPLATE.md` without
+formal compliance approval:
+
+- Review decision is `Approved with conditions` for the portal-owned E08 hardening candidate, with
+  `Unresolved critical/high findings: 0` for the reviewed local code/docs scope.
+- ДКБ-13/51: review verifies no browser OpenStack/Vault token exposure, restored-session CSRF behavior,
+  canary redaction, secret scan and secret inventory evidence.
+- ДКБ-22.02/24/25: review keeps TLS/mTLS as matrix evidence plus external PKI/mTLS owner conditions;
+  no production protected-channel claim is made.
+- ДКБ-46-53: review accepts portal audit evidence for local scope and keeps SIEM/source onboarding,
+  host/container audit, retention and missing-flow alerts external.
+- ДКБ-55/56: review keeps Vault/SecMan adapter evidence separate from production SecMan acceptance and
+  all-secret rotation.
+- ДКБ-65/69/70/77/80: review verifies local container/supply-chain evidence and keeps SELinux,
+  formal ДКБ-69 waiver, corporate registry/signing, network-zone and unused-interface blocking as
+  external/deployment gates.
+
+Evidence: `backend/tests/security/test_e08_security_review.py`,
+`docs/generated/e08-security-review.md`, `docs/generated/risk-register.md` and ExecPlan
+`docs/execplans/E08-security-review.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |
