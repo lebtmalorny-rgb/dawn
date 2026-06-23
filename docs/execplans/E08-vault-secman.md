@@ -182,18 +182,35 @@ Markdown evidence under `docs/generated/`.
   warning/rule text and no actual values; `git diff --check` passed; `make security` failed on
   pre-existing Task 3 backend source line `backend/src/cloud_ui/secrets/vault.py:63`
   (`token = self._read_token(...)`), outside Task 4 ownership.
-- [ ] Optional lab runbook execution completed or explicitly skipped.
+- [x] 2026-06-23: Optional lab runbook execution explicitly skipped for this closeout because no
+  explicit approval was given to SSH to `192.168.10.15`; no remote inspection, installation,
+  deployment or mutation was executed. Evidence: this plan update and absence of a dated
+  `docs/generated/e08-vault-lab-*.md` live evidence file.
 - [x] 2026-06-23: Security gate scanner regression fixed. Evidence: RED `make security` failed on
   scanner false positive for local variable name in `backend/src/cloud_ui/secrets/vault.py:63`
   (`token = self._read_token(...)`); after renaming the local value used for the Vault auth header to
   a neutral name, `make security` passed.
-- [ ] Final verification completed.
+- [x] 2026-06-23: Final verification completed. Evidence:
+  `.venv/bin/python -m pytest tests/secrets tests/test_config.py tests/test_api_health.py -q` in
+  `backend` passed `38 passed in 0.49s`; initial `make lint` failed only because
+  `frontend/node_modules` was absent and `eslint` was not installed in this worktree; `npm install`
+  in `frontend` added 283 packages, found `0 vulnerabilities`, and emitted an `EBADENGINE` warning
+  because local Node was `v25.9.0` while the project declares `>=24 <25`; rerun `make lint` passed;
+  `make typecheck` passed with mypy `Success: no issues found in 83 source files` and frontend
+  `tsc -b`; `make test` passed backend `305 passed, 1 skipped in 3.98s` and frontend `34 passed`;
+  `make test-integration` passed `21 passed, 1 skipped in 0.05s`; `make security` passed;
+  `git diff --check` passed.
 
 ## Неожиданные открытия
 
 - 2026-06-23: `make security` initially failed on a scanner false positive for a benign local
   variable name in the Vault adapter. The scanner allowlist was not weakened; the local variable was
   renamed and the security gate passed.
+- 2026-06-23: `make lint` initially failed in this resumed worktree because frontend dependencies
+  were not installed (`eslint: command not found`). Root cause was environment setup, not the E08
+  code. Running `npm install` restored `node_modules`; the command warned that local Node `v25.9.0`
+  is outside the declared project engine `>=24 <25`, but all frontend lint/typecheck/test gates
+  passed after dependency installation.
 
 ## Журнал решений
 
@@ -1640,11 +1657,18 @@ approves destructive cleanup and the evidence has been sanitized.
 
 ## Итог и остаточные риски
 
-Implementation not started in this plan document. Expected residual risks after the first E08
-Vault/SecMan slice:
+The first E08 Vault/SecMan slice is implemented and locally verified. The branch adds the
+`cloud_ui.secrets` boundary, local provider, Vault HTTP adapter, Vault readiness integration,
+contract tests, generated Vault policy/runbook/evidence template, secret inventory updates and DKB
+traceability updates. No live Vault/SecMan endpoint was contacted during final closeout.
+
+Residual risks:
 
 - production SecMan endpoint/auth remains owner-provided;
 - corporate PKI and mTLS policy remain owner-provided;
+- optional lab inspection/deployment on `192.168.10.15` was skipped without explicit remote approval;
 - full Kolla/Ansible secret rotation remains E09/deployment-pipeline work;
 - Vault HA, backup/restore, auto-unseal/HSM and break-glass remain production hardening work;
+- local verification used Node `v25.9.0`, outside the declared frontend engine `>=24 <25`; gates
+  passed, but release/CI should use the declared Node 24 line;
 - ДКБ-55/56 are supported by portal contract/lab evidence, not fully closed.
