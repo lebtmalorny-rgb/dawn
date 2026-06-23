@@ -54,9 +54,8 @@ Expected: Git records a rename. No content change yet.
 Write exactly this file content:
 
 ```python
-from pathlib import Path
 import re
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CUSTOM_IMAGES = {"cloud-ui-backend", "cloud-ui-frontend"}
@@ -93,7 +92,9 @@ def test_kolla_build_config_declares_exactly_two_custom_images() -> None:
     assert "uid = 42424" in config
     assert "gid = 42424" in config
 
-    image_sections = set(re.findall(r"^\\[(cloud-ui-(?:backend|frontend))\\]$", config, re.MULTILINE))
+    image_sections = set(
+        re.findall(r"^\[(cloud-ui-(?:backend|frontend))\]$", config, re.MULTILINE)
+    )
     assert image_sections == CUSTOM_IMAGES
     assert "latest" not in config.lower()
 
