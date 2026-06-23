@@ -162,6 +162,29 @@ E08 добавляет контракт Vault/SecMan для портальных
 Residual gaps: corporate PKI, mTLS, HA Vault topology, backup/restore, auto-unseal/HSM, break-glass,
 production endpoint/auth and Kolla/service rotation are not closed by E08 Task 4 documentation.
 
+## Обновление требований 2026-06-23: E08 threat model и TLS/mTLS matrix
+
+E08.1/E08.2 добавляют структурированное security evidence без заявления production-закрытия:
+
+- ДКБ-22.02/23.02/24: `docs/generated/tls-matrix.md` теперь фиксирует per-flow TLS/mTLS decision,
+  CA/source, server identity check, client identity/authorization, rotation owner, negative test,
+  evidence and residual gap. Lab Kolla TLS evidence for VIP `192.168.10.250` remains lab-only and
+  does not replace corporate PKI, SCEP/NDES, mTLS authorization or production negative-certificate
+  tests.
+- ДКБ-42-44/80: `docs/generated/e08-threat-model.md` and
+  `docs/generated/network-flow-matrix.md` map trust boundaries and forbidden flows. Network/VLAN/ACL
+  proof remains E09/external evidence.
+- ДКБ-46-53: audit delivery threats now point to E07 portal audit evidence and explicitly keep SIEM
+  protected-channel mTLS/auth/retention and host audit/FIM as external controls.
+- ДКБ-55/56: the threat model references the E08 Vault/SecMan adapter/runbook evidence while keeping
+  full Kolla/OpenStack/MariaDB/RabbitMQ secret rotation as an E09/deployment-pipeline gap.
+- ДКБ-65/69/70/76/77: high residual risks are listed with owner and compensating controls. ДКБ-69 is
+  still a conflict for Python backend/OpenStack runtime and is not hidden by matrix documentation.
+
+Evidence: `backend/tests/security/test_e08_security_docs.py`, `docs/generated/e08-threat-model.md`,
+`docs/generated/tls-matrix.md`, `docs/generated/risk-register.md`,
+`docs/generated/network-flow-matrix.md` and ExecPlan `docs/execplans/E08-threat-model-tls.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |
