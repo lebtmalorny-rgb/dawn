@@ -90,7 +90,8 @@ Included:
 
 - [x] 2026-06-23: Исследование фактического состояния. Evidence: required E09 docs read; baseline
   commands above.
-- [ ] Контракт и RED tests.
+- [ ] Контракт и RED tests. In progress.
+  - 2026-06-24: RED `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` fails because E09.1 Kolla artifacts are absent.
 - [ ] Минимальная реализация.
 - [ ] Отрицательные сценарии и безопасность.
 - [ ] Интеграционные и пользовательские проверки.
