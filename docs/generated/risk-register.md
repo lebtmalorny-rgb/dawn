@@ -1,7 +1,7 @@
 # Актуальный реестр рисков
 
-- Stage: E08 Vault/SecMan evidence
-- Last updated: 2026-06-22
+- Stage: E08 threat/TLS evidence
+- Last updated: 2026-06-23
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
 ## Снятые или суженные решениями риски
@@ -65,7 +65,7 @@
 | ID | Риск | Текущее положение | Митигация | Stage |
 |---|---|---|---|---|
 | R-040 | ДКБ-07 service accounts conflict | Human access can use IdP; OpenStack/Kolla service accounts remain necessary. | Formal service-account exception, non-interactive controls, SIEM/audit evidence. | E12 |
-| R-041 | ДКБ-22.02 mTLS scope unclear | TLS matrix exists; E08 adds Vault server TLS contract, adapter CA verification tests and lab runbook, but mTLS decisions remain pending. | Per-flow mTLS decision, production PKI evidence, negative certificate tests, rotation/revoke evidence. | E08/E09 |
+| R-041 | ДКБ-22.02 mTLS scope unclear | E08 expands `docs/generated/tls-matrix.md` with per-flow TLS/mTLS, CA/source, identity, authorization, rotation owner, negative test and residual-gap fields. E08 also adds `docs/generated/e08-threat-model.md` to map weak-channel threats to controls/evidence. Vault server TLS contract, adapter CA verification tests and lab runbook are implemented, but live corporate PKI/mTLS decisions remain pending. | Per-flow owner decision, production PKI evidence, client certificate authorization, negative certificate tests, rotation/revoke evidence. | E08/E09 |
 | R-042 | ДКБ-50 full audit cannot be portal-only | Portal audit is scoped; host/libvirt/storage/IdP/SIEM sources external. | E07 creates portal audit; E12 maps external sources and gaps. | E07/E12 |
 | R-043 | ДКБ-55/56 Vault does not cover all Kolla secrets | E08 defines the portal Vault/SecMan contract, synthetic lab paths and `192.168.10.15` runbook; production SecMan endpoint/auth and full Kolla/service secret rotation remain open. | Separate Vault ADR/runbook execution, deployment pipeline integration and rotation/revoke evidence for Kolla, MariaDB, RabbitMQ and OpenStack service secrets. | E08/E09 |
 | R-044 | ДКБ-69 conflicts with Python runtime | Backend and OpenStack services require interpreters. | Minimal runtime, SBOM/scan, non-root, formal waiver/exception. | E08/E12 |
@@ -92,6 +92,8 @@
 
 ## Immediate priority order
 
-1. Finish E07 final verification and keep local/contract audit delivery separate from production SIEM evidence.
-2. Keep ADR-001/test federation, ADR-008 production SIEM, Vault/SecMan, IAM/PAM/SoD and host audit evidence as explicit external gaps.
-3. Do not treat E06 P0 mock, read-only Mistral smoke or E07 local audit sink as proof of production mutating workflow safety.
+1. Continue E08 hardening slices without treating matrix/runbook evidence as live production proof.
+2. Keep ADR-001/test federation, ADR-008 production SIEM, Vault/SecMan, IAM/PAM/SoD, PKI/mTLS,
+   host audit and storage evidence as explicit external gaps.
+3. Do not treat E06 P0 mock, read-only Mistral smoke, E07 local audit sink, E08 Vault adapter
+   contract or E08 TLS matrix as proof of production mutating workflow safety.
