@@ -1,7 +1,7 @@
 # Integration register
 
-- Stage: E07
-- Status: E07 adds portal audit repository/outbox, local test sink, Fluentd HTTP payload contract, audit search/export API and lab runbook; production SIEM/OpenSearch auth, mTLS, retention and live deployment remain pending
+- Stage: E08
+- Status: E08 adds Vault/SecMan adapter contract/readiness evidence and lab runbook; production endpoint/auth/rotation, SIEM mTLS and live deployment remain pending
 
 ## Integration summary
 
@@ -20,7 +20,7 @@
 | OpenStack notifications | read model acceleration | notification transport -> event consumer | E04/E07 | not bound in E04; reconciliation remains correctness authority and event acceleration requires contract/security review | Messaging/OpenStack owner |
 | MariaDB `cloud_ui` | portal state, sessions, read model, resource groups, operations, operation events/outbox and idempotency bindings | API/worker/events -> MariaDB | E01+ | E06 operation schema/repository/API contract implemented with local SQLite tests; production MariaDB deployment, migration run evidence and HA behavior remain pending | DB owner |
 | SIEM/test sink | authoritative audit delivery | audit worker -> local test sink / Fluentd HTTP contract / SIEM | E07/E08 | E07 implements `LocalTestAuditSink`, Fluentd HTTP payload contract, retry/dead-letter and heartbeat tests; all-in-one has `fluentd` running but OpenSearch/central logging disabled; production SIEM endpoint/auth/mTLS/retention pending | SIEM owner |
-| Vault (SecMan) | secret storage and lifecycle | backend/deploy -> Vault | E08 | product identified; endpoint/auth/path policy unknown | Vault owner |
+| Vault (SecMan) | secret storage and lifecycle | backend/deploy -> Vault | E08 | E08 adapter contract/readiness tests and lab endpoint `192.168.10.15` runbook; production endpoint/auth/rotation pending | Vault owner |
 | Corporate PKI | TLS/mTLS certificates | deploy/runtime -> PKI | E08/E09 | unknown | PKI owner |
 | Corporate registry | image storage/signing/scanning | deploy -> registry | E08/E09 | unknown | Supply-chain owner |
 | HAProxy/Kolla | same-origin routing/TLS | browser -> HAProxy -> frontend/API | E09 | lab TLS enabled on VIP `192.168.10.250`; live Keystone TLS verification OK with Kolla CA | Platform owner |

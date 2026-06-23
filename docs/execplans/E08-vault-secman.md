@@ -174,7 +174,14 @@ Markdown evidence under `docs/generated/`.
   token-file `OSError` to `SecretUnavailableError`, the same command passed `34 passed in 0.38s`;
   `cd backend && .venv/bin/python -m pytest tests/test_config.py tests/test_api_health.py tests/secrets -q`
   passed `38 passed in 0.39s`; Ruff, mypy, and `git diff --check` passed.
-- [ ] Documentation/evidence updated.
+- [x] 2026-06-23: Documentation/evidence updated. Evidence: created
+  `docs/generated/e08-vault-policy.hcl`, `docs/generated/e08-vault-lab-runbook.md` and
+  `docs/generated/e08-vault-evidence-template.md`; updated secret inventory, TLS matrix,
+  integration register, risk register and DKB traceability. Checks: `rg -n
+  "root token|unseal|private key|client token|BEGIN .*PRIVATE|DKB_CANARY" ...` returned only
+  warning/rule text and no actual values; `git diff --check` passed; `make security` failed on
+  pre-existing Task 3 backend source line `backend/src/cloud_ui/secrets/vault.py:63`
+  (`token = self._read_token(...)`), outside Task 4 ownership.
 - [ ] Optional lab runbook execution completed or explicitly skipped.
 - [ ] Final verification completed.
 

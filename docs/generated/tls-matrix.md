@@ -21,7 +21,7 @@
 | Portal -> MariaDB | TLS if supported by Kolla baseline | optional/client cert decision pending | internal CA | DB endpoint | E09 | DB TLS config and negative test if mTLS |
 | Portal -> RabbitMQ | TLS in production | optional/client cert decision pending | internal CA | broker endpoint | E09 | broker TLS config and negative test if mTLS |
 | Audit worker -> SIEM | TLS 1.2 | likely yes, pending SIEM contract | corporate PKI | SIEM endpoint + client identity | E07/E08 | delivery test and cert rejection |
-| Deploy/runtime -> Vault (SecMan) | TLS 1.2 | likely yes, pending Vault contract | corporate PKI | Vault endpoint + auth method | E08 | contract test and cert rejection |
+| Deploy/runtime -> Vault (SecMan) | TLS 1.2 | server TLS + Vault auth; mTLS pending owner decision | corporate/test PKI preferred; lab CA fallback is lab-only | Vault endpoint + auth method | E08 | E08 server TLS contract, adapter CA verification tests, lab runbook; mTLS pending owner decision |
 | Deploy -> registry | TLS 1.2 | policy pending | corporate PKI | registry endpoint | E08/E09 | pull/push by digest and scan |
 
 ## Open decisions

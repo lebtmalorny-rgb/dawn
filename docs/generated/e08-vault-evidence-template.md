@@ -1,0 +1,28 @@
+# E08 Vault/SecMan evidence template
+
+- Date:
+- Operator:
+- Host: `192.168.10.15`
+- Vault version:
+- Install source:
+- Binary/package checksum:
+- TLS CA type: corporate/test PKI or lab CA
+- CA fingerprint:
+- Certificate SANs:
+- TLS scan result:
+- Vault initialized: yes/no
+- Vault sealed: yes/no
+- Raft storage path: `/opt/vault/data`
+- Audit device: file `/var/log/vault/audit.log`
+- KV mount: `kv/`
+- Portal policy file: `docs/generated/e08-vault-policy.hcl`
+- Positive synthetic read: `kv/cloud-ui/local/session`, value not captured
+- Negative unrelated read: unrelated path denied
+- Notes:
+- Residual gaps:
+  - corporate PKI:
+  - mTLS:
+  - HA:
+  - backup/restore:
+  - auto-unseal/HSM:
+  - Kolla/service secret rotation:

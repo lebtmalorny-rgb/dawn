@@ -1,6 +1,6 @@
 # Актуальный реестр рисков
 
-- Stage: E07 Application audit
+- Stage: E08 Vault/SecMan evidence
 - Last updated: 2026-06-22
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
@@ -65,9 +65,9 @@
 | ID | Риск | Текущее положение | Митигация | Stage |
 |---|---|---|---|---|
 | R-040 | ДКБ-07 service accounts conflict | Human access can use IdP; OpenStack/Kolla service accounts remain necessary. | Formal service-account exception, non-interactive controls, SIEM/audit evidence. | E12 |
-| R-041 | ДКБ-22.02 mTLS scope unclear | TLS matrix exists, mTLS decisions pending. | Per-flow mTLS decision, negative certificate tests, rotation/revoke evidence. | E08/E09 |
+| R-041 | ДКБ-22.02 mTLS scope unclear | TLS matrix exists; E08 adds Vault server TLS contract, adapter CA verification tests and lab runbook, but mTLS decisions remain pending. | Per-flow mTLS decision, production PKI evidence, negative certificate tests, rotation/revoke evidence. | E08/E09 |
 | R-042 | ДКБ-50 full audit cannot be portal-only | Portal audit is scoped; host/libvirt/storage/IdP/SIEM sources external. | E07 creates portal audit; E12 maps external sources and gaps. | E07/E12 |
-| R-043 | ДКБ-55/56 Vault does not cover all Kolla secrets | Vault product identified; endpoint/auth/rotation unknown. | Separate Vault ADR/runbook and deployment pipeline evidence. | E08/E09 |
+| R-043 | ДКБ-55/56 Vault does not cover all Kolla secrets | E08 defines the portal Vault/SecMan contract, synthetic lab paths and `192.168.10.15` runbook; production SecMan endpoint/auth and full Kolla/service secret rotation remain open. | Separate Vault ADR/runbook execution, deployment pipeline integration and rotation/revoke evidence for Kolla, MariaDB, RabbitMQ and OpenStack service secrets. | E08/E09 |
 | R-044 | ДКБ-69 conflicts with Python runtime | Backend and OpenStack services require interpreters. | Minimal runtime, SBOM/scan, non-root, formal waiver/exception. | E08/E12 |
 | R-045 | ДКБ-72 storage architecture external | Portal cannot prove no hypervisor filesystem use. | Storage owner must provide Cinder/Ceph/Nova path evidence. | E12 |
 | R-046 | AIO lab evidence may not transfer to HA deployment | Current lab is all-in-one; production Kolla HA behavior differs. | E09/E10 must run HA/failover/load evidence in representative environment. | E09/E10 |
