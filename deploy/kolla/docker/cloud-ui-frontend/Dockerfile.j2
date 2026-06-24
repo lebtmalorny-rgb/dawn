@@ -1,0 +1,27 @@
+FROM {{ namespace }}/{{ image_prefix }}base:{{ tag }}
+
+ARG CLOUD_UI_SOURCE_PIN=unrecorded
+
+{% block labels %}
+LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build_date }}" \
+      org.opencontainers.image.title="cloud-ui-frontend" \
+      org.opencontainers.image.description="Cloud UI static frontend runtime" \
+      org.opencontainers.image.revision="${CLOUD_UI_SOURCE_PIN}"
+{% endblock %}
+
+{% import "macros.j2" as macros with context %}
+
+{{ macros.configure_user(name='cloudui') }}
+{{ macros.install_packages(['nginx']) }}
+
+COPY cloud-ui-frontend-source/frontend/dist /usr/share/nginx/html
+COPY cloud-ui-frontend-source/frontend/nginx.conf /etc/nginx/nginx.conf
+
+RUN mkdir -p /var/cache/nginx /var/run /var/log/kolla/cloud-ui-frontend \
+    && chown -R cloudui: /usr/share/nginx/html /var/cache/nginx /var/run /var/log/kolla/cloud-ui-frontend
+
+USER cloudui
+EXPOSE 8080
+CMD ["nginx", "-g", "daemon off;"]
+
+{% block footer %}{% endblock %}

@@ -1,0 +1,32 @@
+FROM {{ namespace }}/{{ image_prefix }}openstack-base:{{ tag }}
+
+ARG CLOUD_UI_SOURCE_PIN=unrecorded
+
+{% block labels %}
+LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build_date }}" \
+      org.opencontainers.image.title="cloud-ui-backend" \
+      org.opencontainers.image.description="Cloud UI backend runtime for API, worker, events, migration and smoke commands" \
+      org.opencontainers.image.revision="${CLOUD_UI_SOURCE_PIN}"
+{% endblock %}
+
+{% import "macros.j2" as macros with context %}
+
+{{ macros.configure_user(name='cloudui') }}
+
+RUN ln -s cloud-ui-backend-source/* /cloud-ui-backend \
+    && {{ macros.install_pip(['/cloud-ui-backend'] | customizable("pip_packages")) }} \
+    && mkdir -p /etc/cloud-ui /var/log/kolla/cloud-ui \
+    && chown -R cloudui: /etc/cloud-ui /var/log/kolla/cloud-ui
+
+USER cloudui
+EXPOSE 8080
+
+# Supported commands:
+# - cloud-ui api
+# - cloud-ui worker
+# - cloud-ui events
+# - cloud-ui db-upgrade
+# - cloud-ui smoke
+CMD ["cloud-ui", "api"]
+
+{% block footer %}{% endblock %}

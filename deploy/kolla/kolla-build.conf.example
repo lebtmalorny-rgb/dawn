@@ -1,0 +1,27 @@
+[DEFAULT]
+engine = podman
+base = rocky
+base_tag = 9
+openstack_release = 2025.1
+tag = 2025.1-rocky-9
+profile = cloud-ui
+namespace = cloud-ui-test
+image_prefix =
+maintainer = Cloud UI Platform Team <platform@example.invalid>
+
+[profiles]
+cloud-ui = cloud-ui-backend,cloud-ui-frontend
+
+[cloud-ui-backend]
+type = local
+location = /srv/kolla/cloud-ui/sources/backend
+reference = pinned-by-CLOUD_UI_SOURCE_PIN
+
+[cloud-ui-frontend]
+type = local
+location = /srv/kolla/cloud-ui/sources/frontend
+reference = pinned-by-CLOUD_UI_SOURCE_PIN
+
+[cloudui-user]
+uid = 42424
+gid = 42424

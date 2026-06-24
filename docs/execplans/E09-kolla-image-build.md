@@ -90,9 +90,14 @@ Included:
 
 - [x] 2026-06-23: Исследование фактического состояния. Evidence: required E09 docs read; baseline
   commands above.
-- [ ] Контракт и RED tests. In progress.
+- [x] Контракт и RED tests.
   - 2026-06-24: RED `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` fails because E09.1 Kolla artifacts are absent.
-- [ ] Минимальная реализация.
+- [ ] Минимальная реализация. In progress.
+  - 2026-06-24: Added `deploy/kolla/` build config, custom image templates, build wrapper and README.
+  - 2026-06-24: `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q`
+    reports 4 passed artifact assertions and 2 expected failures for missing
+    `docs/generated/e09-kolla-image-build.md`, which belongs to the evidence milestone.
+  - 2026-06-24: `git diff --check` passes.
 - [ ] Отрицательные сценарии и безопасность.
 - [ ] Интеграционные и пользовательские проверки.
 - [ ] Документация, evidence и review.
