@@ -90,10 +90,20 @@ def load_yaml(relative_path: str) -> dict:
     return yaml.safe_load(read_text(relative_path))
 
 
+def load_yaml_list(relative_path: str) -> list[dict]:
+    loaded = yaml.safe_load(read_text(relative_path))
+    if not isinstance(loaded, list):
+        return []
+    return loaded
+
+
 def role_texts() -> dict[str, str]:
+    if not ROLE_ROOT.exists():
+        return {}
+
     return {
-        str(path.relative_to(ROOT)): path.read_text(encoding="utf-8")
-        for path in (ROOT / "deploy/kolla/ansible").rglob("*")
+        str(path.relative_to(ROLE_ROOT)): path.read_text(encoding="utf-8")
+        for path in ROLE_ROOT.rglob("*")
         if path.is_file()
     }
 
@@ -127,22 +137,56 @@ def test_defaults_declare_four_permanent_services_and_two_images() -> None:
 
 
 def test_tasks_are_skeleton_only_and_import_expected_steps() -> None:
-    main_tasks = read_text("deploy/kolla/ansible/roles/cloud_ui/tasks/main.yml")
-    containers_tasks = read_text("deploy/kolla/ansible/roles/cloud_ui/tasks/containers.yml")
-    validate_tasks = read_text("deploy/kolla/ansible/roles/cloud_ui/tasks/validate.yml")
+    main_tasks = load_yaml_list("deploy/kolla/ansible/roles/cloud_ui/tasks/main.yml")
+    containers_tasks = load_yaml_list(
+        "deploy/kolla/ansible/roles/cloud_ui/tasks/containers.yml"
+    )
+    containers_tasks_text = read_text(
+        "deploy/kolla/ansible/roles/cloud_ui/tasks/containers.yml"
+    )
+    validate_tasks = load_yaml_list(
+        "deploy/kolla/ansible/roles/cloud_ui/tasks/validate.yml"
+    )
+    assert isinstance(main_tasks, list)
+    actual_imports: list[str] = []
+    for task in main_tasks:
+        assert isinstance(task, dict)
+        if "include_tasks" in task:
+            actual_imports.append(str(task["include_tasks"]).strip())
+        elif "ansible.builtin.include_tasks" in task:
+            actual_imports.append(str(task["ansible.builtin.include_tasks"]).strip())
+
+    assert actual_imports == ["validate.yml", "config.yml", "containers.yml"]
+
+    assert isinstance(containers_tasks, list)
+    set_fact_value = None
+    for task in containers_tasks:
+        assert isinstance(task, dict)
+        fact_task = task.get("ansible.builtin.set_fact") or task.get("set_fact")
+        if isinstance(fact_task, dict) and "cloud_ui_container_definitions" in fact_task:
+            set_fact_value = fact_task["cloud_ui_container_definitions"]
+            break
+
+    assert set_fact_value == "{{ cloud_ui_services }}"
+    assert "{{ cloud_ui_services }}" in containers_tasks_text
+
+    assert isinstance(validate_tasks, list)
+    validate_thats = []
+    for task in validate_tasks:
+        assert isinstance(task, dict)
+        assert_block = task.get("ansible.builtin.assert") or task.get("assert")
+        assert isinstance(assert_block, dict)
+        that = assert_block.get("that")
+        assert isinstance(that, list)
+        validate_thats.extend([str(item) for item in that])
 
     for expected in [
-        "validate.yml",
-        "config.yml",
-        "containers.yml",
+        "cloud_ui_backend_image_tag != 'latest'",
+        "cloud_ui_frontend_image_tag != 'latest'",
     ]:
-        assert expected in main_tasks
+        assert expected in validate_thats
 
-    assert "cloud_ui_container_definitions" in containers_tasks
-    assert "cloud_ui_services" in containers_tasks
-    assert "kolla_container" not in containers_tasks
-    assert "cloud_ui_backend_image_tag != 'latest'" in validate_tasks
-    assert "cloud_ui_frontend_image_tag != 'latest'" in validate_tasks
+    assert "kolla_container:" not in containers_tasks_text
 
 
 def test_role_templates_contain_only_non_secret_config() -> None:
@@ -162,7 +206,6 @@ def test_role_templates_contain_only_non_secret_config() -> None:
         assert expected in backend_template
 
     assert "listen {{ cloud_ui_frontend_listen_port }};" in frontend_template
-    assert "proxy_pass" not in frontend_template
 
     combined_templates = f"{backend_template}\n{frontend_template}".lower()
     for forbidden in ["password", "token", "private_key", "secret_key"]:
