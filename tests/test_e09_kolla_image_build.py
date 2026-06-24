@@ -89,6 +89,7 @@ def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
     normalized_template = template.lower()
     assert "node" not in normalized_template
     assert "npm" not in normalized_template
+    assert "COPY cloud-ui-frontend-source" not in template
 
 
 def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:

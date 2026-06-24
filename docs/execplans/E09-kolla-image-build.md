@@ -125,6 +125,8 @@ Included by the end of this E09.1 ExecPlan:
 - 2026-06-24: Stage Kolla source archives inside the custom templates with `ADD
   cloud-ui-*-archive /cloud-ui-*-source` before install/copy steps. Reason: the templates must not
   depend on undocumented pre-extracted build context state.
+- 2026-06-24: Copy frontend assets from the staged archive path inside the image instead of Docker
+  `COPY` from the build context. Reason: the archive pin must be the source of runtime files.
 
 ## Детальный план реализации
 

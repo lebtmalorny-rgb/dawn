@@ -145,6 +145,7 @@ def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
     normalized_template = template.lower()
     assert "node" not in normalized_template
     assert "npm" not in normalized_template
+    assert "COPY cloud-ui-frontend-source" not in template
 
 
 def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
@@ -276,7 +277,7 @@ LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build
 
 ADD cloud-ui-backend-archive /cloud-ui-backend-source
 
-RUN ln -s cloud-ui-backend-source/* /cloud-ui-backend \
+RUN ln -s /cloud-ui-backend-source/* /cloud-ui-backend \
     && {{ macros.install_pip(['/cloud-ui-backend'] | customizable("pip_packages")) }} \
     && mkdir -p /etc/cloud-ui /var/log/kolla/cloud-ui \
     && chown -R cloudui: /etc/cloud-ui /var/log/kolla/cloud-ui
@@ -318,10 +319,9 @@ LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build
 
 ADD cloud-ui-frontend-archive /cloud-ui-frontend-source
 
-COPY cloud-ui-frontend-source/frontend/dist /usr/share/nginx/html
-COPY cloud-ui-frontend-source/frontend/nginx.conf /etc/nginx/nginx.conf
-
 RUN mkdir -p /var/cache/nginx /var/run /var/log/kolla/cloud-ui-frontend \
+    && cp -a /cloud-ui-frontend-source/frontend/dist/. /usr/share/nginx/html/ \
+    && cp /cloud-ui-frontend-source/frontend/nginx.conf /etc/nginx/nginx.conf \
     && chown -R cloudui: /usr/share/nginx/html /var/cache/nginx /var/run /var/log/kolla/cloud-ui-frontend
 
 USER cloudui
