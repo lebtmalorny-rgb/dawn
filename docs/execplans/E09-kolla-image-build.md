@@ -30,15 +30,16 @@ Baseline commands before implementation:
 
 ## Scope
 
-Included:
+Included by the end of this E09.1 ExecPlan:
 
 - Rename and scope the old root Kolla test to E09.1.
 - Add Kolla Build config example for the two portal images.
 - Add custom Kolla `Dockerfile.j2` templates for backend/frontend.
 - Add a Bash build wrapper that requires explicit test registry, immutable tag and source pin and
   rejects `latest`.
-- Add generated evidence for E09.1.
-- Update ДКБ traceability and risk register.
+- Add generated evidence for E09.1 in the evidence milestone, not in the minimal-artifact milestone.
+- Update ДКБ traceability and risk register in the evidence milestone, not in the minimal-artifact
+  milestone.
 
 ## Non-goals
 
@@ -128,15 +129,15 @@ Included:
 2. Replace the test with E09.1 assertions for required files, exactly two image sections, one backend
    image, frontend static runtime, fail-closed script and evidence status.
 3. Run the targeted test and record the expected failure.
-4. Create `deploy/kolla/kolla-build.conf.example`.
-5. Create backend and frontend `Dockerfile.j2` templates.
-6. Create `deploy/kolla/scripts/build-images.sh` and make it executable.
-7. Create `deploy/kolla/README.md`.
-8. Create `docs/generated/e09-kolla-image-build.md`.
-9. Update `docs/generated/risk-register.md`.
-10. Update `docs/11_DKB_TRACEABILITY.md`.
-11. Run targeted tests and full relevant checks.
-12. Update this ExecPlan with command results and residual risks.
+4. Minimal-artifact milestone: create `deploy/kolla/kolla-build.conf.example`.
+5. Minimal-artifact milestone: create backend and frontend `Dockerfile.j2` templates.
+6. Minimal-artifact milestone: create `deploy/kolla/scripts/build-images.sh` and make it executable.
+7. Minimal-artifact milestone: create `deploy/kolla/README.md`.
+8. Evidence milestone: create `docs/generated/e09-kolla-image-build.md`.
+9. Evidence milestone: update `docs/generated/risk-register.md`.
+10. Evidence milestone: update `docs/11_DKB_TRACEABILITY.md`.
+11. Final verification milestone: run targeted tests and full relevant checks.
+12. Final verification milestone: update this ExecPlan with command results and residual risks.
 
 ## Миграции и совместимость
 
@@ -161,7 +162,7 @@ make security
 git diff --check
 ```
 
-Expected:
+Expected after the evidence milestone is complete:
 
 - targeted E09 test passes;
 - backend ruff passes;
@@ -171,6 +172,10 @@ Expected:
 - frontend typecheck passes;
 - backend and frontend tests pass;
 - no whitespace errors.
+
+Expected during the minimal-artifact milestone, before `docs/generated/e09-kolla-image-build.md`
+exists: `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` reports only the
+two evidence-document failures, while artifact assertions pass.
 
 Review commands:
 
@@ -185,7 +190,7 @@ proof is claimed.
 
 ## Доказательства
 
-Created or updated evidence:
+Created or updated evidence by the end of this E09.1 ExecPlan:
 
 - `tests/test_e09_kolla_image_build.py`
 - `deploy/kolla/README.md`
