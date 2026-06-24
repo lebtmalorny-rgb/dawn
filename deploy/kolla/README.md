@@ -21,10 +21,14 @@ Set these only in the test build environment:
 ```bash
 export CLOUD_UI_TEST_REGISTRY='registry.test.example.invalid/cloud-ui'
 export CLOUD_UI_IMAGE_TAG='2025.1-rocky-9-<git-sha>'
-export CLOUD_UI_SOURCE_PIN='<git-sha-or-source-archive-sha256>'
+export CLOUD_UI_SOURCE_PIN='<git-sha>'
+export CLOUD_UI_SOURCE_ROOT='/path/to/cloud-ui-git-checkout'
 ```
 
-The tag `latest` is rejected by `scripts/build-images.sh`.
+The tag `latest` is rejected by `scripts/build-images.sh`. The wrapper also verifies that
+`CLOUD_UI_SOURCE_ROOT` is a clean Git checkout whose `HEAD` equals `CLOUD_UI_SOURCE_PIN`, then renders
+a temporary Kolla config that points the backend and frontend source sections at that checked-out
+tree.
 
 ## Commands
 
@@ -48,6 +52,9 @@ deploy/kolla/scripts/build-images.sh push
 
 Record image digests, SBOM, vulnerability scan and signature evidence in
 `docs/generated/e09-kolla-image-build.md` after the live test registry flow is executed.
+
+Kolla Build turns each source section into an archive named after the image source section, so the
+templates intentionally use `ADD cloud-ui-backend-archive` and `ADD cloud-ui-frontend-archive`.
 
 ## Security Rules
 
