@@ -159,7 +159,9 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         "require_var CLOUD_UI_FRONTEND_DIST_ROOT",
         "require_var CLOUD_UI_FRONTEND_DIST_SHA256",
         "CONFIG_FILE=\"$KOLLA_DIR/kolla-build.conf.example\"",
+        "DOCKER_DIR=\"$KOLLA_DIR/docker\"",
         "KOLLA_BUILD_CONFIG override is not supported for E09.1",
+        "KOLLA_DOCKER_DIR override is not supported for E09.1",
         "git -C \"$SOURCE_ROOT\" rev-parse --is-inside-work-tree",
         "git -C \"$SOURCE_ROOT\" rev-parse --verify \"$CLOUD_UI_SOURCE_PIN^{commit}\"",
         "CLOUD_UI_FRONTEND_DIST_SHA256 does not match frontend dist",
@@ -190,6 +192,7 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
 
     assert "example.com" not in script
     assert 'CONFIG_FILE="${KOLLA_BUILD_CONFIG:-' not in script
+    assert 'DOCKER_DIR="${KOLLA_DOCKER_DIR:-' not in script
     assert "password" not in script.lower()
     assert "token" not in script.lower()
 
@@ -363,7 +366,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KOLLA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_FILE="$KOLLA_DIR/kolla-build.conf.example"
-DOCKER_DIR="${KOLLA_DOCKER_DIR:-$KOLLA_DIR/docker}"
+DOCKER_DIR="$KOLLA_DIR/docker"
 ACTION="${1:-build}"
 
 require_var() {
@@ -383,6 +386,11 @@ require_var CLOUD_UI_FRONTEND_DIST_SHA256
 
 if [ -n "${KOLLA_BUILD_CONFIG:-}" ]; then
     printf '%s\n' "KOLLA_BUILD_CONFIG override is not supported for E09.1" >&2
+    exit 2
+fi
+
+if [ -n "${KOLLA_DOCKER_DIR:-}" ]; then
+    printf '%s\n' "KOLLA_DOCKER_DIR override is not supported for E09.1" >&2
     exit 2
 fi
 
@@ -566,9 +574,10 @@ The tag `latest` is rejected by `scripts/build-images.sh`. The wrapper renders t
 directories from `git archive CLOUD_UI_SOURCE_PIN` for tracked backend/frontend files, verifies the
 prebuilt frontend `dist` directory against `CLOUD_UI_FRONTEND_DIST_SHA256`, copies that verified dist
 into the temporary frontend source tree, then renders a temporary Kolla config that points the backend
-and frontend source sections at those sanitized directories. `KOLLA_BUILD_CONFIG` overrides are not
-supported in E09.1; the wrapper always starts from the checked-in `kolla-build.conf.example` and
-validates the rendered source paths and resolved commit before invoking `kolla-build`.
+and frontend source sections at those sanitized directories. `KOLLA_BUILD_CONFIG` and
+`KOLLA_DOCKER_DIR` overrides are not supported in E09.1; the wrapper always starts from the checked-in
+`kolla-build.conf.example` and `deploy/kolla/docker`, then validates the rendered source paths and
+resolved commit before invoking `kolla-build`.
 
 ## Commands
 

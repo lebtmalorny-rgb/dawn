@@ -156,10 +156,11 @@ Included by the end of this E09.1 ExecPlan:
   `dist` directory before rendering source locations into a temporary Kolla config. Reason: revision
   labels alone do not make the build source reproducible, and ignored frontend build output must be
   verified explicitly.
-- 2026-06-24: Reject `KOLLA_BUILD_CONFIG` overrides in the E09.1 wrapper and validate the rendered
-  config contains the sanitized backend/frontend source paths and resolved commit. Reason: a custom
-  config can bypass source path substitution, so this slice uses the checked-in config as the only
-  template until a later deployment slice defines a reviewed config-extension mechanism.
+- 2026-06-24: Reject `KOLLA_BUILD_CONFIG` and `KOLLA_DOCKER_DIR` overrides in the E09.1 wrapper and
+  validate the rendered config contains the sanitized backend/frontend source paths and resolved
+  commit. Reason: custom config or template directories can bypass reviewed source/template
+  substitution, so this slice uses checked-in Kolla files until a later deployment slice defines a
+  reviewed extension mechanism.
 
 ## Детальный план реализации
 

@@ -103,7 +103,9 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         "require_var CLOUD_UI_FRONTEND_DIST_ROOT",
         "require_var CLOUD_UI_FRONTEND_DIST_SHA256",
         "CONFIG_FILE=\"$KOLLA_DIR/kolla-build.conf.example\"",
+        "DOCKER_DIR=\"$KOLLA_DIR/docker\"",
         "KOLLA_BUILD_CONFIG override is not supported for E09.1",
+        "KOLLA_DOCKER_DIR override is not supported for E09.1",
         "git -C \"$SOURCE_ROOT\" rev-parse --is-inside-work-tree",
         "git -C \"$SOURCE_ROOT\" rev-parse --verify \"$CLOUD_UI_SOURCE_PIN^{commit}\"",
         "CLOUD_UI_FRONTEND_DIST_SHA256 does not match frontend dist",
@@ -134,6 +136,7 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
 
     assert "example.com" not in script
     assert 'CONFIG_FILE="${KOLLA_BUILD_CONFIG:-' not in script
+    assert 'DOCKER_DIR="${KOLLA_DOCKER_DIR:-' not in script
     assert "password" not in script.lower()
     assert "token" not in script.lower()
 

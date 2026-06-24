@@ -315,8 +315,8 @@ registry/deployment compliance:
   source pin, rejects `latest`, and provides the push-by-registry contract. Actual corporate test
   registry push, digest, SBOM, scanner and signature evidence remain pending external evidence.
   The wrapper builds Kolla source directories from a pinned Git archive and separately verifies the
-  prebuilt frontend dist hash, rejects custom Kolla config overrides, and validates rendered source
-  paths before invoking `kolla-build`.
+  prebuilt frontend dist hash, rejects custom Kolla config/template overrides, and validates rendered
+  source paths before invoking `kolla-build`.
 - ДКБ-76/77/80: `deploy/kolla/README.md` documents image build interfaces and non-goals. Runtime
   Kolla-Ansible container inspection, network ACLs, management-zone placement, disabled unused
   interfaces, HAProxy/TLS and rollback proof remain E09.2-E09.8.

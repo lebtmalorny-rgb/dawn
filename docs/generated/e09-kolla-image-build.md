@@ -32,8 +32,8 @@ Required operator inputs:
 It also renders tracked backend/frontend source trees from `git archive CLOUD_UI_SOURCE_PIN`, verifies
 the prebuilt frontend `dist` directory against `CLOUD_UI_FRONTEND_DIST_SHA256`, and renders a temporary
 Kolla config that points backend and frontend source sections at those sanitized directories.
-`KOLLA_BUILD_CONFIG` overrides are rejected in this slice, and the wrapper validates the rendered
-source paths and resolved commit before invoking `kolla-build`.
+`KOLLA_BUILD_CONFIG` and `KOLLA_DOCKER_DIR` overrides are rejected in this slice, and the wrapper
+validates the rendered source paths and resolved commit before invoking `kolla-build`.
 
 ## Commands
 
@@ -63,8 +63,8 @@ repository-only slice.
   This is not closed without a formal waiver and approved scanner/signing evidence.
 - ДКБ-70: the repository now has a corporate test registry build/push contract, but live registry
   evidence remains pending. The wrapper builds Kolla source directories from a pinned Git archive and
-  separately verifies the prebuilt frontend dist hash, rejects custom Kolla config overrides, and
-  validates rendered source paths before invoking `kolla-build`.
+  separately verifies the prebuilt frontend dist hash, rejects custom Kolla config/template overrides,
+  and validates rendered source paths before invoking `kolla-build`.
 - ДКБ-76/77/80: deployment image interfaces are documented. Network ACLs, management-zone placement,
   disabled unused interfaces and runtime Kolla inspection remain later E09 evidence.
 - ДКБ-55/56: no secrets are stored in the build contract. Secret injection and rotation remain

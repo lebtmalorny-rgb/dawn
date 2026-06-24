@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KOLLA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_FILE="$KOLLA_DIR/kolla-build.conf.example"
-DOCKER_DIR="${KOLLA_DOCKER_DIR:-$KOLLA_DIR/docker}"
+DOCKER_DIR="$KOLLA_DIR/docker"
 ACTION="${1:-build}"
 
 require_var() {
@@ -24,6 +24,11 @@ require_var CLOUD_UI_FRONTEND_DIST_SHA256
 
 if [ -n "${KOLLA_BUILD_CONFIG:-}" ]; then
     printf '%s\n' "KOLLA_BUILD_CONFIG override is not supported for E09.1" >&2
+    exit 2
+fi
+
+if [ -n "${KOLLA_DOCKER_DIR:-}" ]; then
+    printf '%s\n' "KOLLA_DOCKER_DIR override is not supported for E09.1" >&2
     exit 2
 fi
 
