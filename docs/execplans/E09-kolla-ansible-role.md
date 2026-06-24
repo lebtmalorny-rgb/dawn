@@ -108,7 +108,11 @@ Included in E09.2:
   - 2026-06-24: `cd backend && .venv/bin/python -m ruff check ../tests/test_e09_kolla_ansible_role.py`
     -> passed.
   - 2026-06-24: Spec compliance review and code quality review approved Task 1 in RED state.
-- [ ] Minimal role skeleton.
+- [x] 2026-06-24: Minimal role skeleton.
+  - Created `deploy/kolla/ansible/README.md` and complete `deploy/kolla/ansible/roles/cloud_ui` task/defaults/handler/template
+    skeleton.
+  - Targeted test: `backend/.venv/bin/python -m pytest tests/test_e09_kolla_ansible_role.py -q`
+    -> 3 failed assertions, all in evidence/test-evidence glue assertions (no structure/contract failures).
 - [ ] Evidence, DKB traceability and risk register.
 - [ ] Final verification and review.
 

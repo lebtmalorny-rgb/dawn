@@ -1,0 +1,11 @@
+---
+- name: Validate Cloud UI role inputs
+  ansible.builtin.include_tasks: validate.yml
+
+- name: Prepare Cloud UI config templates
+  ansible.builtin.include_tasks: config.yml
+  when: cloud_ui_enabled | bool
+
+- name: Define Cloud UI container data
+  ansible.builtin.include_tasks: containers.yml
+  when: cloud_ui_enabled | bool

@@ -1,0 +1,4 @@
+---
+- name: Publish Cloud UI container definitions for later Kolla deployment tasks
+  ansible.builtin.set_fact:
+    cloud_ui_container_definitions: "{{ cloud_ui_services }}"

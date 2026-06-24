@@ -1,0 +1,25 @@
+---
+- name: Ensure Cloud UI config directories exist
+  ansible.builtin.file:
+    path: "{{ cloud_ui_config_root }}/{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - cloud-ui-backend
+    - cloud-ui-frontend
+
+- name: Render Cloud UI backend non-secret environment
+  ansible.builtin.template:
+    src: cloud-ui-backend.env.j2
+    dest: "{{ cloud_ui_config_root }}/cloud-ui-backend/cloud-ui-backend.env"
+    mode: "0640"
+  notify:
+    - Restart Cloud UI containers
+
+- name: Render Cloud UI frontend runtime config
+  ansible.builtin.template:
+    src: cloud-ui-frontend.conf.j2
+    dest: "{{ cloud_ui_config_root }}/cloud-ui-frontend/nginx.conf"
+    mode: "0640"
+  notify:
+    - Restart Cloud UI containers

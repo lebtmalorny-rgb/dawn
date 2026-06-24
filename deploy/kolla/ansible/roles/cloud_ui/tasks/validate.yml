@@ -1,0 +1,21 @@
+---
+- name: Reject mutable Cloud UI image tags
+  ansible.builtin.assert:
+    that:
+      - cloud_ui_backend_image_tag != 'latest'
+      - cloud_ui_frontend_image_tag != 'latest'
+    fail_msg: "Cloud UI images must not use the latest tag."
+
+- name: Validate Cloud UI service count
+  ansible.builtin.assert:
+    that:
+      - cloud_ui_services | length == cloud_ui_permanent_container_count_per_node
+      - cloud_ui_permanent_container_count_per_node == 4
+    fail_msg: "Cloud UI must declare exactly four permanent services per node."
+
+- name: Validate Cloud UI image names
+  ansible.builtin.assert:
+    that:
+      - cloud_ui_backend_image == 'cloud-ui-backend'
+      - cloud_ui_frontend_image == 'cloud-ui-frontend'
+    fail_msg: "Cloud UI must keep the E09 two-image contract."

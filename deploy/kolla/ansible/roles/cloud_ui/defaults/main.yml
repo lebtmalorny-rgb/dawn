@@ -1,0 +1,98 @@
+---
+cloud_ui_enabled: false
+
+cloud_ui_config_version: "e09.2-role-skeleton"
+cloud_ui_public_base_url: "/"
+cloud_ui_log_level: "INFO"
+
+cloud_ui_permanent_container_count_per_node: 4
+
+cloud_ui_frontend_group: "cloud-ui-frontend"
+cloud_ui_api_group: "cloud-ui-api"
+cloud_ui_worker_group: "cloud-ui-worker"
+cloud_ui_events_group: "cloud-ui-events"
+
+cloud_ui_registry: "{{ kolla_internal_fqdn | default('registry.test.example.invalid/cloud-ui') }}"
+cloud_ui_backend_image: "cloud-ui-backend"
+cloud_ui_frontend_image: "cloud-ui-frontend"
+cloud_ui_backend_image_tag: "{{ openstack_tag | default('2025.1-rocky-9') }}"
+cloud_ui_frontend_image_tag: "{{ openstack_tag | default('2025.1-rocky-9') }}"
+cloud_ui_backend_image_digest: ""
+cloud_ui_frontend_image_digest: ""
+cloud_ui_backend_image_full: "{{ cloud_ui_registry }}/{{ cloud_ui_backend_image }}{% if cloud_ui_backend_image_digest | length > 0 %}@{{ cloud_ui_backend_image_digest }}{% else %}:{{ cloud_ui_backend_image_tag }}{% endif %}"
+cloud_ui_frontend_image_full: "{{ cloud_ui_registry }}/{{ cloud_ui_frontend_image }}{% if cloud_ui_frontend_image_digest | length > 0 %}@{{ cloud_ui_frontend_image_digest }}{% else %}:{{ cloud_ui_frontend_image_tag }}{% endif %}"
+
+cloud_ui_config_root: "{{ node_config_directory | default('/etc/kolla') }}"
+cloud_ui_container_config_directory: "{{ container_config_directory | default('/var/lib/kolla/config_files') }}"
+cloud_ui_log_volume: "kolla_logs"
+
+cloud_ui_backend_listen_port: 8080
+cloud_ui_frontend_listen_port: 8080
+
+cloud_ui_backend_dimensions:
+  cap_drop:
+    - ALL
+  read_only: true
+  pids_limit: 512
+  ulimits:
+    nofile:
+      soft: 65536
+      hard: 65536
+
+cloud_ui_frontend_dimensions:
+  cap_drop:
+    - ALL
+  read_only: true
+  pids_limit: 256
+  ulimits:
+    nofile:
+      soft: 65536
+      hard: 65536
+
+cloud_ui_services:
+  cloud_ui_frontend:
+    container_name: "cloud_ui_frontend"
+    group: "{{ cloud_ui_frontend_group }}"
+    enabled: "{{ cloud_ui_enabled }}"
+    image: "{{ cloud_ui_frontend_image_full }}"
+    command: "nginx -g 'daemon off;'"
+    listen_port: "{{ cloud_ui_frontend_listen_port }}"
+    config_dir: "cloud-ui-frontend"
+    dimensions: "{{ cloud_ui_frontend_dimensions }}"
+    volumes:
+      - "{{ cloud_ui_config_root }}/cloud-ui-frontend/:{{ cloud_ui_container_config_directory }}/:ro"
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla/"
+  cloud_ui_api:
+    container_name: "cloud_ui_api"
+    group: "{{ cloud_ui_api_group }}"
+    enabled: "{{ cloud_ui_enabled }}"
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui api"
+    listen_port: "{{ cloud_ui_backend_listen_port }}"
+    config_dir: "cloud-ui-backend"
+    dimensions: "{{ cloud_ui_backend_dimensions }}"
+    volumes:
+      - "{{ cloud_ui_config_root }}/cloud-ui-backend/:{{ cloud_ui_container_config_directory }}/:ro"
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla/"
+  cloud_ui_worker:
+    container_name: "cloud_ui_worker"
+    group: "{{ cloud_ui_worker_group }}"
+    enabled: "{{ cloud_ui_enabled }}"
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui worker"
+    config_dir: "cloud-ui-backend"
+    dimensions: "{{ cloud_ui_backend_dimensions }}"
+    volumes:
+      - "{{ cloud_ui_config_root }}/cloud-ui-backend/:{{ cloud_ui_container_config_directory }}/:ro"
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla/"
+  cloud_ui_events:
+    container_name: "cloud_ui_events"
+    group: "{{ cloud_ui_events_group }}"
+    enabled: "{{ cloud_ui_enabled }}"
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui events"
+    config_dir: "cloud-ui-backend"
+    dimensions: "{{ cloud_ui_backend_dimensions }}"
+    volumes:
+      - "{{ cloud_ui_config_root }}/cloud-ui-backend/:{{ cloud_ui_container_config_directory }}/:ro"
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla/"
