@@ -165,6 +165,7 @@ def test_role_templates_contain_only_non_secret_config() -> None:
 
 
 def test_role_scope_excludes_later_e09_work() -> None:
+    assert ROLE_ROOT.exists(), ROLE_ROOT
     combined_role = "\n".join(role_texts().values()).lower()
 
     for forbidden in [
