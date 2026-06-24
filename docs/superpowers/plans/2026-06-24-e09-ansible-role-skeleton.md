@@ -442,7 +442,6 @@ Create `deploy/kolla/ansible/roles/cloud_ui/tasks/main.yml`:
 
 - name: Define Cloud UI container data
   ansible.builtin.include_tasks: containers.yml
-  when: cloud_ui_enabled | bool
 ```
 
 Create `deploy/kolla/ansible/roles/cloud_ui/tasks/validate.yml`:
@@ -527,7 +526,7 @@ Create `deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-backend.env.j2`:
 CLOUD_UI_CONFIG_VERSION={{ cloud_ui_config_version }}
 CLOUD_UI_PUBLIC_BASE_URL={{ cloud_ui_public_base_url }}
 CLOUD_UI_LOG_LEVEL={{ cloud_ui_log_level }}
-CLOUD_UI_BACKEND_ROLE={{ item.key | default('cloud_ui_backend') }}
+CLOUD_UI_BACKEND_ROLE=cloud_ui_backend
 ```
 
 Create `deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-frontend.conf.j2`:

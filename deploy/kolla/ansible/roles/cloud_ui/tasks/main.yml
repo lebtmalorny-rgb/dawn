@@ -8,4 +8,3 @@
 
 - name: Define Cloud UI container data
   ansible.builtin.include_tasks: containers.yml
-  when: cloud_ui_enabled | bool
