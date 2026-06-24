@@ -101,7 +101,13 @@ Included in E09.2:
 - [x] 2026-06-24: E09.2 design approved and committed in
   docs/superpowers/specs/2026-06-24-e09-ansible-role-skeleton-design.md.
 - [x] 2026-06-24: Worktree bootstrapped. Baseline targeted E09.1 test and shell syntax checks passed.
-- [ ] Contract and RED tests.
+- [x] Contract and RED tests.
+  - 2026-06-24: Added `tests/test_e09_kolla_ansible_role.py`.
+  - 2026-06-24: `backend/.venv/bin/python -m pytest tests/test_e09_kolla_ansible_role.py -q`
+    -> 6 expected RED failures for missing role/evidence files; no syntax/import failures.
+  - 2026-06-24: `cd backend && .venv/bin/python -m ruff check ../tests/test_e09_kolla_ansible_role.py`
+    -> passed.
+  - 2026-06-24: Spec compliance review and code quality review approved Task 1 in RED state.
 - [ ] Minimal role skeleton.
 - [ ] Evidence, DKB traceability and risk register.
 - [ ] Final verification and review.
