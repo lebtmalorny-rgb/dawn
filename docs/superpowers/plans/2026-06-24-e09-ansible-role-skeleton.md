@@ -434,14 +434,14 @@ Create `deploy/kolla/ansible/roles/cloud_ui/tasks/main.yml`:
 ```yaml
 ---
 - name: Validate Cloud UI role inputs
-  ansible.builtin.import_tasks: validate.yml
+  ansible.builtin.include_tasks: validate.yml
 
 - name: Prepare Cloud UI config templates
-  ansible.builtin.import_tasks: config.yml
+  ansible.builtin.include_tasks: config.yml
   when: cloud_ui_enabled | bool
 
 - name: Define Cloud UI container data
-  ansible.builtin.import_tasks: containers.yml
+  ansible.builtin.include_tasks: containers.yml
   when: cloud_ui_enabled | bool
 ```
 
