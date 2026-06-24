@@ -31,7 +31,9 @@ The tag `latest` is rejected by `scripts/build-images.sh`. The wrapper renders t
 directories from `git archive CLOUD_UI_SOURCE_PIN` for tracked backend/frontend files, verifies the
 prebuilt frontend `dist` directory against `CLOUD_UI_FRONTEND_DIST_SHA256`, copies that verified dist
 into the temporary frontend source tree, then renders a temporary Kolla config that points the backend
-and frontend source sections at those sanitized directories.
+and frontend source sections at those sanitized directories. `KOLLA_BUILD_CONFIG` overrides are not
+supported in E09.1; the wrapper always starts from the checked-in `kolla-build.conf.example` and
+validates the rendered source paths and resolved commit before invoking `kolla-build`.
 
 ## Commands
 

@@ -158,6 +158,8 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         "require_var CLOUD_UI_SOURCE_ROOT",
         "require_var CLOUD_UI_FRONTEND_DIST_ROOT",
         "require_var CLOUD_UI_FRONTEND_DIST_SHA256",
+        "CONFIG_FILE=\"$KOLLA_DIR/kolla-build.conf.example\"",
+        "KOLLA_BUILD_CONFIG override is not supported for E09.1",
         "git -C \"$SOURCE_ROOT\" rev-parse --is-inside-work-tree",
         "git -C \"$SOURCE_ROOT\" rev-parse --verify \"$CLOUD_UI_SOURCE_PIN^{commit}\"",
         "CLOUD_UI_FRONTEND_DIST_SHA256 does not match frontend dist",
@@ -167,6 +169,12 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         "awk -v backend_source=\"$SOURCE_BUILD_ROOT/backend\"",
         "location = \" backend_source",
         "reference = \" source_pin",
+        "grep -Fx \"location = $SOURCE_BUILD_ROOT/backend\"",
+        "grep -Fx \"location = $SOURCE_BUILD_ROOT/frontend\"",
+        "REFERENCE_COUNT=\"$(awk -v expected=\"reference = $SOURCE_PIN_COMMIT\"",
+        "Rendered Kolla config did not record the resolved source pin twice",
+        "Rendered Kolla config still contains default mutable source paths",
+        "Rendered Kolla config still contains unresolved source pin placeholders",
         "CLOUD_UI_IMAGE_TAG must not be latest",
         "--config-file \"$CONFIG_FILE\"",
         "--docker-dir \"$DOCKER_DIR\"",
@@ -181,6 +189,7 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         assert expected in script
 
     assert "example.com" not in script
+    assert 'CONFIG_FILE="${KOLLA_BUILD_CONFIG:-' not in script
     assert "password" not in script.lower()
     assert "token" not in script.lower()
 
@@ -353,7 +362,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KOLLA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-CONFIG_FILE="${KOLLA_BUILD_CONFIG:-$KOLLA_DIR/kolla-build.conf.example}"
+CONFIG_FILE="$KOLLA_DIR/kolla-build.conf.example"
 DOCKER_DIR="${KOLLA_DOCKER_DIR:-$KOLLA_DIR/docker}"
 ACTION="${1:-build}"
 
@@ -371,6 +380,11 @@ require_var CLOUD_UI_SOURCE_PIN
 require_var CLOUD_UI_SOURCE_ROOT
 require_var CLOUD_UI_FRONTEND_DIST_ROOT
 require_var CLOUD_UI_FRONTEND_DIST_SHA256
+
+if [ -n "${KOLLA_BUILD_CONFIG:-}" ]; then
+    printf '%s\n' "KOLLA_BUILD_CONFIG override is not supported for E09.1" >&2
+    exit 2
+fi
 
 if [ "$CLOUD_UI_IMAGE_TAG" = "latest" ]; then
     printf '%s\n' "CLOUD_UI_IMAGE_TAG must not be latest" >&2
@@ -449,6 +463,36 @@ awk -v backend_source="$SOURCE_BUILD_ROOT/backend" \
     }
     { print }
 ' "$CONFIG_FILE" > "$RENDERED_CONFIG"
+
+if ! grep -Fx "location = $SOURCE_BUILD_ROOT/backend" "$RENDERED_CONFIG" >/dev/null; then
+    printf '%s\n' "Rendered Kolla config did not point backend source at sanitized archive" >&2
+    exit 2
+fi
+
+if ! grep -Fx "location = $SOURCE_BUILD_ROOT/frontend" "$RENDERED_CONFIG" >/dev/null; then
+    printf '%s\n' "Rendered Kolla config did not point frontend source at sanitized archive" >&2
+    exit 2
+fi
+
+REFERENCE_COUNT="$(awk -v expected="reference = $SOURCE_PIN_COMMIT" '
+    $0 == expected { count++ }
+    END { print count + 0 }
+' "$RENDERED_CONFIG")"
+if [ "$REFERENCE_COUNT" -ne 2 ]; then
+    printf '%s\n' "Rendered Kolla config did not record the resolved source pin twice" >&2
+    exit 2
+fi
+
+if grep -F "location = /srv/kolla/cloud-ui/sources/" "$RENDERED_CONFIG" >/dev/null; then
+    printf '%s\n' "Rendered Kolla config still contains default mutable source paths" >&2
+    exit 2
+fi
+
+if grep -F "reference = pinned-by-CLOUD_UI_SOURCE_PIN" "$RENDERED_CONFIG" >/dev/null; then
+    printf '%s\n' "Rendered Kolla config still contains unresolved source pin placeholders" >&2
+    exit 2
+fi
+
 CONFIG_FILE="$RENDERED_CONFIG"
 
 COMMON_ARGS=(
@@ -512,10 +556,19 @@ Set these only in the test build environment:
 ```bash
 export CLOUD_UI_TEST_REGISTRY='registry.test.example.invalid/cloud-ui'
 export CLOUD_UI_IMAGE_TAG='2025.1-rocky-9-<git-sha>'
-export CLOUD_UI_SOURCE_PIN='<git-sha-or-source-archive-sha256>'
+export CLOUD_UI_SOURCE_PIN='<git-sha>'
+export CLOUD_UI_SOURCE_ROOT='/path/to/cloud-ui-git-checkout'
+export CLOUD_UI_FRONTEND_DIST_ROOT='/path/to/prebuilt/frontend-dist'
+export CLOUD_UI_FRONTEND_DIST_SHA256='<directory-sha256>'
 ```
 
-The tag `latest` is rejected by `scripts/build-images.sh`.
+The tag `latest` is rejected by `scripts/build-images.sh`. The wrapper renders temporary source
+directories from `git archive CLOUD_UI_SOURCE_PIN` for tracked backend/frontend files, verifies the
+prebuilt frontend `dist` directory against `CLOUD_UI_FRONTEND_DIST_SHA256`, copies that verified dist
+into the temporary frontend source tree, then renders a temporary Kolla config that points the backend
+and frontend source sections at those sanitized directories. `KOLLA_BUILD_CONFIG` overrides are not
+supported in E09.1; the wrapper always starts from the checked-in `kolla-build.conf.example` and
+validates the rendered source paths and resolved commit before invoking `kolla-build`.
 
 ## Commands
 

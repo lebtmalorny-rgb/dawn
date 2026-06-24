@@ -102,6 +102,8 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         "require_var CLOUD_UI_SOURCE_ROOT",
         "require_var CLOUD_UI_FRONTEND_DIST_ROOT",
         "require_var CLOUD_UI_FRONTEND_DIST_SHA256",
+        "CONFIG_FILE=\"$KOLLA_DIR/kolla-build.conf.example\"",
+        "KOLLA_BUILD_CONFIG override is not supported for E09.1",
         "git -C \"$SOURCE_ROOT\" rev-parse --is-inside-work-tree",
         "git -C \"$SOURCE_ROOT\" rev-parse --verify \"$CLOUD_UI_SOURCE_PIN^{commit}\"",
         "CLOUD_UI_FRONTEND_DIST_SHA256 does not match frontend dist",
@@ -111,6 +113,12 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         "awk -v backend_source=\"$SOURCE_BUILD_ROOT/backend\"",
         "location = \" backend_source",
         "reference = \" source_pin",
+        "grep -Fx \"location = $SOURCE_BUILD_ROOT/backend\"",
+        "grep -Fx \"location = $SOURCE_BUILD_ROOT/frontend\"",
+        "REFERENCE_COUNT=\"$(awk -v expected=\"reference = $SOURCE_PIN_COMMIT\"",
+        "Rendered Kolla config did not record the resolved source pin twice",
+        "Rendered Kolla config still contains default mutable source paths",
+        "Rendered Kolla config still contains unresolved source pin placeholders",
         "CLOUD_UI_IMAGE_TAG must not be latest",
         "--config-file \"$CONFIG_FILE\"",
         "--docker-dir \"$DOCKER_DIR\"",
@@ -125,6 +133,7 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         assert expected in script
 
     assert "example.com" not in script
+    assert 'CONFIG_FILE="${KOLLA_BUILD_CONFIG:-' not in script
     assert "password" not in script.lower()
     assert "token" not in script.lower()
 
