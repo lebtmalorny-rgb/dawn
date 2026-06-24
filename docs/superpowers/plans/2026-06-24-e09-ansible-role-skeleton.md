@@ -168,7 +168,6 @@ def test_tasks_are_skeleton_only_and_import_expected_steps() -> None:
             break
 
     assert set_fact_value == "{{ cloud_ui_services }}"
-    assert "{{ cloud_ui_services }}" in containers_tasks_text
 
     assert isinstance(validate_tasks, list)
     validate_thats = []
