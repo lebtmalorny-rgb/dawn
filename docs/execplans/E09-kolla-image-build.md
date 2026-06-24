@@ -122,6 +122,9 @@ Included by the end of this E09.1 ExecPlan:
 - 2026-06-23: Rename the legacy `E015` root test to E09.1 instead of satisfying its old lab playbook
   expectations. Reason: E09.1 scope is image build only; role/deploy/rollback playbooks belong to
   later E09 slices.
+- 2026-06-24: Stage Kolla source archives inside the custom templates with `ADD
+  cloud-ui-*-archive /cloud-ui-*-source` before install/copy steps. Reason: the templates must not
+  depend on undocumented pre-extracted build context state.
 
 ## Детальный план реализации
 

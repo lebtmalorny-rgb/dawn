@@ -13,6 +13,8 @@ LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build
 
 {{ macros.configure_user(name='cloudui') }}
 
+ADD cloud-ui-backend-archive /cloud-ui-backend-source
+
 RUN ln -s cloud-ui-backend-source/* /cloud-ui-backend \
     && {{ macros.install_pip(['/cloud-ui-backend'] | customizable("pip_packages")) }} \
     && mkdir -p /etc/cloud-ui /var/log/kolla/cloud-ui \

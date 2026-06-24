@@ -105,6 +105,7 @@ def test_backend_template_keeps_one_backend_image_for_all_commands() -> None:
     for expected in [
         "FROM {{ namespace }}/{{ image_prefix }}openstack-base:{{ tag }}",
         "ARG CLOUD_UI_SOURCE_PIN",
+        "ADD cloud-ui-backend-archive /cloud-ui-backend-source",
         "cloud-ui-backend-source",
         "{{ macros.configure_user(name='cloudui') }}",
         "org.opencontainers.image.title=\"cloud-ui-backend\"",
@@ -133,6 +134,7 @@ def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
     for expected in [
         "FROM {{ namespace }}/{{ image_prefix }}base:{{ tag }}",
         "ARG CLOUD_UI_SOURCE_PIN",
+        "ADD cloud-ui-frontend-archive /cloud-ui-frontend-source",
         "cloud-ui-frontend-source/frontend/dist",
         "{{ macros.configure_user(name='cloudui') }}",
         "org.opencontainers.image.title=\"cloud-ui-frontend\"",
@@ -272,6 +274,8 @@ LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build
 
 {{ macros.configure_user(name='cloudui') }}
 
+ADD cloud-ui-backend-archive /cloud-ui-backend-source
+
 RUN ln -s cloud-ui-backend-source/* /cloud-ui-backend \
     && {{ macros.install_pip(['/cloud-ui-backend'] | customizable("pip_packages")) }} \
     && mkdir -p /etc/cloud-ui /var/log/kolla/cloud-ui \
@@ -311,6 +315,8 @@ LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build
 
 {{ macros.configure_user(name='cloudui') }}
 {{ macros.install_packages(['nginx']) }}
+
+ADD cloud-ui-frontend-archive /cloud-ui-frontend-source
 
 COPY cloud-ui-frontend-source/frontend/dist /usr/share/nginx/html
 COPY cloud-ui-frontend-source/frontend/nginx.conf /etc/nginx/nginx.conf
