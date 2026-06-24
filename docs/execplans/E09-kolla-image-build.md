@@ -106,16 +106,26 @@ Included by the end of this E09.1 ExecPlan:
   - 2026-06-24: Evidence and risk register keep registry push, digest, SBOM, vulnerability scan,
     image signature and Kolla-Ansible deployment as `pending_external_evidence`; no live deployment,
     registry push or production action is claimed.
-- [ ] Интеграционные и пользовательские проверки.
+- [x] Интеграционные и пользовательские проверки.
+  - 2026-06-24: No live Kolla integration was executed in E09.1 because approved test registry,
+    Kolla 2025.1 build host and test inventory are not available in this repository session.
+    Repository-side operator smoke is the targeted Kolla contract test below.
 - [x] Документация, evidence и review.
   - 2026-06-24: Added `docs/generated/e09-kolla-image-build.md`.
   - 2026-06-24: Updated `docs/generated/risk-register.md` with E09 deployment risks R-056-R-058.
   - 2026-06-24: Updated `docs/11_DKB_TRACEABILITY.md` with E09.1 DKB impact and evidence links.
   - 2026-06-24: Targeted Task 3 verification:
     `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` -> 6 passed.
-- [ ] Финальная проверка всего E09.1 набора.
-  - Not complete in Task 3; full `make lint`, `make typecheck`, `make test` and `make security`
-    remain outside this targeted evidence-only work item unless run later.
+- [x] Финальная проверка всего E09.1 набора.
+  - 2026-06-24: `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` -> 6 passed.
+  - 2026-06-24: `make lint` -> backend ruff passed, frontend eslint passed, secret scan passed.
+  - 2026-06-24: `make typecheck` -> backend mypy passed, frontend TypeScript build passed.
+  - 2026-06-24: `make test` -> backend 326 passed, 1 skipped; frontend 35 passed.
+  - 2026-06-24: `make security` -> secret scan passed.
+  - 2026-06-24: `git diff --check` -> passed.
+  - 2026-06-24: self-review grep for `password|token|private key|BEGIN|latest|production approved|12 permanent containers proven`
+    found only explanatory/negative-assertion text and prior traceability references, not credentials
+    or production approval claims.
 
 ## Неожиданные открытия
 
@@ -231,4 +241,17 @@ and digest.
 
 ## Итог и остаточные риски
 
-Pending until implementation finishes.
+E09.1 is implemented as repository-side Kolla image build evidence. The repository now contains a
+tested contract for exactly two custom images, source-staged Kolla templates, a fail-closed build
+wrapper, generated evidence, updated ДКБ traceability and risk-register rows.
+
+Remaining external risks:
+
+- No live `kolla-build` was run because the approved Rocky/Kolla 2025.1 test build host and registry
+  are not available in this repository session.
+- Corporate test registry push, registry digest, SBOM tied to digest, vulnerability scanner, image
+  signature and provenance remain `pending_external_evidence`.
+- Kolla-Ansible role, DB/RabbitMQ provisioning, one-shot migration, HAProxy/TLS, 12 permanent
+  containers, SELinux host proof, rolling update and rollback execution remain E09.2-E09.8.
+- ДКБ-69 remains not closed for the Python backend interpreter without a formal waiver and approved
+  image policy evidence.
