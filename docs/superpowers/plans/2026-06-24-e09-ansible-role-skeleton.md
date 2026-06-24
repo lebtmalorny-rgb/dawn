@@ -151,11 +151,15 @@ def test_tasks_are_skeleton_only_and_import_expected_steps() -> None:
     actual_imports: list[str] = []
     for task in main_tasks:
         assert isinstance(task, dict)
+        assert (
+            "include_tasks" in task or "ansible.builtin.include_tasks" in task
+        ), "Only include_tasks entries are allowed in main.yml"
         if "include_tasks" in task:
             actual_imports.append(str(task["include_tasks"]).strip())
         elif "ansible.builtin.include_tasks" in task:
             actual_imports.append(str(task["ansible.builtin.include_tasks"]).strip())
 
+    assert len(main_tasks) == len(actual_imports)
     assert actual_imports == ["validate.yml", "config.yml", "containers.yml"]
 
     assert isinstance(containers_tasks, list)
@@ -167,6 +171,7 @@ def test_tasks_are_skeleton_only_and_import_expected_steps() -> None:
             set_fact_value = fact_task["cloud_ui_container_definitions"]
             break
 
+    assert set_fact_value is not None
     assert set_fact_value == "{{ cloud_ui_services }}"
 
     assert isinstance(validate_tasks, list)
