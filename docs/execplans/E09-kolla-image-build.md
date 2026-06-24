@@ -117,15 +117,22 @@ Included by the end of this E09.1 ExecPlan:
   - 2026-06-24: Targeted Task 3 verification:
     `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` -> 6 passed.
 - [x] Финальная проверка всего E09.1 набора.
-  - 2026-06-24: `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` -> 6 passed.
-  - 2026-06-24: `make lint` -> backend ruff passed, frontend eslint passed, secret scan passed.
-  - 2026-06-24: `make typecheck` -> backend mypy passed, frontend TypeScript build passed.
-  - 2026-06-24: `make test` -> backend 326 passed, 1 skipped; frontend 35 passed.
-  - 2026-06-24: `make security` -> secret scan passed.
-  - 2026-06-24: `git diff --check` -> passed.
+  - 2026-06-24 after commit `6424f77`: `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` -> 6 passed.
+  - 2026-06-24 after commit `6424f77`: `cd backend && .venv/bin/python -m ruff check ../tests/test_e09_kolla_image_build.py` -> passed.
+  - 2026-06-24 after commit `6424f77`: `bash -n deploy/kolla/scripts/build-images.sh` -> passed.
+  - 2026-06-24 after commit `6424f77`: runtime `KOLLA_BUILD_CONFIG=... deploy/kolla/scripts/build-images.sh invalid-action` -> exit 2 with `KOLLA_BUILD_CONFIG override is not supported for E09.1`.
+  - 2026-06-24 after commit `6424f77`: runtime `KOLLA_DOCKER_DIR=... deploy/kolla/scripts/build-images.sh invalid-action` -> exit 2 with `KOLLA_DOCKER_DIR override is not supported for E09.1`.
+  - 2026-06-24 after commit `6424f77`: runtime pinned inputs with no override and `invalid-action` -> exit 2 with usage after source render/validation.
+  - 2026-06-24 after commit `6424f77`: `make lint` -> backend ruff passed, frontend eslint passed, secret scan passed.
+  - 2026-06-24 after commit `6424f77`: `make typecheck` -> backend mypy passed, frontend TypeScript build passed.
+  - 2026-06-24 after commit `6424f77`: `make test` -> backend 326 passed, 1 skipped; frontend 35 passed.
+  - 2026-06-24 after commit `6424f77`: `make security` -> secret scan passed.
+  - 2026-06-24 after commit `6424f77`: `git diff --check` -> passed.
   - 2026-06-24: self-review grep for `password|token|private key|BEGIN|latest|production approved|12 permanent containers proven`
     found only explanatory/negative-assertion text and prior traceability references, not credentials
     or production approval claims.
+  - 2026-06-24: final reviewer approved E09.1 after review fixes; remaining gaps are only the
+    documented external live Kolla/registry/SBOM/scan/signing/deployment evidence.
 
 ## Неожиданные открытия
 
