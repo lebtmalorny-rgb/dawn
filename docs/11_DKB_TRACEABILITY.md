@@ -302,6 +302,28 @@ Evidence: `backend/tests/security/test_e08_security_review.py`,
 `docs/generated/e08-security-review.md`, `docs/generated/risk-register.md` and ExecPlan
 `docs/execplans/E08-security-review.md`.
 
+## Обновление требований 2026-06-24: E09.1 Kolla image build
+
+E09.1 добавляет repository-side Kolla Build contract для двух portal-owned images без заявления live
+registry/deployment compliance:
+
+- ДКБ-69: `deploy/kolla/docker/cloud-ui-backend/Dockerfile.j2` and
+  `deploy/kolla/docker/cloud-ui-frontend/Dockerfile.j2` define custom Kolla image templates and
+  keep one backend image for API, worker, events, migration and smoke commands. Python backend still
+  requires an interpreter; formal waiver and approved scanner/signing evidence remain required.
+- ДКБ-70: `deploy/kolla/scripts/build-images.sh` requires explicit test registry, immutable tag and
+  source pin, rejects `latest`, and provides the push-by-registry contract. Actual corporate test
+  registry push, digest, SBOM, scanner and signature evidence remain pending external evidence.
+- ДКБ-76/77/80: `deploy/kolla/README.md` documents image build interfaces and non-goals. Runtime
+  Kolla-Ansible container inspection, network ACLs, management-zone placement, disabled unused
+  interfaces, HAProxy/TLS and rollback proof remain E09.2-E09.8.
+- ДКБ-55/56: the build contract stores no runtime secrets. Kolla/Ansible secret references, DB/RabbitMQ
+  credentials and rotation proof remain later deployment evidence.
+
+Evidence: `tests/test_e09_kolla_image_build.py`, `deploy/kolla/README.md`,
+`deploy/kolla/kolla-build.conf.example`, `deploy/kolla/scripts/build-images.sh`,
+`docs/generated/e09-kolla-image-build.md` and ExecPlan `docs/execplans/E09-kolla-image-build.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

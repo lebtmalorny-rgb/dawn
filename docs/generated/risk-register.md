@@ -93,6 +93,14 @@
 | R-051 | Ignored local worktrees can break scans | `.worktrees/**` previously caused secret-scan false positives. | `scripts/secret-scan.sh` excludes ignored worktrees; regression test added. | Done, keep covered |
 | R-052 | Kolla prototype tests in root may not match current gate | `tests/test_e015_kolla_layout.py` targets deployment files not in current root state. | Do not use that test as E00/E02 gate unless E01.5/Kolla prototype files are restored or task requires it. | E09/E015 |
 
+## E09 Kolla deployment risks
+
+| ID | Риск | Текущее положение | Митигация | Stage |
+|---|---|---|---|---|
+| R-056 | E09.1 build contract mistaken for live registry proof | E09.1 creates Kolla Build config/templates/script/evidence for two images only. No registry push, digest, signing or vulnerability scanner was executed in this slice. | Keep registry/SBOM/scan/signature rows as `pending_external_evidence` until an approved corporate test registry flow is executed and recorded. | E09 |
+| R-057 | Custom backend processes split into multiple images | E09.1 tests enforce one `cloud-ui-backend` image for API, worker, events, `db-upgrade` and `smoke`. | Keep Kolla role definitions in E09.2-E09.5 pointing to one backend digest with different commands. | E09 |
+| R-058 | Kolla custom image syntax drifts from supported flow | E09.1 uses Kolla `--docker-dir`, profile and custom user section patterns from upstream Kolla image-build documentation. | Run `deploy/kolla/scripts/build-images.sh list` in the approved Kolla 2025.1 test build environment before claiming live build readiness. | E09 |
+
 ## Immediate priority order
 
 1. Continue E08 hardening slices without treating session bootstrap, container hardening, supply-chain SBOM, matrix, runbook evidence or `docs/generated/e08-dkb-gaps-waivers.md` as live production proof.

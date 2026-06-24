@@ -93,15 +93,29 @@ Included by the end of this E09.1 ExecPlan:
   commands above.
 - [x] Контракт и RED tests.
   - 2026-06-24: RED `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` fails because E09.1 Kolla artifacts are absent.
-- [ ] Минимальная реализация. In progress.
+- [x] Минимальная реализация.
   - 2026-06-24: Added `deploy/kolla/` build config, custom image templates, build wrapper and README.
   - 2026-06-24: `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q`
     reports 4 passed artifact assertions and 2 expected failures for missing
     `docs/generated/e09-kolla-image-build.md`, which belongs to the evidence milestone.
   - 2026-06-24: `git diff --check` passes.
-- [ ] Отрицательные сценарии и безопасность.
+- [x] Отрицательные сценарии и безопасность.
+  - 2026-06-24: Task 3 re-ran RED targeted test before evidence update:
+    `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` -> 2 failed,
+    4 passed, failing only because `docs/generated/e09-kolla-image-build.md` did not exist.
+  - 2026-06-24: Evidence and risk register keep registry push, digest, SBOM, vulnerability scan,
+    image signature and Kolla-Ansible deployment as `pending_external_evidence`; no live deployment,
+    registry push or production action is claimed.
 - [ ] Интеграционные и пользовательские проверки.
-- [ ] Документация, evidence и review.
+- [x] Документация, evidence и review.
+  - 2026-06-24: Added `docs/generated/e09-kolla-image-build.md`.
+  - 2026-06-24: Updated `docs/generated/risk-register.md` with E09 deployment risks R-056-R-058.
+  - 2026-06-24: Updated `docs/11_DKB_TRACEABILITY.md` with E09.1 DKB impact and evidence links.
+  - 2026-06-24: Targeted Task 3 verification:
+    `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py -q` -> 6 passed.
+- [ ] Финальная проверка всего E09.1 набора.
+  - Not complete in Task 3; full `make lint`, `make typecheck`, `make test` and `make security`
+    remain outside this targeted evidence-only work item unless run later.
 
 ## Неожиданные открытия
 
