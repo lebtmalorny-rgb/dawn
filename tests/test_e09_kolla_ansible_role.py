@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import yaml
@@ -204,3 +205,15 @@ def test_e09_role_evidence_records_limits_and_dkb_scope() -> None:
 
     assert "12 live containers proven" not in evidence
     assert "production approved" not in evidence.lower()
+
+
+def test_risk_register_ids_are_unique() -> None:
+    risk_register = read_text("docs/generated/risk-register.md")
+    risk_ids = re.findall(r"^\| (R-\d{3}) \|", risk_register, flags=re.MULTILINE)
+    duplicate_ids = {
+        risk_id
+        for risk_id in risk_ids
+        if risk_ids.count(risk_id) > 1
+    }
+
+    assert duplicate_ids == set()

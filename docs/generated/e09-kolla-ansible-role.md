@@ -40,6 +40,10 @@ certificate or live deployment output was added.
 
 | Evidence | Status | Reason |
 |---|---|---|
+| corporate test registry digest pull | pending_external_evidence | Requires an approved registry flow with immutable image digests from E09.1 artifacts. |
+| SBOM tied to deployed digests | pending_external_evidence | Requires approved SBOM tooling against the exact backend/frontend digests used by the stand. |
+| vulnerability scan | pending_external_evidence | Requires approved scanner output and policy threshold for the deployed images. |
+| image signature verification | pending_external_evidence | Requires approved signing keys and pull-time verification policy. |
 | Kolla-Ansible syntax/render against test inventory | pending_external_evidence | Requires an approved non-production test inventory and host group mapping. |
 | live Kolla-Ansible deploy/reconfigure | pending_external_evidence | Requires a test stand with approved registry digests and runtime secrets. |
 | MariaDB schema/user and RabbitMQ vhost/user provisioning | pending_external_evidence | Later E09 slices own database, broker and secret integration. |

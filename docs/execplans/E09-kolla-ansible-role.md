@@ -121,7 +121,22 @@ Included in E09.2:
     `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-backend-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_kolla_ansible_role.py -q`
     -> 6 passed.
   - `git diff --check` -> passed.
-- [ ] Final verification and review.
+- [x] 2026-06-24: Final verification and review.
+  - Added regression coverage that rejects duplicate `R-xxx` IDs in `docs/generated/risk-register.md`.
+  - Fixed E09.2 risk ID from duplicate `R-060` to `R-062`.
+  - Final review found no role-scope blockers after the risk ID and stale ExecPlan findings were fixed.
+  - `backend/.venv/bin/python -m pytest tests/test_e09_kolla_ansible_role.py -q` -> 7 passed.
+  - `backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py tests/test_e09_kolla_ansible_role.py -q`
+    -> 13 passed.
+  - `cd backend && .venv/bin/python -m ruff check ../tests/test_e09_kolla_ansible_role.py`
+    -> passed.
+  - `make lint` -> passed: backend ruff, frontend eslint and secret scan.
+  - `make typecheck` -> passed: backend mypy and frontend TypeScript.
+  - `make test` -> passed: backend 326 passed, 1 skipped; frontend 35 passed.
+  - `make security` -> passed.
+  - `git diff --check` -> passed.
+  - Self-review grep for `password|token|private key|BEGIN|latest|production approved|12 live containers proven`
+    found only explanatory text, negative assertions or existing traceability references.
 
 ## Неожиданные открытия
 
@@ -220,7 +235,12 @@ own rollback procedures must handle host config and container state.
 
 ## Итог и остаточные риски
 
-To be completed after implementation. Expected residual risks:
+E09.2 is implemented as a repository-side Kolla-Ansible role skeleton and evidence package. The
+observable result is the `deploy/kolla/ansible/roles/cloud_ui` role with defaults, validation tasks,
+config templates, handler names and container-definition facts for `cloud_ui_frontend`,
+`cloud_ui_api`, `cloud_ui_worker` and `cloud_ui_events`.
+
+Residual risks remain explicit:
 
 - no live Kolla-Ansible syntax/render on a test inventory;
 - no test registry digest/SBOM/scan/signing;
