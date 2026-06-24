@@ -99,7 +99,7 @@ Included in E09.2:
   deploy/AGENTS.md read.
 - [x] 2026-06-24: Existing `deploy/kolla` and root E09.1 tests inspected.
 - [x] 2026-06-24: E09.2 design approved and committed in
-  `docs/superpowers/specs/2026-06-24-e09-ansible-role-skeleton-design.md`.
+  docs/superpowers/specs/2026-06-24-e09-ansible-role-skeleton-design.md.
 - [x] 2026-06-24: Worktree bootstrapped. Baseline targeted E09.1 test and shell syntax checks passed.
 - [ ] Contract and RED tests.
 - [ ] Minimal role skeleton.

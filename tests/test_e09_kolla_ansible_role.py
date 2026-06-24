@@ -1,0 +1,154 @@
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+ROLE_ROOT = ROOT / "deploy/kolla/ansible/roles/cloud_ui"
+
+EXPECTED_ROLE_FILES = [
+    "deploy/kolla/ansible/README.md",
+    "deploy/kolla/ansible/roles/cloud_ui/defaults/main.yml",
+    "deploy/kolla/ansible/roles/cloud_ui/handlers/main.yml",
+    "deploy/kolla/ansible/roles/cloud_ui/tasks/main.yml",
+    "deploy/kolla/ansible/roles/cloud_ui/tasks/validate.yml",
+    "deploy/kolla/ansible/roles/cloud_ui/tasks/config.yml",
+    "deploy/kolla/ansible/roles/cloud_ui/tasks/containers.yml",
+    "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-backend.env.j2",
+    "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-frontend.conf.j2",
+    "docs/generated/e09-kolla-ansible-role.md",
+]
+
+EXPECTED_SERVICES = {
+    "cloud_ui_frontend",
+    "cloud_ui_api",
+    "cloud_ui_worker",
+    "cloud_ui_events",
+}
+
+
+def read_text(relative_path: str) -> str:
+    return (ROOT / relative_path).read_text(encoding="utf-8")
+
+
+def load_yaml(relative_path: str) -> dict:
+    return yaml.safe_load(read_text(relative_path))
+
+
+def role_texts() -> dict[str, str]:
+    return {
+        str(path.relative_to(ROOT)): path.read_text(encoding="utf-8")
+        for path in (ROOT / "deploy/kolla/ansible").rglob("*")
+        if path.is_file()
+    }
+
+
+def test_e09_ansible_role_files_exist() -> None:
+    for relative_path in EXPECTED_ROLE_FILES:
+        assert (ROOT / relative_path).exists(), relative_path
+
+
+def test_defaults_declare_four_permanent_services_and_two_images() -> None:
+    defaults = load_yaml("deploy/kolla/ansible/roles/cloud_ui/defaults/main.yml")
+    services = defaults["cloud_ui_services"]
+
+    assert set(services) == EXPECTED_SERVICES
+    assert defaults["cloud_ui_backend_image"] == "cloud-ui-backend"
+    assert defaults["cloud_ui_frontend_image"] == "cloud-ui-frontend"
+    assert defaults["cloud_ui_backend_image_tag"] != "latest"
+    assert defaults["cloud_ui_frontend_image_tag"] != "latest"
+    assert defaults["cloud_ui_permanent_container_count_per_node"] == 4
+
+    assert services["cloud_ui_frontend"]["image"] == "{{ cloud_ui_frontend_image_full }}"
+    for service_name in ["cloud_ui_api", "cloud_ui_worker", "cloud_ui_events"]:
+        assert services[service_name]["image"] == "{{ cloud_ui_backend_image_full }}"
+
+    assert services["cloud_ui_api"]["command"] == "cloud-ui api"
+    assert services["cloud_ui_worker"]["command"] == "cloud-ui worker"
+    assert services["cloud_ui_events"]["command"] == "cloud-ui events"
+    assert "cloud-ui db-upgrade" not in {
+        service["command"] for service in services.values()
+    }
+
+
+def test_tasks_are_skeleton_only_and_import_expected_steps() -> None:
+    main_tasks = read_text("deploy/kolla/ansible/roles/cloud_ui/tasks/main.yml")
+    containers_tasks = read_text("deploy/kolla/ansible/roles/cloud_ui/tasks/containers.yml")
+    validate_tasks = read_text("deploy/kolla/ansible/roles/cloud_ui/tasks/validate.yml")
+
+    for expected in [
+        "validate.yml",
+        "config.yml",
+        "containers.yml",
+    ]:
+        assert expected in main_tasks
+
+    assert "cloud_ui_container_definitions" in containers_tasks
+    assert "cloud_ui_services" in containers_tasks
+    assert "kolla_container" not in containers_tasks
+    assert "cloud_ui_backend_image_tag != 'latest'" in validate_tasks
+    assert "cloud_ui_frontend_image_tag != 'latest'" in validate_tasks
+
+
+def test_role_templates_contain_only_non_secret_config() -> None:
+    backend_template = read_text(
+        "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-backend.env.j2"
+    )
+    frontend_template = read_text(
+        "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-frontend.conf.j2"
+    )
+
+    for expected in [
+        "CLOUD_UI_CONFIG_VERSION",
+        "CLOUD_UI_PUBLIC_BASE_URL",
+        "CLOUD_UI_LOG_LEVEL",
+        "CLOUD_UI_BACKEND_ROLE",
+    ]:
+        assert expected in backend_template
+
+    assert "listen {{ cloud_ui_frontend_listen_port }};" in frontend_template
+    assert "proxy_pass" not in frontend_template
+
+    combined_templates = f"{backend_template}\n{frontend_template}".lower()
+    for forbidden in ["password", "token", "private_key", "secret_key"]:
+        assert forbidden not in combined_templates
+
+
+def test_role_scope_excludes_later_e09_work() -> None:
+    combined_role = "\n".join(role_texts().values()).lower()
+
+    for forbidden in [
+        "mariadb",
+        "rabbitmq",
+        "db-upgrade",
+        "haproxy",
+        "tls_private",
+        "production",
+        "inventory.ini",
+        "kolla_container:",
+    ]:
+        assert forbidden not in combined_role
+
+    assert "pending_external_evidence" in read_text(
+        "docs/generated/e09-kolla-ansible-role.md"
+    )
+
+
+def test_e09_role_evidence_records_limits_and_dkb_scope() -> None:
+    evidence = read_text("docs/generated/e09-kolla-ansible-role.md")
+
+    for expected in [
+        "Stage: E09.2 Ansible role skeleton",
+        "cloud_ui_frontend",
+        "cloud_ui_api",
+        "cloud_ui_worker",
+        "cloud_ui_events",
+        "repository-side role skeleton",
+        "pending_external_evidence",
+        "ДКБ-69",
+        "ДКБ-70",
+        "ДКБ-76/77/80",
+    ]:
+        assert expected in evidence
+
+    assert "12 live containers proven" not in evidence
+    assert "production approved" not in evidence.lower()
