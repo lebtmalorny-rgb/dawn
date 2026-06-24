@@ -23,12 +23,15 @@ export CLOUD_UI_TEST_REGISTRY='registry.test.example.invalid/cloud-ui'
 export CLOUD_UI_IMAGE_TAG='2025.1-rocky-9-<git-sha>'
 export CLOUD_UI_SOURCE_PIN='<git-sha>'
 export CLOUD_UI_SOURCE_ROOT='/path/to/cloud-ui-git-checkout'
+export CLOUD_UI_FRONTEND_DIST_ROOT='/path/to/prebuilt/frontend-dist'
+export CLOUD_UI_FRONTEND_DIST_SHA256='<directory-sha256>'
 ```
 
-The tag `latest` is rejected by `scripts/build-images.sh`. The wrapper also verifies that
-`CLOUD_UI_SOURCE_ROOT` is a clean Git checkout whose `HEAD` equals `CLOUD_UI_SOURCE_PIN`, then renders
-a temporary Kolla config that points the backend and frontend source sections at that checked-out
-tree.
+The tag `latest` is rejected by `scripts/build-images.sh`. The wrapper renders temporary source
+directories from `git archive CLOUD_UI_SOURCE_PIN` for tracked backend/frontend files, verifies the
+prebuilt frontend `dist` directory against `CLOUD_UI_FRONTEND_DIST_SHA256`, copies that verified dist
+into the temporary frontend source tree, then renders a temporary Kolla config that points the backend
+and frontend source sections at those sanitized directories.
 
 ## Commands
 

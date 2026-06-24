@@ -25,11 +25,13 @@ Required operator inputs:
 - `CLOUD_UI_IMAGE_TAG`
 - `CLOUD_UI_SOURCE_PIN`
 - `CLOUD_UI_SOURCE_ROOT`
+- `CLOUD_UI_FRONTEND_DIST_ROOT`
+- `CLOUD_UI_FRONTEND_DIST_SHA256`
 
 `deploy/kolla/scripts/build-images.sh` rejects `CLOUD_UI_IMAGE_TAG=latest`.
-It also verifies that `CLOUD_UI_SOURCE_ROOT` is a clean Git checkout whose `HEAD` equals
-`CLOUD_UI_SOURCE_PIN`, then renders a temporary Kolla config that points backend and frontend source
-sections at that checkout.
+It also renders tracked backend/frontend source trees from `git archive CLOUD_UI_SOURCE_PIN`, verifies
+the prebuilt frontend `dist` directory against `CLOUD_UI_FRONTEND_DIST_SHA256`, and renders a temporary
+Kolla config that points backend and frontend source sections at those sanitized directories.
 
 ## Commands
 
@@ -58,8 +60,8 @@ repository-only slice.
 - ДКБ-69: image minimization contract is improved, but the Python backend still requires an interpreter.
   This is not closed without a formal waiver and approved scanner/signing evidence.
 - ДКБ-70: the repository now has a corporate test registry build/push contract, but live registry
-  evidence remains pending. The wrapper enforces a clean Git source checkout before invoking
-  `kolla-build`.
+  evidence remains pending. The wrapper builds Kolla source directories from a pinned Git archive and
+  separately verifies the prebuilt frontend dist hash before invoking `kolla-build`.
 - ДКБ-76/77/80: deployment image interfaces are documented. Network ACLs, management-zone placement,
   disabled unused interfaces and runtime Kolla inspection remain later E09 evidence.
 - ДКБ-55/56: no secrets are stored in the build contract. Secret injection and rotation remain

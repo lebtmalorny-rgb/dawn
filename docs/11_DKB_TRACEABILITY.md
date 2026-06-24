@@ -314,8 +314,8 @@ registry/deployment compliance:
 - ДКБ-70: `deploy/kolla/scripts/build-images.sh` requires explicit test registry, immutable tag and
   source pin, rejects `latest`, and provides the push-by-registry contract. Actual corporate test
   registry push, digest, SBOM, scanner and signature evidence remain pending external evidence.
-  The wrapper verifies a clean Git source checkout at the requested source pin before invoking
-  `kolla-build`.
+  The wrapper builds Kolla source directories from a pinned Git archive and separately verifies the
+  prebuilt frontend dist hash before invoking `kolla-build`.
 - ДКБ-76/77/80: `deploy/kolla/README.md` documents image build interfaces and non-goals. Runtime
   Kolla-Ansible container inspection, network ACLs, management-zone placement, disabled unused
   interfaces, HAProxy/TLS and rollback proof remain E09.2-E09.8.

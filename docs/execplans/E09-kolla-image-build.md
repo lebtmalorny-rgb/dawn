@@ -151,9 +151,11 @@ Included by the end of this E09.1 ExecPlan:
   depend on undocumented pre-extracted build context state.
 - 2026-06-24: Copy frontend assets from the staged archive path inside the image instead of Docker
   `COPY` from the build context. Reason: the archive pin must be the source of runtime files.
-- 2026-06-24: Enforce `CLOUD_UI_SOURCE_PIN` in the build wrapper by requiring `CLOUD_UI_SOURCE_ROOT`
-  to be a clean Git checkout whose `HEAD` matches the pin, then rendering source locations into a
-  temporary Kolla config. Reason: revision labels alone do not make the build source reproducible.
+- 2026-06-24: Enforce `CLOUD_UI_SOURCE_PIN` in the build wrapper by creating temporary backend and
+  frontend source directories from `git archive`, then adding a separately hashed prebuilt frontend
+  `dist` directory before rendering source locations into a temporary Kolla config. Reason: revision
+  labels alone do not make the build source reproducible, and ignored frontend build output must be
+  verified explicitly.
 
 ## Детальный план реализации
 

@@ -19,6 +19,8 @@ require_var CLOUD_UI_TEST_REGISTRY
 require_var CLOUD_UI_IMAGE_TAG
 require_var CLOUD_UI_SOURCE_PIN
 require_var CLOUD_UI_SOURCE_ROOT
+require_var CLOUD_UI_FRONTEND_DIST_ROOT
+require_var CLOUD_UI_FRONTEND_DIST_SHA256
 
 if [ "$CLOUD_UI_IMAGE_TAG" = "latest" ]; then
     printf '%s\n' "CLOUD_UI_IMAGE_TAG must not be latest" >&2
@@ -26,6 +28,7 @@ if [ "$CLOUD_UI_IMAGE_TAG" = "latest" ]; then
 fi
 
 SOURCE_ROOT="$(cd "$CLOUD_UI_SOURCE_ROOT" && pwd)"
+FRONTEND_DIST_ROOT="$(cd "$CLOUD_UI_FRONTEND_DIST_ROOT" && pwd)"
 
 if [ ! -d "$SOURCE_ROOT/backend" ] || [ ! -d "$SOURCE_ROOT/frontend" ]; then
     printf '%s\n' "CLOUD_UI_SOURCE_ROOT must contain backend and frontend directories" >&2
@@ -37,28 +40,51 @@ if ! git -C "$SOURCE_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     exit 2
 fi
 
-ACTUAL_SOURCE_PIN="$(git -C "$SOURCE_ROOT" rev-parse HEAD)"
-if [ "$ACTUAL_SOURCE_PIN" != "$CLOUD_UI_SOURCE_PIN" ]; then
-    printf '%s\n' "CLOUD_UI_SOURCE_PIN does not match source checkout" >&2
+if ! SOURCE_PIN_COMMIT="$(git -C "$SOURCE_ROOT" rev-parse --verify "$CLOUD_UI_SOURCE_PIN^{commit}" 2>/dev/null)"; then
+    printf '%s\n' "CLOUD_UI_SOURCE_PIN must resolve to a Git commit" >&2
     exit 2
 fi
 
-if ! git -C "$SOURCE_ROOT" diff --quiet; then
-    printf '%s\n' "CLOUD_UI_SOURCE_ROOT has unstaged changes" >&2
+if ! find "$FRONTEND_DIST_ROOT" -type f -print -quit | grep -q .; then
+    printf '%s\n' "CLOUD_UI_FRONTEND_DIST_ROOT must contain built frontend files" >&2
     exit 2
 fi
 
-if ! git -C "$SOURCE_ROOT" diff --cached --quiet; then
-    printf '%s\n' "CLOUD_UI_SOURCE_ROOT has staged changes" >&2
+hash_directory() {
+    local directory="$1"
+    (
+        cd "$directory"
+        find . -type f -print0 \
+            | LC_ALL=C sort -z \
+            | while IFS= read -r -d '' file_path; do
+                shasum -a 256 "$file_path"
+            done \
+            | shasum -a 256 \
+            | awk '{print $1}'
+    )
+}
+
+ACTUAL_FRONTEND_DIST_SHA256="$(hash_directory "$FRONTEND_DIST_ROOT")"
+if [ "$ACTUAL_FRONTEND_DIST_SHA256" != "$CLOUD_UI_FRONTEND_DIST_SHA256" ]; then
+    printf '%s\n' "CLOUD_UI_FRONTEND_DIST_SHA256 does not match frontend dist" >&2
     exit 2
 fi
 
+SOURCE_BUILD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/cloud-ui-kolla-source.XXXXXX")"
 RENDERED_CONFIG="$(mktemp "${TMPDIR:-/tmp}/cloud-ui-kolla-build.XXXXXX.conf")"
-trap 'rm -f "$RENDERED_CONFIG"' EXIT
+trap 'rm -rf "$SOURCE_BUILD_ROOT"; rm -f "$RENDERED_CONFIG"' EXIT
 
-awk -v backend_source="$SOURCE_ROOT/backend" \
-    -v frontend_source="$SOURCE_ROOT/frontend" \
-    -v source_pin="$CLOUD_UI_SOURCE_PIN" '
+git -C "$SOURCE_ROOT" archive --format=tar "$SOURCE_PIN_COMMIT" backend \
+    | tar -C "$SOURCE_BUILD_ROOT" -xf -
+git -C "$SOURCE_ROOT" archive --format=tar "$SOURCE_PIN_COMMIT" frontend \
+    | tar -C "$SOURCE_BUILD_ROOT" -xf -
+rm -rf "$SOURCE_BUILD_ROOT/frontend/dist"
+mkdir -p "$SOURCE_BUILD_ROOT/frontend/dist"
+cp -a "$FRONTEND_DIST_ROOT"/. "$SOURCE_BUILD_ROOT/frontend/dist/"
+
+awk -v backend_source="$SOURCE_BUILD_ROOT/backend" \
+    -v frontend_source="$SOURCE_BUILD_ROOT/frontend" \
+    -v source_pin="$SOURCE_PIN_COMMIT" '
     $0 == "location = /srv/kolla/cloud-ui/sources/backend" {
         print "location = " backend_source
         next
@@ -80,7 +106,7 @@ COMMON_ARGS=(
     --docker-dir "$DOCKER_DIR"
     --profile cloud-ui
     --tag "$CLOUD_UI_IMAGE_TAG"
-    --build-args "CLOUD_UI_SOURCE_PIN=$CLOUD_UI_SOURCE_PIN"
+    --build-args "CLOUD_UI_SOURCE_PIN=$SOURCE_PIN_COMMIT"
 )
 
 case "$ACTION" in
