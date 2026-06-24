@@ -327,6 +327,31 @@ Evidence: `tests/test_e09_kolla_image_build.py`, `deploy/kolla/README.md`,
 `deploy/kolla/kolla-build.conf.example`, `deploy/kolla/scripts/build-images.sh`,
 `docs/generated/e09-kolla-image-build.md` and ExecPlan `docs/execplans/E09-kolla-image-build.md`.
 
+## Обновление требований 2026-06-24: E09.2 Kolla-Ansible role skeleton
+
+E09.2 добавляет repository-side Kolla-Ansible role skeleton для Cloud UI без заявления live
+deployment compliance:
+
+- ДКБ-69: `deploy/kolla/ansible/roles/cloud_ui/defaults/main.yml` keeps exactly two portal-owned
+  image names and maps `cloud_ui_api`, `cloud_ui_worker` and `cloud_ui_events` to `cloud-ui-backend`.
+  Python backend still requires an interpreter; formal waiver, scanner and signing evidence remain
+  required.
+- ДКБ-70: role defaults include tag/digest placeholders and validation rejects `latest`. Corporate
+  registry push, pull-by-digest enforcement, SBOM, vulnerability scan and signature evidence remain
+  pending external evidence.
+- ДКБ-76/77/80: `deploy/kolla/ansible/roles/cloud_ui` records service groups, ports, config roots,
+  volumes and hardening dimensions for later Kolla-Ansible integration. It does not prove runtime
+  network ACLs, management-zone placement, unused-interface blocking, HAProxy/TLS or live container
+  inspection.
+- ДКБ-55/56: E09.2 templates contain only non-secret config. Kolla secret delivery, DB/RabbitMQ
+  credentials and rotation proof remain later deployment evidence.
+- ДКБ-82: rollback for this slice is Git revert only. Live Kolla reconfigure/rollback proof remains
+  later E09 evidence.
+
+Evidence: `tests/test_e09_kolla_ansible_role.py`, `deploy/kolla/ansible/README.md`,
+`deploy/kolla/ansible/roles/cloud_ui/*`, `docs/generated/e09-kolla-ansible-role.md`,
+`docs/generated/risk-register.md` and ExecPlan `docs/execplans/E09-kolla-ansible-role.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

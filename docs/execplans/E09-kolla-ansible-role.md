@@ -113,7 +113,14 @@ Included in E09.2:
     skeleton.
   - Targeted test: `backend/.venv/bin/python -m pytest tests/test_e09_kolla_ansible_role.py -q`
     -> 3 failed assertions, all in evidence/test-evidence glue assertions (no structure/contract failures).
-- [ ] Evidence, DKB traceability and risk register.
+- [x] 2026-06-24: Evidence, DKB traceability and risk register.
+  - Added `docs/generated/e09-kolla-ansible-role.md`.
+  - Updated `deploy/kolla/README.md`, `docs/generated/risk-register.md` and
+    `docs/11_DKB_TRACEABILITY.md`.
+  - Targeted test:
+    `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-backend-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_kolla_ansible_role.py -q`
+    -> 6 passed.
+  - `git diff --check` -> passed.
 - [ ] Final verification and review.
 
 ## Неожиданные открытия
@@ -122,6 +129,8 @@ Included in E09.2:
   running tests in the isolated workspace.
 - `make bootstrap` succeeds in the worktree, but local Node version is newer than the frontend
   package engine range. This is a warning only in the current environment and did not block bootstrap.
+- `uv run` generated local `backend/uv.lock` and `backend/src/cloud_ui.egg-info/` during the test
+  environment rebuild; both were removed before committing.
 
 ## Журнал решений
 

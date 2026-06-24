@@ -8,11 +8,19 @@ This directory is the E09.1 repository contract for building the two portal-owne
 It follows the Kolla custom template flow: `kolla-build.conf.example` defines a `cloud-ui` profile,
 and `deploy/kolla/docker` is passed to `kolla-build` with `--docker-dir`.
 
+E09.2 adds a repository-side Kolla-Ansible role skeleton at
+`deploy/kolla/ansible/roles/cloud_ui`. The role declares the later deployment service layout for
+`cloud_ui_frontend`, `cloud_ui_api`, `cloud_ui_worker` and `cloud_ui_events` while keeping live
+deployment evidence pending in `docs/generated/e09-kolla-ansible-role.md`.
+
 ## Scope
 
 This slice creates build artifacts only. It does not deploy Kolla-Ansible, create DB or RabbitMQ
 users, configure HAProxy/TLS, prove SELinux labels, push to a live registry, sign images or prove the
 three-node 12-container topology.
+
+The E09.2 role skeleton is also repository-only. It does not add inventory, run Kolla-Ansible,
+provision DB/RabbitMQ, execute migrations, configure HAProxy/TLS or inspect live containers.
 
 ## Required Operator Inputs
 
