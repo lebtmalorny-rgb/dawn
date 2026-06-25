@@ -38,6 +38,13 @@ AUTHORIZATION_BEARER_RE = re.compile(
 SENSITIVE_KEY_RE = re.compile(
     r"(?i)(password|passwd|token|secret|private[_-]?key|application_credential)"
 )
+CREDENTIAL_URL_RE = re.compile(
+    r"(?i)\b([a-z][a-z0-9+.-]*://[^/\s:@]+:)([^@\s/]+)(@)"
+)
+PEM_PRIVATE_KEY_RE = re.compile(
+    r"(?is)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----"
+)
+COOKIE_RE = re.compile(r"(?i)\b((?:set-)?cookie\s*:\s*[^=\s;]+)=([^;\s|`]+)")
 
 
 @dataclass(frozen=True)
@@ -90,6 +97,15 @@ def redact(value: str) -> str:
         lambda match: f"{match.group(1)}[REDACTED]",
         value,
     )
+    value = PEM_PRIVATE_KEY_RE.sub("[REDACTED]", value)
+    value = CREDENTIAL_URL_RE.sub(
+        lambda match: f"{match.group(1)}[REDACTED]{match.group(3)}",
+        value,
+    )
+    value = COOKIE_RE.sub(
+        lambda match: f"{match.group(1)}=[REDACTED]",
+        value,
+    )
     value = JSON_SECRET_RE.sub(
         lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]{match.group(2)}",
         value,
@@ -113,6 +129,10 @@ def _redact_json(value):
 
 def _table_cell(value: str) -> str:
     return redact(value).replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
+
+
+def _inline_code(value: str) -> str:
+    return redact(value).replace("\\", "\\\\").replace("`", "\\`").replace("\n", " ")
 
 
 def _write_evidence(output_path: Path, evidence: str) -> ValidationResult:
@@ -179,9 +199,13 @@ def validate_inputs(
 
     if not is_digest_ref(backend_image) or _image_name(backend_image) != "cloud-ui-backend":
         errors.append("backend image must be cloud-ui-backend by sha256 digest")
+    elif PRODUCTION_RE.search(backend_image):
+        errors.append("backend image registry looks like production")
 
     if not is_digest_ref(frontend_image) or _image_name(frontend_image) != "cloud-ui-frontend":
         errors.append("frontend image must be cloud-ui-frontend by sha256 digest")
+    elif PRODUCTION_RE.search(frontend_image):
+        errors.append("frontend image registry looks like production")
 
     if not rollback_window_open:
         errors.append("rollback window must be explicitly open")
@@ -219,9 +243,9 @@ def render_evidence(
         "# E09.8 Deployment smoke/evidence",
         "",
         "- Stage: E09.8 Deployment smoke/evidence",
-        f"- Live execution status: `{redact(live_status)}`",
+        f"- Live execution status: `{_inline_code(live_status)}`",
         "- Scope: `partial` `test-stand`",
-        f"- Inventory: `{redact(inventory_name)}`",
+        f"- Inventory: `{_inline_code(inventory_name)}`",
         f"- Backend image: `{backend_image}`",
         f"- Frontend image: `{frontend_image}`",
         "",

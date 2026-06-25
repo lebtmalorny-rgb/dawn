@@ -290,6 +290,40 @@ def test_preflight_rejects_swapped_frontend_and_backend_images(tmp_path: Path) -
     assert "frontend image" in " ".join(result.errors)
 
 
+def test_preflight_rejects_production_image_registry_refs(tmp_path: Path) -> None:
+    module = load_module()
+    inventory = tmp_path / "test-inventory.ini"
+    inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+
+    backend_result = module.validate_inputs(
+        inventory_path=inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.prod.example/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+    frontend_result = module.validate_inputs(
+        inventory_path=inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.prd01.example/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+    test_result = module.validate_inputs(
+        inventory_path=inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test.example/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test.example/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert backend_result.ok is False
+    assert "production" in " ".join(backend_result.errors)
+    assert frontend_result.ok is False
+    assert "production" in " ".join(frontend_result.errors)
+    assert test_result.ok is True
+
+
 def test_cli_preflight_fails_closed_without_running_commands_or_writing_output(
     tmp_path: Path,
 ) -> None:
@@ -365,6 +399,25 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
                 "passed",
                 '{"access": {"token": {"id": "keystone-secret"}}}',
             ),
+            module.CommandSummary(
+                "urls",
+                "passed",
+                (
+                    "mysql+pymysql://user:pass@host/db "
+                    "amqp://user:pass@host/vhost "
+                    "https://user:pass@example.invalid/path"
+                ),
+            ),
+            module.CommandSummary(
+                "pem",
+                "passed",
+                "-----BEGIN PRIVATE KEY-----\nPEMSECRET\n-----END PRIVATE KEY-----",
+            ),
+            module.CommandSummary(
+                "cookies",
+                "passed",
+                "Cookie: session=abc; theme=light Set-Cookie: session=abc; HttpOnly",
+            ),
             module.CommandSummary("container_count", "pending", "12 expected"),
         ],
     )
@@ -384,8 +437,27 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
     assert "very secret value" not in evidence
     assert "nested-secret" not in evidence
     assert "keystone-secret" not in evidence
+    assert "user:pass@" not in evidence
+    assert "PEMSECRET" not in evidence
+    assert "session=abc" not in evidence
     assert "[REDACTED]" in evidence
     assert "ДКБ-69/70" in evidence
+
+
+def test_rendered_evidence_escapes_inline_code_fields() -> None:
+    module = load_module()
+    evidence = module.render_evidence(
+        inventory_name="test`inventory\nname.ini",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        live_status="pending`status\nnext",
+        command_summaries=[],
+    )
+
+    assert "test`inventory" not in evidence
+    assert "pending`status" not in evidence
+    assert "name.ini" in evidence
+    assert "pending\\`status next" in evidence
 
 
 def test_rendered_evidence_escapes_markdown_table_cells() -> None:
