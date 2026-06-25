@@ -70,11 +70,22 @@ pending external evidence и не имела отдельного job contract.
 
 - [x] 2026-06-25: Исследование фактического состояния. Evidence: E09 docs read, role/CLI inspected,
   `make test` baseline passed in worktree.
-- [ ] Контракт и тестовый double.
-- [ ] Минимальная реализация.
-- [ ] Отрицательные сценарии и безопасность.
-- [ ] Интеграционные и пользовательские проверки.
-- [ ] Документация, evidence и review.
+- [x] 2026-06-25: Контракт и тестовый double. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_migration_job.py -q` failed with missing
+  `migration.yml`, missing migration defaults, missing `--check` parser support, missing sanitized
+  output and missing generated evidence.
+- [x] 2026-06-25: Минимальная реализация. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_migration_job.py -q` passed `9 passed`.
+- [x] 2026-06-25: Отрицательные сценарии и безопасность. Evidence: targeted tests verify API startup
+  does not call Alembic upgrade, `db-upgrade --check` does not apply migrations, CLI output omits DB
+  URL, migration job is outside permanent services and generated evidence excludes token/unseal-key
+  phrases.
+- [x] 2026-06-25: Интеграционные и пользовательские проверки. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_migration_job.py tests/test_e09_kolla_ansible_role.py tests/test_e09_db_rabbitmq_provisioning.py -q`
+  passed `22 passed`; `backend/.venv/bin/python -m pytest tests -q` passed `28 passed`.
+- [x] 2026-06-25: Документация, evidence и review. Evidence: generated E09.4 evidence,
+  traceability, risk register and adjacent E09.2/E09.3 evidence were updated; `make lint`,
+  `make typecheck`, `make security`, `make test` and `git diff --check` passed.
 
 ## Неожиданные открытия
 
@@ -155,6 +166,10 @@ after the rollback window, and validate migration rollback on a copy of data bef
 
 ## Итог и остаточные риски
 
-Not completed yet. Remaining expected risks: no live migration execution, no failed migration retry
-evidence, no copied-data downgrade proof, no three-node rollout and no production SecMan/registry/TLS
-owner evidence.
+Implemented E09.4 as a tested repository-side migration job contract. The role defines
+`cloud_ui_db_migrate` outside permanent services, records one-shot/precheck/lock/rollback policy and
+keeps API startup separate from Alembic upgrade. CLI `cloud-ui db-upgrade --check` performs a
+precheck without applying migration, and `cloud-ui db-upgrade` prints sanitized success output.
+
+Remaining risks: no live migration execution, no failed migration retry evidence, no copied-data
+downgrade proof, no three-node rollout and no production SecMan/registry/TLS owner evidence.

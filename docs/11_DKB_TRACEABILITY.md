@@ -377,6 +377,24 @@ Evidence: `tests/test_e09_db_rabbitmq_provisioning.py`,
 `docs/generated/e09-db-rabbitmq-provisioning.md`, `docs/generated/risk-register.md` and ExecPlan
 `docs/execplans/E09-db-rabbitmq-provisioning.md`.
 
+## Обновление требований 2026-06-25: E09.4 Migration job
+
+E09.4 добавляет repository-side contract для one-shot DB migration job без live schema mutation:
+
+- ДКБ-55/56: `cloud_ui_db_migrate` uses the existing backend image and the explicit
+  `cloud-ui db-upgrade` command. Migration secret material remains tied to the E09.3 Vault-backed
+  migration credential and is not stored in Git. CLI success output is sanitized and does not print
+  database URL or credentials.
+- ДКБ-69/70: the migration job preserves the two-image contract and does not introduce a third
+  migration image. Registry digest pull, scanner, signing, package provenance and the ДКБ-69 Python
+  interpreter waiver remain pending external evidence.
+- ДКБ-76/77/80/82: role metadata records one-shot semantics, precheck command, required lock and
+  rollback-window requirement. `API auto migration` is disabled; live migration execution remains pending.
+  No Kolla deploy/reconfigure or three-node rollout proof is claimed by this slice.
+
+Evidence: `tests/test_e09_migration_job.py`, `docs/generated/e09-migration-job.md`,
+`docs/generated/risk-register.md` and ExecPlan `docs/execplans/E09-migration-job.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

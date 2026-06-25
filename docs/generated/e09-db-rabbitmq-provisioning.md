@@ -128,5 +128,6 @@ declaration. Final `/cloud-ui` permissions list only `cloud_ui`.
 
 ## Safe Next Step
 
-E09.3 lab DB/RabbitMQ provisioning is complete. E09.4 migration job remains a separate stage and is
-not started by this evidence.
+E09.3 lab DB/RabbitMQ provisioning is complete. E09.4 owns the separate migration job contract; live
+application migration execution remains pending until an approved lab run plan covers backup,
+precheck, lock, sanitized logs and rollback window.

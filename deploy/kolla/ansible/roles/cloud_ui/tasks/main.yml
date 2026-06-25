@@ -6,5 +6,8 @@
   ansible.builtin.include_tasks: config.yml
   when: cloud_ui_enabled | bool
 
+- name: Define Cloud UI one-shot migration job data
+  ansible.builtin.include_tasks: migration.yml
+
 - name: Define Cloud UI container data
   ansible.builtin.include_tasks: containers.yml

@@ -47,7 +47,7 @@ certificate or live deployment output was added.
 | Kolla-Ansible syntax/render against test inventory | pending_external_evidence | Requires an approved non-production test inventory and host group mapping. |
 | live Kolla-Ansible deploy/reconfigure | pending_external_evidence | Requires a test stand with approved registry digests and runtime secrets. |
 | MariaDB schema/user and RabbitMQ vhost/user provisioning | pending_external_evidence | Later E09 slices own database, broker and secret integration. |
-| one-shot `cloud-ui db-upgrade` migration ordering | pending_external_evidence | Migration job is intentionally outside the permanent container set. |
+| one-shot `cloud-ui db-upgrade` migration ordering | completed_repository_evidence | E09.4 adds `cloud_ui_db_migrate` job metadata outside the permanent container set; live execution remains pending. |
 | HAProxy/TLS routing | pending_external_evidence | Requires Kolla TLS/HAProxy configuration and certificate evidence. |
 | SELinux labels and host enforcement proof | pending_external_evidence | Requires Rocky/Kolla host inspection. |
 | 12 live containers on three control/UI nodes | pending_external_evidence | Requires the deployment stand and container inspection. |
@@ -67,6 +67,13 @@ certificate or live deployment output was added.
   MariaDB/RabbitMQ credentials and rotation evidence remain later deployment work.
 - ДКБ-82: rollback is repository-only by Git revert in this slice. Live rollback proof remains later
   E09 evidence.
+
+## E09.4 Update
+
+E09.4 extends this role with `deploy/kolla/ansible/roles/cloud_ui/tasks/migration.yml` and
+`cloud_ui_migration_job` defaults. The migration job uses `cloud-ui db-upgrade`, remains outside
+`cloud_ui_services`, and preserves the four-permanent-containers-per-node contract. This is
+repository evidence only; live migration execution, failure logs and rollback proof remain pending.
 
 ## Rollback
 

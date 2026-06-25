@@ -1,0 +1,8 @@
+---
+- name: Publish Cloud UI migration job definition for later Kolla execution
+  ansible.builtin.set_fact:
+    cloud_ui_migration_job_definition: "{{ cloud_ui_migration_job }}"
+
+- name: Publish Cloud UI migration execution policy for rollout ordering
+  ansible.builtin.set_fact:
+    cloud_ui_migration_execution_policy_effective: "{{ cloud_ui_migration_execution_policy }}"

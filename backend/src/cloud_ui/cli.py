@@ -27,8 +27,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cloud-ui")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for command_name in ("api", "db-upgrade", "inventory-sync-synthetic", "smoke"):
+    for command_name in ("api", "inventory-sync-synthetic", "smoke"):
         subparsers.add_parser(command_name)
+    db_parser = subparsers.add_parser("db-upgrade")
+    db_parser.add_argument("--check", action="store_true")
     events_parser = subparsers.add_parser("events")
     events_parser.add_argument("--once", action="store_true")
     worker_parser = subparsers.add_parser("worker")
@@ -48,11 +50,18 @@ def run_api() -> None:
     )
 
 
-def run_db_upgrade() -> None:
+def run_db_upgrade(*, check: bool = False) -> int:
     settings = get_settings()
     cfg = Config("alembic.ini")
     cfg.set_main_option("sqlalchemy.url", settings.database_url.unicode_string())
+    if check:
+        command.current(cfg)
+        print("db migration precheck ok")
+        return 0
+
     command.upgrade(cfg, "head")
+    print("db migration upgrade ok: revision=head")
+    return 0
 
 
 def run_inventory_sync_synthetic() -> int:
@@ -166,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
             return run_audit_delivery_once()
         run_loop("events")
     elif args.command == "db-upgrade":
-        run_db_upgrade()
+        return run_db_upgrade(check=args.check)
     elif args.command == "inventory-sync-synthetic":
         return run_inventory_sync_synthetic()
 

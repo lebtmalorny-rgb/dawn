@@ -13,6 +13,7 @@ EXPECTED_ROLE_FILES = [
     "deploy/kolla/ansible/roles/cloud_ui/tasks/main.yml",
     "deploy/kolla/ansible/roles/cloud_ui/tasks/validate.yml",
     "deploy/kolla/ansible/roles/cloud_ui/tasks/config.yml",
+    "deploy/kolla/ansible/roles/cloud_ui/tasks/migration.yml",
     "deploy/kolla/ansible/roles/cloud_ui/tasks/containers.yml",
     "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-backend.env.j2",
     "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-frontend.conf.j2",
@@ -109,7 +110,7 @@ def test_tasks_are_skeleton_only_and_import_expected_steps() -> None:
             )
 
     assert len(main_tasks) == len(actual_imports)
-    assert actual_imports == ["validate.yml", "config.yml", "containers.yml"]
+    assert actual_imports == ["validate.yml", "config.yml", "migration.yml", "containers.yml"]
 
     assert isinstance(containers_tasks, list)
     set_fact_value = None
@@ -172,7 +173,6 @@ def test_role_scope_excludes_later_e09_work() -> None:
     for forbidden in [
         "mariadb",
         "rabbitmq",
-        "db-upgrade",
         "haproxy",
         "tls_private",
         "production",
@@ -180,6 +180,12 @@ def test_role_scope_excludes_later_e09_work() -> None:
         "kolla_container:",
     ]:
         assert forbidden not in combined_role
+
+    defaults = load_yaml("deploy/kolla/ansible/roles/cloud_ui/defaults/main.yml")
+    services = defaults["cloud_ui_services"]
+    assert "cloud-ui db-upgrade" not in {
+        service["command"] for service in services.values()
+    }
 
     assert "pending_external_evidence" in read_text(
         "docs/generated/e09-kolla-ansible-role.md"

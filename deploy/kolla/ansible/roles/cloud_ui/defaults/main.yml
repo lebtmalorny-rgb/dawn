@@ -1,7 +1,7 @@
 ---
 cloud_ui_enabled: false
 
-cloud_ui_config_version: "e09.2-role-skeleton"
+cloud_ui_config_version: "e09.4-migration-job"
 cloud_ui_public_base_url: "/"
 cloud_ui_log_level: "INFO"
 
@@ -28,6 +28,9 @@ cloud_ui_log_volume: "kolla_logs"
 
 cloud_ui_backend_listen_port: 8080
 cloud_ui_frontend_listen_port: 8080
+
+cloud_ui_migration_enabled: false
+cloud_ui_migration_log_path: "/var/log/kolla/cloud-ui/db-upgrade.log"
 
 cloud_ui_backend_dimensions:
   cap_drop:
@@ -96,3 +99,29 @@ cloud_ui_services:
     volumes:
       - "{{ cloud_ui_config_root }}/cloud-ui-backend/:{{ cloud_ui_container_config_directory }}/:ro"
       - "{{ cloud_ui_log_volume }}:/var/log/kolla/"
+
+cloud_ui_migration_job:
+  container_name: "cloud_ui_db_migrate"
+  group: "{{ cloud_ui_api_group }}"
+  enabled: "{{ cloud_ui_migration_enabled }}"
+  image: "{{ cloud_ui_backend_image_full }}"
+  command: "cloud-ui db-upgrade"
+  config_dir: "cloud-ui-backend"
+  dimensions: "{{ cloud_ui_backend_dimensions }}"
+  restart_policy: "no"
+  run_once: true
+  volumes:
+    - "{{ cloud_ui_config_root }}/cloud-ui-backend/:{{ cloud_ui_container_config_directory }}/:ro"
+    - "{{ cloud_ui_log_volume }}:/var/log/kolla/"
+
+cloud_ui_migration_execution_policy:
+  run_once: true
+  lock_required: true
+  precheck_required: true
+  api_auto_migration_allowed: false
+  rollback_window_required: true
+  retry_on_failure: false
+  max_attempts: 1
+  precheck_command: "cloud-ui db-upgrade --check"
+  upgrade_command: "cloud-ui db-upgrade"
+  log_path: "/var/log/kolla/cloud-ui/db-upgrade.log"
