@@ -26,6 +26,7 @@ def test_digest_validation_accepts_sha256_and_rejects_tags() -> None:
     module = load_module()
 
     assert module.is_digest_ref("registry.test/cloud-ui-backend@sha256:" + "a" * 64)
+    assert module.is_digest_ref("registry.test:5000/cloud-ui-backend@sha256:" + "a" * 64)
     assert not module.is_digest_ref("registry.test/cloud-ui-backend:2026.06.25")
     assert not module.is_digest_ref("registry.test/cloud-ui-backend:latest")
     assert not module.is_digest_ref("registry.test/cloud-ui-backend@sha256:" + "a" * 63)
@@ -40,6 +41,8 @@ def test_preflight_rejects_production_inventory_filename(tmp_path: Path) -> None
     module = load_module()
     inventory = tmp_path / "production-inventory.ini"
     inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+    prod01_inventory = tmp_path / "cloud-ui-prod01.ini"
+    prod01_inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
 
     result = module.validate_inputs(
         inventory_path=inventory,
@@ -52,12 +55,28 @@ def test_preflight_rejects_production_inventory_filename(tmp_path: Path) -> None
     assert result.ok is False
     assert "production" in " ".join(result.errors)
 
+    prod01_result = module.validate_inputs(
+        inventory_path=prod01_inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert prod01_result.ok is False
+    assert "production" in " ".join(prod01_result.errors)
+
 
 def test_preflight_rejects_production_inventory_content(tmp_path: Path) -> None:
     module = load_module()
     inventory = tmp_path / "test-inventory.ini"
     inventory.write_text(
-        "cloud_ui_test_stand=true\nenvironment=production\n",
+        "cloud_ui_test_stand=true\nenvironment=production\napi_host=cloud-ui.example.prod\n",
+        encoding="utf-8",
+    )
+    prod01_inventory = tmp_path / "test-prod01-content.ini"
+    prod01_inventory.write_text(
+        "cloud_ui_test_stand=true\nenv=prod01\n",
         encoding="utf-8",
     )
 
@@ -71,6 +90,17 @@ def test_preflight_rejects_production_inventory_content(tmp_path: Path) -> None:
 
     assert result.ok is False
     assert "production" in " ".join(result.errors)
+
+    prod01_result = module.validate_inputs(
+        inventory_path=prod01_inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert prod01_result.ok is False
+    assert "production" in " ".join(prod01_result.errors)
 
 
 def test_preflight_rejects_missing_marker_and_non_digest_images(tmp_path: Path) -> None:
@@ -150,6 +180,31 @@ def test_preflight_rejects_generated_docs_symlink_escape(tmp_path: Path) -> None
 
         assert result.ok is False
         assert "output path" in " ".join(result.errors)
+
+        calls = []
+
+        def fake_executor(*args, **kwargs):
+            calls.append((args, kwargs))
+            return "unexpected command output"
+
+        exit_code = module.main(
+            [
+                "--inventory",
+                str(inventory),
+                "--output",
+                str(symlink_path),
+                "--backend-image",
+                "registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+                "--frontend-image",
+                "registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+                "--rollback-window-open",
+            ],
+            command_executor=fake_executor,
+        )
+
+        assert exit_code != 0
+        assert calls == []
+        assert not escaped_output.exists()
     finally:
         if symlink_path.is_symlink():
             symlink_path.unlink()
@@ -232,7 +287,15 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
         frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
         live_status="pending_external_evidence",
         command_summaries=[
-            module.CommandSummary("preflight", "passed", "token=abc123"),
+            module.CommandSummary(
+                "preflight",
+                "passed",
+                (
+                    "token=abc123 OS_PASSWORD=swordfish OS_TOKEN=os-token "
+                    "OS_APPLICATION_CREDENTIAL_SECRET=app-secret "
+                    '"token": "json-secret"'
+                ),
+            ),
             module.CommandSummary("container_count", "pending", "12 expected"),
         ],
     )
@@ -243,8 +306,30 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
     assert "12 expected" in evidence
     assert "pending_external_evidence" in evidence
     assert "abc123" not in evidence
+    assert "swordfish" not in evidence
+    assert "os-token" not in evidence
+    assert "app-secret" not in evidence
+    assert "json-secret" not in evidence
     assert "[REDACTED]" in evidence
     assert "ДКБ-69/70" in evidence
+
+
+def test_rendered_evidence_escapes_markdown_table_cells() -> None:
+    module = load_module()
+    evidence = module.render_evidence(
+        inventory_name="test-inventory.ini",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        live_status="pending_external_evidence",
+        command_summaries=[
+            module.CommandSummary("pipe|name", "passed\nlater", "first|second\nthird"),
+        ],
+    )
+
+    assert "pipe\\|name" in evidence
+    assert "first\\|second third" in evidence
+    assert "| pipe|name |" not in evidence
+    assert "passed\nlater" not in evidence
 
 
 def test_rendered_evidence_states_acceptance_rows_and_partial_scope() -> None:

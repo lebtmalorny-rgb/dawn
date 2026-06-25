@@ -4,21 +4,31 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 GENERATED_DOCS = (ROOT / "docs/generated").resolve()
 
-DIGEST_RE = re.compile(r"^[^:@\s]+(?:/[^:@\s]+)+@sha256:[a-fA-F0-9]{64}$")
-PRODUCTION_RE = re.compile(r"\b(prod|production|prd)\b", re.IGNORECASE)
+DIGEST_RE = re.compile(
+    r"^[A-Za-z0-9._-]+(?::[0-9]+)?(?:/[A-Za-z0-9._-]+)+@sha256:[a-fA-F0-9]{64}$"
+)
+PRODUCTION_RE = re.compile(
+    r"(?i)(?:^|[^a-z0-9])(?:prod(?:uction)?|prd)[0-9]*(?:$|[^a-z0-9])"
+)
 TEST_MARKER_RE = re.compile(
     r"(?m)^\s*cloud_ui_test_stand\s*(?:=|:)\s*true\s*$",
     re.IGNORECASE,
 )
-SECRET_RE = re.compile(
-    r"(?i)\b(password|passwd|token|secret|private[_-]?key|application_credential)"
-    r"\s*[:=]\s*[^,\s|`]+"
+JSON_SECRET_RE = re.compile(
+    r"(?i)([\"']?[A-Za-z0-9_-]*(?:password|passwd|token|secret|private[_-]?key|"
+    r"application_credential(?:_secret)?)[A-Za-z0-9_-]*[\"']?\s*:\s*)([\"'])(.*?)(\2)"
+)
+ASSIGNMENT_SECRET_RE = re.compile(
+    r"(?i)\b([A-Za-z0-9_-]*(?:password|passwd|token|secret|private[_-]?key|"
+    r"application_credential(?:_secret)?)[A-Za-z0-9_-]*)(\s*[:=]\s*)"
+    r"(?:\"[^\"]*\"|'[^']*'|[^,\s|`]+)"
 )
 
 
@@ -61,7 +71,56 @@ def _output_path_is_allowed(output_path: Path) -> bool:
 
 
 def redact(value: str) -> str:
-    return SECRET_RE.sub(lambda match: f"{match.group(1)}=[REDACTED]", value)
+    value = JSON_SECRET_RE.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]{match.group(2)}",
+        value,
+    )
+    return ASSIGNMENT_SECRET_RE.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]",
+        value,
+    )
+
+
+def _table_cell(value: str) -> str:
+    return redact(value).replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
+
+
+def _write_evidence(output_path: Path, evidence: str) -> ValidationResult:
+    if output_path.is_symlink() or not _output_path_is_allowed(output_path):
+        return ValidationResult(
+            ok=False,
+            errors=("output path must be under docs/generated without symlink escape",),
+        )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        output_path.parent.resolve(strict=True).relative_to(GENERATED_DOCS)
+    except (OSError, ValueError):
+        return ValidationResult(
+            ok=False,
+            errors=("output path parent must be under docs/generated",),
+        )
+
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=output_path.parent,
+            prefix=f".{output_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_file.write(evidence)
+            temporary_path = Path(temporary_file.name)
+
+        temporary_path.replace(output_path)
+    except OSError as exc:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        return ValidationResult(ok=False, errors=(f"failed to write evidence: {exc}",))
+
+    return ValidationResult(ok=True, errors=())
 
 
 def validate_inputs(
@@ -144,7 +203,8 @@ def render_evidence(
 
     for item in rows:
         lines.append(
-            f"| {redact(item.name)} | {redact(item.status)} | {redact(item.summary)} |"
+            f"| {_table_cell(item.name)} | {_table_cell(item.status)} | "
+            f"{_table_cell(item.summary)} |"
         )
 
     lines.extend(
@@ -176,6 +236,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None, command_executor=None) -> int:
+    # Reserved for a future explicit live mode; current behavior never runs commands.
     args = parse_args(list(argv if argv is not None else sys.argv[1:]))
     result = validate_inputs(
         inventory_path=args.inventory,
@@ -196,11 +257,19 @@ def main(argv: list[str] | None = None, command_executor=None) -> int:
         live_status=args.live_status,
         command_summaries=[
             CommandSummary("preflight", "passed", "test marker and digest checks passed"),
-            CommandSummary("live commands", "not_run", "runner does not run live commands by default"),
+            CommandSummary(
+                "live commands",
+                "not_run",
+                "runner does not run live commands by default",
+            ),
         ],
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(evidence, encoding="utf-8")
+    write_result = _write_evidence(args.output, evidence)
+    if not write_result.ok:
+        for error in write_result.errors:
+            print(f"E09.8 write failed: {error}", file=sys.stderr)
+        return 2
+
     print(f"E09.8 evidence written to {args.output}")
     return 0
 
