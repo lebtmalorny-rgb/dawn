@@ -2,6 +2,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "deploy/kolla/scripts/collect-e09-evidence.py"
 
@@ -32,6 +34,26 @@ def test_preflight_requires_test_marker_and_rejects_production_inventory(tmp_pat
     module = load_module()
     inventory = tmp_path / "production-inventory.ini"
     inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+
+    result = module.validate_inputs(
+        inventory_path=inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert result.ok is False
+    assert "production" in " ".join(result.errors)
+
+
+def test_preflight_rejects_production_inventory_content(tmp_path: Path) -> None:
+    module = load_module()
+    inventory = tmp_path / "test-inventory.ini"
+    inventory.write_text(
+        "cloud_ui_test_stand=true\nenvironment=production\n",
+        encoding="utf-8",
+    )
 
     result = module.validate_inputs(
         inventory_path=inventory,
@@ -82,6 +104,87 @@ def test_preflight_rejects_output_path_outside_generated_docs(tmp_path: Path) ->
     assert "output path" in " ".join(result.errors)
 
 
+def test_preflight_rejects_generated_docs_path_traversal(tmp_path: Path) -> None:
+    module = load_module()
+    inventory = tmp_path / "test-inventory.ini"
+    inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+
+    result = module.validate_inputs(
+        inventory_path=inventory,
+        output_path=ROOT / "docs/generated/../e09-escape.md",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert result.ok is False
+    assert "output path" in " ".join(result.errors)
+
+
+def test_preflight_rejects_generated_docs_symlink_escape(tmp_path: Path) -> None:
+    module = load_module()
+    inventory = tmp_path / "test-inventory.ini"
+    inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+    escaped_output = tmp_path / "escaped.md"
+    symlink_path = ROOT / "docs/generated/e09-symlink-escape-test.md"
+
+    try:
+        try:
+            symlink_path.symlink_to(escaped_output)
+        except (NotImplementedError, OSError) as exc:
+            pytest.skip(f"symlink creation is unsupported: {exc}")
+
+        result = module.validate_inputs(
+            inventory_path=inventory,
+            output_path=symlink_path,
+            backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+            frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+            rollback_window_open=True,
+        )
+
+        assert result.ok is False
+        assert "output path" in " ".join(result.errors)
+    finally:
+        if symlink_path.is_symlink():
+            symlink_path.unlink()
+
+
+def test_preflight_rejects_digest_refs_for_wrong_image_names(tmp_path: Path) -> None:
+    module = load_module()
+    inventory = tmp_path / "test-inventory.ini"
+    inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+
+    result = module.validate_inputs(
+        inventory_path=inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test/not-cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/not-cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert result.ok is False
+    assert "backend image" in " ".join(result.errors)
+    assert "frontend image" in " ".join(result.errors)
+
+
+def test_preflight_rejects_swapped_frontend_and_backend_images(tmp_path: Path) -> None:
+    module = load_module()
+    inventory = tmp_path / "test-inventory.ini"
+    inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+
+    result = module.validate_inputs(
+        inventory_path=inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test/cloud-ui-frontend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-backend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert result.ok is False
+    assert "backend image" in " ".join(result.errors)
+    assert "frontend image" in " ".join(result.errors)
+
+
 def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None:
     module = load_module()
     evidence = module.render_evidence(
@@ -112,22 +215,11 @@ def test_rendered_evidence_states_acceptance_rows_and_partial_scope() -> None:
         backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
         frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
         live_status="pending_external_evidence",
-        command_summaries=[
-            module.CommandSummary("migration", "pending", "one-shot migration pending"),
-            module.CommandSummary("db_rabbitmq", "pending", "DB/RabbitMQ access pending"),
-            module.CommandSummary("haproxy_tls", "pending", "HAProxy/TLS smoke pending"),
-            module.CommandSummary(
-                "container_hardening",
-                "pending",
-                "user/caps/mounts/SELinux inspection pending",
-            ),
-            module.CommandSummary("api_ui_smoke", "pending", "API/UI smoke pending"),
-            module.CommandSummary("rollback", "pending", "rollback pending"),
-        ],
+        command_summaries=[],
     )
     normalized = evidence.lower()
 
-    assert "one-shot migration" in normalized or "migration" in normalized
+    assert "one-shot migration" in normalized
     assert "db/rabbitmq" in normalized
     assert "haproxy/tls" in normalized
     assert (

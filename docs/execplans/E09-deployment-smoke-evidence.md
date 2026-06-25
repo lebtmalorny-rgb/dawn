@@ -83,7 +83,7 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   baseline `make test` passed.
 - [x] 2026-06-25: Контракт и тестовый double. Evidence:
   `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py -q` exited
-  `1` with `8 failed`; failures are the expected RED state because
+  `1` with `13 failed`; failures are the expected RED state because
   `deploy/kolla/scripts/collect-e09-evidence.py` and
   `docs/generated/e09-deployment-smoke-evidence.md` do not exist yet.
 - [ ] Минимальная реализация.
