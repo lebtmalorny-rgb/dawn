@@ -43,16 +43,20 @@ Read-only checks were run against the approved test Ansible host before any DB/R
 | Vault service | inactive |
 | Vault listeners | none observed on `:8200` or `:8201` |
 | Vault package source | `vault_package_unavailable` from the approved `dnf` package-source check |
+| Official HashiCorp RPM repository | approved for lab use, but `https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo` returned HTTP `404` with `x-amzn-waf-reason: geo` from the test host |
+| Vault package after approved repository attempt | not installed |
+| HashiCorp repo file | absent |
+| Remote package side effect | `yum-utils` installed and `dnf-plugins-core` updated before the repository add failed |
 
-The plan requires stopping when the selected test host has no approved Vault package source. DB/MQ
-provisioning was therefore not attempted.
+The plan requires stopping when the selected test host has no reachable approved Vault package
+source. DB/MQ provisioning was therefore not attempted.
 
 ## External Evidence Status
 
 | Evidence | Status | Reason |
 |---|---|---|
-| Vault/SecMan lab service on `192.168.10.15` | pending_external_evidence | The approved package-source check did not expose a Vault package. |
-| Cloud UI DB/MQ secret material in Vault | pending_external_evidence | Requires the lab Vault service or another approved SecMan mechanism. |
+| Vault/SecMan lab service on `192.168.10.15` | pending_external_evidence | The official HashiCorp RPM endpoint is geo-blocked from the test host. |
+| Cloud UI DB/MQ secret material in Vault | pending_external_evidence | Requires reachable Vault package provenance, a pre-installed approved lab Vault or another approved SecMan mechanism. |
 | MariaDB schema `cloud_ui` | pending_external_evidence | Not created because the protected secret mechanism is unavailable. |
 | MariaDB users `cloud_ui` and `cloud_ui_migration` | pending_external_evidence | Not created because DB credentials must come from the protected secret mechanism. |
 | RabbitMQ vhost `/cloud-ui` and user `cloud_ui` | pending_external_evidence | Not created because MQ credentials must come from the protected secret mechanism. |
@@ -62,9 +66,10 @@ provisioning was therefore not attempted.
 
 ## DKB Impact
 
-- ДКБ-55/56: E09.3 adds the repository-side Vault/SecMan path contract for Cloud UI DB/MQ material,
-  but the selected test host does not yet provide an approved lab Vault package source. Full secret
-  storage, rotation, production SecMan endpoint/auth and owner approval remain open.
+- ДКБ-55/56: E09.3 adds the repository-side Vault/SecMan path contract for Cloud UI DB/MQ material.
+  The official HashiCorp RPM repository was approved for lab use, but the selected test host receives
+  a geo WAF block from that endpoint. Full secret storage, rotation, production SecMan endpoint/auth
+  and owner approval remain open.
 - ДКБ-76/77/80: E09.3 documents the DB/MQ interface boundaries for Cloud UI. Network zone, firewall,
   unused-interface blocking and management-zone evidence remain external E09/E10 proof.
 - ДКБ-42-44: no new browser, DB or MQ network path was opened by this slice. VLAN/ACL proof remains
@@ -76,6 +81,6 @@ provisioning was therefore not attempted.
 
 ## Safe Next Step
 
-Provide an approved Vault/SecMan package source or a pre-installed approved lab Vault on
-`192.168.10.15`, then rerun the E09.3 remote bootstrap steps before attempting MariaDB/RabbitMQ
-provisioning.
+Provide a reachable approved Vault/SecMan package source, an internal mirror of the approved
+HashiCorp package, or a pre-installed approved lab Vault on `192.168.10.15`, then rerun the E09.3
+remote bootstrap steps before attempting MariaDB/RabbitMQ provisioning.

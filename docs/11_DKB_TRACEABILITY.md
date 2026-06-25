@@ -360,8 +360,9 @@ provisioning остановлен на безопасном external blocker:
 - ДКБ-55/56: `deploy/kolla/ansible/roles/cloud_ui_provisioning` фиксирует Vault/SecMan lab path
   `kv/cloud-ui/local/*`, отдельные Cloud UI DB/MQ principals and `no_log` task shape. На выбранном
   test Ansible host `192.168.10.15` approved package-source check returned
-  `vault_package_unavailable`; поэтому live secret material, MariaDB schema/users and RabbitMQ
-  vhost/user/permissions remain `pending_external_evidence`.
+  `vault_package_unavailable`; after approval of the official HashiCorp RPM repository, the host
+  received HTTP `404` with `x-amzn-waf-reason: geo` from that endpoint. Therefore live secret
+  material, MariaDB schema/users and RabbitMQ vhost/user/permissions remain `pending_external_evidence`.
 - ДКБ-42-44/76/77/80: роль документирует DB/MQ object boundaries only. Network/VLAN/ACL,
   management-zone placement, unused-interface blocking and live RabbitMQ/MariaDB access checks remain
   external E09/E10 evidence.

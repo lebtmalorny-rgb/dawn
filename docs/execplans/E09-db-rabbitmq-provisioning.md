@@ -123,6 +123,11 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
     `ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/dawn_known_hosts -o BatchMode=yes root@192.168.10.15 ...`
     exited 20 with `vault_package_unavailable`. Per plan, live Vault bootstrap stopped and sanitized
     blocker evidence was recorded in `docs/generated/e09-db-rabbitmq-provisioning.md`.
+  - 2026-06-25: User approved the official HashiCorp RPM repository for lab use. Official docs list
+    `https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo`, but the test host receives HTTP `404`
+    with `x-amzn-waf-reason: geo`. Vault remains not installed, `/etc/yum.repos.d/hashicorp.repo` is
+    absent and DB/MQ provisioning remains stopped. Remote side effect: `yum-utils` installed and
+    `dnf-plugins-core` updated before the repository add failed.
 - [ ] Remote DB/RabbitMQ provisioning and least-privilege evidence.
   - 2026-06-25: Not executed because the protected secret mechanism is unavailable on the selected
     test host.
@@ -140,6 +145,12 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
     `make test` -> backend 327 passed, 1 skipped; frontend 35 passed;
     `make security` -> secret scan passed;
     `git diff --check` -> passed.
+  - 2026-06-25 after official HashiCorp RPM repository geo block evidence:
+    `backend/.venv/bin/python -m pytest tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_ansible_role.py backend/tests/test_secret_scan_script.py -q` -> 16 passed;
+    `make lint` -> backend Ruff, frontend ESLint and secret scan passed;
+    `make test` -> backend 327 passed, 1 skipped; frontend 35 passed;
+    `./scripts/secret-scan.sh` -> passed;
+    `git diff --check` -> passed.
 
 ## Неожиданные открытия
 
@@ -148,6 +159,9 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
 - The selected test host does not currently expose an approved Vault package through `dnf`; the remote
   check returned `vault_package_unavailable`. E09.3 cannot safely proceed to DB/MQ mutation until an
   approved Vault/SecMan source or pre-installed approved lab Vault is available.
+- The user approved the official HashiCorp RPM repository, but `rpm.releases.hashicorp.com` returns
+  CloudFront HTTP `404` with `x-amzn-waf-reason: geo` from the test host. This is an external network
+  policy/source reachability blocker, not a repository contract issue.
 - The repository secret scanner intentionally flags password-like YAML keys. E09.3 Ansible modules
   need those module argument names for Vault-derived values, so `scripts/secret-scan.sh` now has a
   narrow path-and-expression allowlist plus `backend/tests/test_secret_scan_script.py` regression
@@ -169,6 +183,11 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   `vault_package_unavailable`. Alternative: download/install Vault through an ad hoc path. Reason:
   E09.3 requires an approved secret mechanism and package provenance before live DB/MQ mutation.
   Consequence: E09.3 is blocked with repository contract and blocker evidence only.
+- 2026-06-25: Treat the official HashiCorp RPM repository geo block as a blocker instead of using an
+  ad hoc package transfer or binary download. Alternative: bypass the blocked RPM repository from a
+  different network path. Reason: the approved source must be reachable from the lab or mirrored by an
+  approved process to preserve package provenance evidence. Consequence: Vault bootstrap remains
+  pending external evidence.
 - 2026-06-25: Allowlist only exact Cloud UI provisioning Ansible template references in the secret
   scanner. Alternative: weaken the generic password-key pattern. Reason: the role needs Ansible module
   argument names, but arbitrary literal secret values must remain blocked. Consequence: `make lint`
@@ -268,10 +287,10 @@ Preserve `/opt/vault/data` unless destructive cleanup is explicitly approved.
 
 Current status: blocked before live DB/RabbitMQ mutation. The repository contract and sanitized
 external blocker evidence are present, but E09.3 live provisioning is not complete because the
-selected test host has no approved Vault package source.
+selected test host cannot reach the approved HashiCorp RPM source.
 
-- approved Vault/SecMan package source or pre-installed approved lab Vault is required before DB/MQ
-  provisioning can run;
+- reachable approved Vault/SecMan package source, approved mirror, or pre-installed approved lab Vault
+  is required before DB/MQ provisioning can run;
 - live MariaDB schema/users and RabbitMQ vhost/user/permissions were not created;
 - least-privilege negative DB/MQ checks were not executed;
 - lab all-in-one evidence is not HA production evidence;
