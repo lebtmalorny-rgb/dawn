@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 import tempfile
@@ -15,7 +16,8 @@ DIGEST_RE = re.compile(
     r"^[A-Za-z0-9._-]+(?::[0-9]+)?(?:/[A-Za-z0-9._-]+)+@sha256:[a-fA-F0-9]{64}$"
 )
 PRODUCTION_RE = re.compile(
-    r"(?i)(?:^|[^a-z0-9])(?:prod(?:uction)?|prd)[0-9]*(?:$|[^a-z0-9])"
+    r"(?i)(?:^|[^a-z0-9])(?:production|prd[a-z0-9]*|prod(?!uct)[a-z0-9]*)"
+    r"(?:$|[^a-z0-9])"
 )
 TEST_MARKER_RE = re.compile(
     r"(?m)^\s*cloud_ui_test_stand\s*(?:=|:)\s*true\s*$",
@@ -28,7 +30,13 @@ JSON_SECRET_RE = re.compile(
 ASSIGNMENT_SECRET_RE = re.compile(
     r"(?i)\b([A-Za-z0-9_-]*(?:password|passwd|token|secret|private[_-]?key|"
     r"application_credential(?:_secret)?)[A-Za-z0-9_-]*)(\s*[:=]\s*)"
-    r"(?:\"[^\"]*\"|'[^']*'|[^,\s|`]+)"
+    r"(?:\"[^\"]*\"|'[^']*'|[^\n|`]+)"
+)
+AUTHORIZATION_BEARER_RE = re.compile(
+    r"(?i)\b(authorization\s*:\s*bearer\s+)[^\s,|`]+"
+)
+SENSITIVE_KEY_RE = re.compile(
+    r"(?i)(password|passwd|token|secret|private[_-]?key|application_credential)"
 )
 
 
@@ -71,6 +79,17 @@ def _output_path_is_allowed(output_path: Path) -> bool:
 
 
 def redact(value: str) -> str:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        parsed = None
+    else:
+        return json.dumps(_redact_json(parsed), ensure_ascii=False, sort_keys=True)
+
+    value = AUTHORIZATION_BEARER_RE.sub(
+        lambda match: f"{match.group(1)}[REDACTED]",
+        value,
+    )
     value = JSON_SECRET_RE.sub(
         lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]{match.group(2)}",
         value,
@@ -79,6 +98,17 @@ def redact(value: str) -> str:
         lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]",
         value,
     )
+
+
+def _redact_json(value):
+    if isinstance(value, dict):
+        return {
+            key: "[REDACTED]" if SENSITIVE_KEY_RE.search(str(key)) else _redact_json(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_json(item) for item in value]
+    return value
 
 
 def _table_cell(value: str) -> str:

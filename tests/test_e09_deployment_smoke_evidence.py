@@ -43,6 +43,12 @@ def test_preflight_rejects_production_inventory_filename(tmp_path: Path) -> None
     inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
     prod01_inventory = tmp_path / "cloud-ui-prod01.ini"
     prod01_inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+    prdcontrol_inventory = tmp_path / "prdcontrol01.ini"
+    prdcontrol_inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+    prodblue_inventory = tmp_path / "prodblue01.ini"
+    prodblue_inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
+    product_inventory = tmp_path / "product-lab.ini"
+    product_inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
 
     result = module.validate_inputs(
         inventory_path=inventory,
@@ -65,6 +71,28 @@ def test_preflight_rejects_production_inventory_filename(tmp_path: Path) -> None
 
     assert prod01_result.ok is False
     assert "production" in " ".join(prod01_result.errors)
+
+    for production_inventory in (prdcontrol_inventory, prodblue_inventory):
+        production_result = module.validate_inputs(
+            inventory_path=production_inventory,
+            output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+            backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+            frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+            rollback_window_open=True,
+        )
+
+        assert production_result.ok is False
+        assert "production" in " ".join(production_result.errors)
+
+    product_result = module.validate_inputs(
+        inventory_path=product_inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert product_result.ok is True
 
 
 def test_preflight_rejects_production_inventory_content(tmp_path: Path) -> None:
@@ -79,6 +107,11 @@ def test_preflight_rejects_production_inventory_content(tmp_path: Path) -> None:
         "cloud_ui_test_stand=true\nenv=prod01\n",
         encoding="utf-8",
     )
+    prefixed_inventory = tmp_path / "test-prefixed-prod-content.ini"
+    prefixed_inventory.write_text(
+        "cloud_ui_test_stand=true\nhost=prdcontrol01\nblue=prodblue01\nname=product-lab\n",
+        encoding="utf-8",
+    )
 
     result = module.validate_inputs(
         inventory_path=inventory,
@@ -101,6 +134,17 @@ def test_preflight_rejects_production_inventory_content(tmp_path: Path) -> None:
 
     assert prod01_result.ok is False
     assert "production" in " ".join(prod01_result.errors)
+
+    prefixed_result = module.validate_inputs(
+        inventory_path=prefixed_inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert prefixed_result.ok is False
+    assert "production" in " ".join(prefixed_result.errors)
 
 
 def test_preflight_rejects_missing_marker_and_non_digest_images(tmp_path: Path) -> None:
@@ -296,6 +340,31 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
                     '"token": "json-secret"'
                 ),
             ),
+            module.CommandSummary(
+                "bearer",
+                "passed",
+                "Authorization: Bearer eyJsecret",
+            ),
+            module.CommandSummary(
+                "xauth",
+                "passed",
+                "X-Auth-Token: xauth-secret",
+            ),
+            module.CommandSummary(
+                "spaces",
+                "passed",
+                "password=very secret value",
+            ),
+            module.CommandSummary(
+                "json",
+                "passed",
+                '{"token": {"id": "nested-secret"}}',
+            ),
+            module.CommandSummary(
+                "keystone",
+                "passed",
+                '{"access": {"token": {"id": "keystone-secret"}}}',
+            ),
             module.CommandSummary("container_count", "pending", "12 expected"),
         ],
     )
@@ -310,6 +379,11 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
     assert "os-token" not in evidence
     assert "app-secret" not in evidence
     assert "json-secret" not in evidence
+    assert "eyJsecret" not in evidence
+    assert "xauth-secret" not in evidence
+    assert "very secret value" not in evidence
+    assert "nested-secret" not in evidence
+    assert "keystone-secret" not in evidence
     assert "[REDACTED]" in evidence
     assert "ДКБ-69/70" in evidence
 
