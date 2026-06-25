@@ -31,7 +31,7 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   - inventories `/etc/kolla/all-in-one`, `/root/all-in-one` and `/root/multinode` exist;
   - `/etc/kolla/passwords.yml` exists and was not read into the repository.
 - Vault precheck found:
-  - `vault` CLI missing;
+  - `vault_cli_missing`;
   - `systemctl is-active vault` -> inactive;
   - no `:8200` or `:8201` listener;
   - `https://127.0.0.1:8200/v1/sys/health` refused connection.
@@ -99,7 +99,15 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   `/etc/kolla/all-in-one`.
 - [x] 2026-06-24: Selected secret mechanism: lab Vault/SecMan on `192.168.10.15`.
 - [x] 2026-06-24: Vault precheck found no active Vault service or listener.
-- [ ] Contract and RED tests.
+- [x] 2026-06-25: Contract and RED tests complete. Added
+  `tests/test_e09_db_rabbitmq_provisioning.py`. RED command
+  `/Users/dmitry/Desktop/dawn/backend/.venv/bin/python -m pytest tests/test_e09_db_rabbitmq_provisioning.py -q`
+  exited 1 with expected missing-artifact failures: 4 failed, 1 passed because
+  `deploy/kolla/ansible/roles/cloud_ui_provisioning/defaults/main.yml`,
+  `deploy/kolla/ansible/roles/cloud_ui_provisioning/tasks/main.yml` and
+  `docs/generated/e09-db-rabbitmq-provisioning.md` do not exist yet. Ruff command
+  `cd backend && /Users/dmitry/Desktop/dawn/backend/.venv/bin/python -m ruff check ../tests/test_e09_db_rabbitmq_provisioning.py`
+  exited 0 with `All checks passed!`.
 - [ ] Provisioning role skeleton.
 - [ ] Remote Vault bootstrap and sanitized evidence.
 - [ ] Remote DB/RabbitMQ provisioning and least-privilege evidence.
