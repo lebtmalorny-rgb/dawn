@@ -129,6 +129,10 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   run. Additional read-only probes found `/usr/bin/podman`, but no Cloud UI/Kolla containers/images by
   name, no `kolla-ansible`/`kolla-build` on PATH and no approved inventory/digest inputs to feed into
   the evidence runner.
+- 2026-06-25: Final whole-branch review found an important redaction gap: non-JSON
+  `Authorization:` headers were redacted only for Bearer values. Commit
+  `8cac2a4 deploy: redact all E09 authorization headers` now redacts any `Authorization:` or
+  `Proxy-Authorization:` header value and adds Basic/Token/custom scheme regression tests.
 
 ## Журнал решений
 
@@ -184,6 +188,13 @@ Run from `/Users/dmitry/Desktop/dawn/.worktrees/e09-deployment-smoke-evidence`:
 - `git diff --check`
   - 2026-06-25 pre-ExecPlan-update result: exit `0`.
   - 2026-06-25 post-ExecPlan-update result: exit `0`.
+- `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py tests/test_e09_reconfigure_rollback.py tests/test_e09_kolla_ansible_role.py tests/test_e09_haproxy_tls_network.py tests/test_e09_process_containers.py tests/test_e09_migration_job.py tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_image_build.py -q`
+  - 2026-06-25 post-review auth-header fix result: exit `0`, `68 passed in 0.31s`.
+- `make lint`
+  - 2026-06-25 post-review auth-header fix result: exit `0`; ruff `All checks passed!`,
+    frontend eslint completed, `./scripts/secret-scan.sh` completed.
+- `git diff --check`
+  - 2026-06-25 post-review auth-header fix result: exit `0`.
 
 Optional live test-stand checks must be recorded as sanitized command summaries only after repository
 checks pass and test inventory marker/digests/rollback window are present.
@@ -207,7 +218,8 @@ stand, rollback must use recorded previous image digests/config commit and the E
 
 Repository-side E09.8 status is implemented and verified: the fail-closed evidence runner,
 repository evidence, DKB traceability row and R-068 risk entry exist, and the retry verification gates
-above passed after the static canary fixture fix in `5574b2f`.
+above passed after the static canary fixture fix in `5574b2f`. Final whole-branch review found an
+authorization-header scheme redaction gap, fixed by `8cac2a4`.
 
 Full E09 acceptance is still not claimed. The optional live test-stand smoke, real container/HAProxy/
 DB/RabbitMQ inspection summaries, image digest pull proof and failed-update rollback evidence remain
