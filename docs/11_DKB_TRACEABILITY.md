@@ -411,6 +411,28 @@ E09.5 adds synthetic repository topology evidence for the permanent Cloud UI pro
 Evidence: `tests/test_e09_process_containers.py`, `docs/generated/e09-process-containers.md`,
 `docs/generated/risk-register.md` and ExecPlan `docs/execplans/E09-process-containers.md`.
 
+## Обновление требований 2026-06-25: E09.6 HAProxy/TLS/network
+
+E09.6 добавляет repository-side HAProxy/TLS/network contract для Cloud UI same-origin route:
+
+- ДКБ-22.02/23.02/24: роль фиксирует внешний `https` route, TLS minimum `TLSv1.2`, backend TLS mode
+  decision (`internal_http`, `backend_tls`, `backend_mtls`) and trusted proxy headers. Corporate PKI,
+  mTLS authorization, revocation/rotation and negative certificate tests remain pending external
+  evidence.
+- ДКБ-65/66: `docs/generated/network-flow-matrix.md` records Cloud UI same-origin route and forbidden
+  browser/frontend flows. Management CIDR/VLAN/firewall ACL proof remains pending external evidence.
+- ДКБ-69/70: HAProxy template stores no certificate/key material, passwords, tokens, `.env` or
+  production inventory values. Registry digest pull, scanner/signature and ДКБ-69 waiver remain
+  external gates.
+- ДКБ-76/77/80/82: route, health check, timeout, body limit, security headers and public path
+  deployment interface are tested. This is not a live HAProxy deployment, Kolla reconfigure, route
+  smoke, rollback execution or production approval.
+
+Evidence: `tests/test_e09_haproxy_tls_network.py`,
+`docs/generated/e09-haproxy-tls-network.md`, `docs/generated/tls-matrix.md`,
+`docs/generated/network-flow-matrix.md`, `docs/generated/risk-register.md` and ExecPlan
+`docs/execplans/E09-haproxy-tls-network.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

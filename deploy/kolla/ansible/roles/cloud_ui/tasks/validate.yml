@@ -28,3 +28,19 @@
       - cloud_ui_backend_image == 'cloud-ui-backend'
       - cloud_ui_frontend_image == 'cloud-ui-frontend'
     fail_msg: "Cloud UI must keep the E09 two-image contract."
+
+- name: Validate Cloud UI HAProxy route policy
+  ansible.builtin.assert:
+    that:
+      - cloud_ui_external_scheme == 'https'
+      - cloud_ui_external_fqdn | length > 0
+      - cloud_ui_external_fqdn != 'cloud-ui.example.invalid' or not cloud_ui_haproxy_enabled
+      - cloud_ui_api_public_path == '/api/v1/'
+      - cloud_ui_haproxy_routes | length == 2
+      - cloud_ui_haproxy_routes[0].name == 'cloud_ui_api'
+      - cloud_ui_haproxy_routes[1].name == 'cloud_ui_frontend'
+      - cloud_ui_haproxy_tls_min_version in ['TLSv1.2', 'TLSv1.3']
+      - cloud_ui_haproxy_backend_tls_mode in cloud_ui_haproxy_backend_tls_mode_allowed
+      - cloud_ui_haproxy_max_body_bytes > 0
+      - cloud_ui_management_network_acl_required | bool
+    fail_msg: "Cloud UI HAProxy route must keep the E09.6 same-origin TLS/network contract."

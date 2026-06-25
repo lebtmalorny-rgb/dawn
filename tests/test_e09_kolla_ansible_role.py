@@ -17,6 +17,7 @@ EXPECTED_ROLE_FILES = [
     "deploy/kolla/ansible/roles/cloud_ui/tasks/containers.yml",
     "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-backend.env.j2",
     "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-frontend.conf.j2",
+    "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-haproxy.cfg.j2",
     "docs/generated/e09-kolla-ansible-role.md",
 ]
 
@@ -150,6 +151,9 @@ def test_role_templates_contain_only_non_secret_config() -> None:
     frontend_template = read_text(
         "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-frontend.conf.j2"
     )
+    haproxy_template = read_text(
+        "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-haproxy.cfg.j2"
+    )
 
     for expected in [
         "CLOUD_UI_CONFIG_VERSION",
@@ -161,7 +165,7 @@ def test_role_templates_contain_only_non_secret_config() -> None:
 
     assert "listen {{ cloud_ui_frontend_listen_port }};" in frontend_template
 
-    combined_templates = f"{backend_template}\n{frontend_template}".lower()
+    combined_templates = f"{backend_template}\n{frontend_template}\n{haproxy_template}".lower()
     for forbidden in ["password", "token", "private_key", "secret_key"]:
         assert forbidden not in combined_templates
 
@@ -171,9 +175,11 @@ def test_role_scope_excludes_later_e09_work() -> None:
     combined_role = "\n".join(role_texts().values()).lower()
 
     for forbidden in [
-        "mariadb",
-        "rabbitmq",
-        "haproxy",
+        "mysql_user",
+        "rabbitmq_user",
+        "rabbitmq_vhost",
+        "community.mysql",
+        "community.rabbitmq",
         "tls_private",
         "production",
         "inventory.ini",

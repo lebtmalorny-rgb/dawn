@@ -100,11 +100,23 @@ backend health checks, proxy headers и network flow evidence.
 - [x] 2026-06-25: Исследование фактического состояния. Evidence: E09 task and listed docs were read
   before design approval; role defaults/templates/tests and backend health routes inspected; baseline
   `make test` passed after Python 3.11 setup.
-- [ ] Контракт и тестовый double.
-- [ ] Минимальная реализация.
-- [ ] Отрицательные сценарии и безопасность.
-- [ ] Интеграционные и пользовательские проверки.
-- [ ] Документация, evidence и review.
+- [x] 2026-06-25: Контракт и тестовый double. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_haproxy_tls_network.py -q` failed `7 failed`
+  because HAProxy defaults, template/config task, validation rules, evidence and E09 role guard updates
+  are not implemented yet.
+- [x] 2026-06-25: Минимальная реализация. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_haproxy_tls_network.py -q` passed `7 passed`
+  after adding HAProxy defaults, non-secret template, config rendering, validation and evidence docs.
+- [x] 2026-06-25: Отрицательные сценарии и безопасность. Evidence: E09.6 tests verify no secret
+  keywords in HAProxy template, placeholder FQDN is rejected when enabled, forbidden network flows are
+  documented and evidence does not claim production approval.
+- [x] 2026-06-25: Интеграционные и пользовательские проверки. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_haproxy_tls_network.py tests/test_e09_kolla_ansible_role.py tests/test_e09_process_containers.py tests/test_e09_migration_job.py -q`
+  passed `31 passed`.
+- [x] 2026-06-25: Документация, evidence и review. Evidence:
+  `backend/.venv/bin/python -m pytest tests -q` passed `43 passed`; `make lint`, `make typecheck`,
+  `make security`, `make test` and `git diff --check` passed. Full `make test` passed backend
+  `327 passed, 1 skipped` and frontend `35 passed`.
 
 ## Неожиданные открытия
 
@@ -206,4 +218,12 @@ routes still answer.
 
 ## Итог и остаточные риски
 
-Pending implementation.
+Implemented E09.6 as a repository-side HAProxy/TLS/network contract. The Cloud UI role now records
+same-origin route defaults, placeholder external FQDN, TLS minimum, backend TLS mode choices, trusted
+proxy headers, body/timeouts/security headers, management ACL status, forbidden network flows and a
+non-secret HAProxy route template. The role renders this contract to config only and does not reload a
+live HAProxy process.
+
+Residual risks: no live HAProxy route, no `https://` UI smoke, no corporate PKI scan, no mTLS owner
+approval, no wrong-certificate negative test, no firewall/management ACL reject proof, no WAF/rate
+policy evidence, no Kolla reconfigure/rollback execution and no production approval.

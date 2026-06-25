@@ -7,6 +7,7 @@
   loop:
     - cloud-ui-backend
     - cloud-ui-frontend
+    - cloud-ui-haproxy
 
 - name: Render Cloud UI backend non-secret environment
   ansible.builtin.template:
@@ -23,3 +24,9 @@
     mode: "0640"
   notify:
     - Restart Cloud UI containers
+
+- name: Render Cloud UI HAProxy route contract
+  ansible.builtin.template:
+    src: cloud-ui-haproxy.cfg.j2
+    dest: "{{ cloud_ui_config_root }}/cloud-ui-haproxy/cloud-ui-haproxy.cfg"
+    mode: "0640"

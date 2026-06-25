@@ -1,7 +1,8 @@
 # Network flow matrix
 
 - Stage: E08
-- Status: E08 adds threat model and expanded TLS/mTLS matrix; actual production CIDR/VLAN/ACL/mTLS evidence remains pending
+- Status: E08 adds threat model and expanded TLS/mTLS matrix; E09.6 adds Cloud UI same-origin route
+  contract; actual production CIDR/VLAN/ACL/mTLS evidence remains pending
 
 ## Zones
 
@@ -19,9 +20,9 @@
 
 | Source | Destination | Protocol | Purpose | Stage | Required control | Status |
 |---|---|---|---|---|---|---|
-| Browser | HAProxy/VIP | HTTPS | portal UI/API same-origin | E08/E09 | TLS >= 1.2, auth/session, WAF/rate policy if required; see `docs/generated/tls-matrix.md` | lab Kolla TLS observed; production PKI/portal scan pending |
-| HAProxy | Frontend containers | HTTP or HTTPS | static SPA | E09 | internal ACL, health check, backend TLS/mTLS decision by matrix | pending |
-| HAProxy | API containers | HTTP or HTTPS | `/api/v1` | E09 | trusted proxy headers, timeouts, request limits, backend TLS/mTLS decision by matrix | pending |
+| Browser | HAProxy/VIP | HTTPS | Cloud UI same-origin route contract for portal UI/API | E08/E09.6 | TLS >= 1.2, auth/session, WAF/rate policy if required; see `docs/generated/tls-matrix.md` | lab Kolla TLS observed; production PKI/portal scan pending |
+| HAProxy | Cloud UI frontend containers | HTTP or HTTPS | static SPA | E09.6 | internal ACL, `/` health check, backend TLS/mTLS decision by matrix | repository contract exists; management ACL proof pending |
+| HAProxy | Cloud UI API containers | HTTP or HTTPS | `/api/v1` | E09.6 | trusted proxy headers, timeouts, request limits, `/api/v1/health/ready`, backend TLS/mTLS decision by matrix | repository contract exists; management ACL proof pending |
 | API | Keystone/IdP | HTTPS | auth, scope, service catalog | E02/E03/E08 | TLS, optional mTLS by matrix, timeout/retry, OpenStack policy final authority | lab Keystone TLS observed; production PKI/mTLS pending |
 | API/worker/events | MariaDB `cloud_ui` | TCP/TLS if enabled | sessions, read model, operations, audit index | E01/E08/E09 | least privilege DB user, network ACL, backup, TLS/client-cert decision by matrix | pending |
 | API/worker/events | RabbitMQ `/cloud-ui` | AMQPS in production | jobs/outbox/events | E01/E08/E09 | vhost/user ACL, DLX, no OpenStack RPC wildcard, TLS/client-cert decision by matrix | pending |
@@ -51,6 +52,9 @@
 
 ## Current observations
 
+- E09.6 repository contract adds Cloud UI same-origin route contract:
+  HAProxy -> Cloud UI frontend containers for `/`, and HAProxy -> Cloud UI API containers for
+  `/api/v1/`. Live management ACL proof pending.
 - `192.168.10.250` responds to ICMP from Ansible host.
 - `https://192.168.10.250/` returns Horizon redirect to `/auth/login/` when verified with the Kolla CA.
 - `https://192.168.10.250:5000/v3` returns Keystone version discovery `v3.14` when verified with the Kolla CA.

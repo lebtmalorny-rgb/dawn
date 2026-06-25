@@ -1,0 +1,54 @@
+# Cloud UI HAProxy route contract.
+# This repository template contains no certificate, key or credential material.
+
+global
+  log stdout format raw local0
+  daemon
+  maxconn 2048
+  tune.ssl.default-dh-param 2048
+  ssl-default-bind-options no-sslv3 no-tlsv10 no-tlsv11
+  ssl-default-bind-ciphers PROFILE=SYSTEM
+
+defaults
+  mode http
+  log global
+  option httplog
+  option dontlognull
+  option forwardfor
+  timeout connect {{ cloud_ui_haproxy_timeouts.connect }}
+  timeout client {{ cloud_ui_haproxy_timeouts.client }}
+  timeout server {{ cloud_ui_haproxy_timeouts.server }}
+  timeout http-request {{ cloud_ui_haproxy_timeouts.http_request }}
+  unique-id-format %[uuid()]
+  unique-id-header X-Request-ID
+
+frontend cloud_ui_external
+  bind {{ cloud_ui_haproxy_bind_address }}:{{ cloud_ui_haproxy_external_port }} ssl crt {{ cloud_ui_haproxy_tls_cert_bundle_path }} ssl-min-ver {{ cloud_ui_haproxy_tls_min_version }}
+  http-request deny deny_status 413 if { req.hdr(content-length),int gt {{ cloud_ui_haproxy_max_body_bytes }} }
+  http-request set-header X-Forwarded-For %[src]
+  http-request set-header X-Forwarded-Proto https if { ssl_fc }
+  http-request set-header X-Forwarded-Proto http unless { ssl_fc }
+  http-request set-header X-Forwarded-Host %[req.hdr(Host)]
+  http-request set-header X-Request-ID %[unique-id] unless { req.hdr(X-Request-ID) -m found }
+  http-response set-header X-Content-Type-Options nosniff
+  http-response set-header X-Frame-Options DENY
+  http-response set-header Referrer-Policy no-referrer
+  acl cloud_ui_api_path path_beg {{ cloud_ui_api_public_path }}
+  use_backend cloud_ui_api if cloud_ui_api_path
+  default_backend cloud_ui_frontend
+
+backend cloud_ui_api
+  balance roundrobin
+  option httpchk GET /api/v1/health/ready
+  http-check expect status 200
+{% for host in groups[cloud_ui_api_group] | default([]) %}
+  server cloud_ui_api_{{ loop.index }} {{ hostvars[host].ansible_host | default(host) }}:{{ cloud_ui_backend_listen_port }} check{% if cloud_ui_haproxy_backend_tls_mode in ['backend_tls', 'backend_mtls'] %} ssl verify required ca-file {{ cloud_ui_haproxy_backend_ca_path }}{% endif %}{% if cloud_ui_haproxy_backend_tls_mode == 'backend_mtls' %} crt {{ cloud_ui_haproxy_backend_client_cert_path }} key {{ cloud_ui_haproxy_backend_client_key_path }}{% endif %}
+{% endfor %}
+
+backend cloud_ui_frontend
+  balance roundrobin
+  option httpchk GET /
+  http-check expect status 200
+{% for host in groups[cloud_ui_frontend_group] | default([]) %}
+  server cloud_ui_frontend_{{ loop.index }} {{ hostvars[host].ansible_host | default(host) }}:{{ cloud_ui_frontend_listen_port }} check
+{% endfor %}

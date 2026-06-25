@@ -1,9 +1,67 @@
 ---
 cloud_ui_enabled: false
 
-cloud_ui_config_version: "e09.4-migration-job"
-cloud_ui_public_base_url: "/"
+cloud_ui_config_version: "e09.6-haproxy-tls-network"
+cloud_ui_external_scheme: "https"
+cloud_ui_external_fqdn: "cloud-ui.example.invalid"
+cloud_ui_public_base_url: "{{ cloud_ui_external_scheme }}://{{ cloud_ui_external_fqdn }}/"
+cloud_ui_api_public_path: "/api/v1/"
 cloud_ui_log_level: "INFO"
+
+cloud_ui_haproxy_enabled: false
+cloud_ui_haproxy_bind_address: "{{ kolla_external_vip_address }}"
+cloud_ui_haproxy_external_port: 443
+cloud_ui_haproxy_tls_cert_bundle_path: "/etc/kolla/certificates/cloud-ui-haproxy.pem"
+cloud_ui_haproxy_tls_min_version: "TLSv1.2"
+cloud_ui_haproxy_backend_tls_mode: "internal_http"
+cloud_ui_haproxy_backend_tls_mode_allowed:
+  - internal_http
+  - backend_tls
+  - backend_mtls
+cloud_ui_haproxy_backend_ca_path: "/etc/kolla/certificates/ca/root.crt"
+cloud_ui_haproxy_backend_client_cert_path: "/etc/kolla/certificates/cloud-ui-haproxy-client.crt"
+cloud_ui_haproxy_backend_client_key_path: "/etc/kolla/certificates/cloud-ui-haproxy-client.key"
+cloud_ui_haproxy_backend_scheme: "http"
+cloud_ui_haproxy_frontend_scheme: "http"
+cloud_ui_haproxy_timeouts:
+  connect: "5s"
+  client: "60s"
+  server: "60s"
+  http_request: "10s"
+cloud_ui_haproxy_max_body_bytes: 16777216
+cloud_ui_haproxy_trusted_proxy_headers:
+  - X-Forwarded-For
+  - X-Forwarded-Proto
+  - X-Forwarded-Host
+  - X-Request-ID
+cloud_ui_haproxy_security_headers:
+  X-Content-Type-Options: "nosniff"
+  X-Frame-Options: "DENY"
+  Referrer-Policy: "no-referrer"
+cloud_ui_management_network_acl_required: true
+cloud_ui_management_network_acl_status: "pending_external_evidence"
+cloud_ui_forbidden_network_flows:
+  - browser_to_openstack_api
+  - browser_to_database
+  - browser_to_rabbitmq
+  - browser_to_vault
+  - frontend_to_openstack_service_database
+  - portal_consumer_to_openstack_rpc_wildcard
+cloud_ui_haproxy_routes:
+  - name: cloud_ui_api
+    path_prefix: "{{ cloud_ui_api_public_path }}"
+    service: cloud_ui_api
+    backend: cloud_ui_api
+    health_check_path: "/api/v1/health/ready"
+    upstream_scheme: "{{ cloud_ui_haproxy_backend_scheme }}"
+    upstream_port: "{{ cloud_ui_backend_listen_port }}"
+  - name: cloud_ui_frontend
+    path_prefix: "/"
+    service: cloud_ui_frontend
+    backend: cloud_ui_frontend
+    health_check_path: "/"
+    upstream_scheme: "{{ cloud_ui_haproxy_frontend_scheme }}"
+    upstream_port: "{{ cloud_ui_frontend_listen_port }}"
 
 cloud_ui_permanent_container_count_per_node: 4
 cloud_ui_expected_control_ui_node_count: 3
