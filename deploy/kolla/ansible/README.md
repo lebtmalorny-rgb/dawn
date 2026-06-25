@@ -22,3 +22,11 @@ container definition data for later Kolla-Ansible integration.
 Database provisioning, message broker provisioning, one-shot migration, HAProxy/TLS, live container
 inspection, SELinux proof, registry digest evidence, rollback and three-node smoke remain later E09
 slices.
+
+## E09.3 DB/RabbitMQ Provisioning
+
+`roles/cloud_ui_provisioning` is the repository contract for one-time Cloud UI dependency
+provisioning. It stores only object names and Vault secret references. It must not contain DB
+passwords, RabbitMQ passwords, Vault tokens, openrc files or `clouds.yaml`.
+
+Live E09.3 evidence is recorded in `docs/generated/e09-db-rabbitmq-provisioning.md`.

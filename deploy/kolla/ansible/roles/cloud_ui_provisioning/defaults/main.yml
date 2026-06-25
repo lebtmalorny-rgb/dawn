@@ -1,0 +1,30 @@
+---
+cloud_ui_provisioning_enabled: false
+
+cloud_ui_vault_addr: "https://192.168.10.15:8200"
+cloud_ui_vault_kv_mount: "kv"
+cloud_ui_vault_validate_certs: true
+cloud_ui_vault_secret_paths:
+  mariadb_runtime: "cloud-ui/local/mariadb/runtime"
+  mariadb_migration: "cloud-ui/local/mariadb/migration"
+  rabbitmq_runtime: "cloud-ui/local/rabbitmq/runtime"
+
+cloud_ui_database_name: "cloud_ui"
+cloud_ui_database_runtime_user: "cloud_ui"
+cloud_ui_database_migration_user: "cloud_ui_migration"
+
+cloud_ui_rabbitmq_vhost: "/cloud-ui"
+cloud_ui_rabbitmq_user: "cloud_ui"
+cloud_ui_rabbitmq_exchanges:
+  - "cloud-ui.events"
+  - "cloud-ui.jobs"
+  - "cloud-ui.audit"
+  - "cloud-ui.dlx"
+cloud_ui_rabbitmq_queues:
+  - "cloud-ui.events"
+  - "cloud-ui.jobs"
+  - "cloud-ui.audit"
+  - "cloud-ui.dead"
+cloud_ui_rabbitmq_permission_configure: "^cloud-ui\\."
+cloud_ui_rabbitmq_permission_write: "^cloud-ui\\."
+cloud_ui_rabbitmq_permission_read: "^cloud-ui\\."

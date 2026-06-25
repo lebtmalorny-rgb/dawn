@@ -1,0 +1,27 @@
+---
+- name: Read Cloud UI MariaDB runtime secret from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ cloud_ui_vault_addr }}"
+    engine_mount_point: "{{ cloud_ui_vault_kv_mount }}"
+    path: "{{ cloud_ui_vault_secret_paths.mariadb_runtime }}"
+    validate_certs: "{{ cloud_ui_vault_validate_certs }}"
+  register: cloud_ui_mariadb_runtime_secret
+  no_log: true
+
+- name: Read Cloud UI MariaDB migration secret from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ cloud_ui_vault_addr }}"
+    engine_mount_point: "{{ cloud_ui_vault_kv_mount }}"
+    path: "{{ cloud_ui_vault_secret_paths.mariadb_migration }}"
+    validate_certs: "{{ cloud_ui_vault_validate_certs }}"
+  register: cloud_ui_mariadb_migration_secret
+  no_log: true
+
+- name: Read Cloud UI RabbitMQ runtime secret from Vault
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ cloud_ui_vault_addr }}"
+    engine_mount_point: "{{ cloud_ui_vault_kv_mount }}"
+    path: "{{ cloud_ui_vault_secret_paths.rabbitmq_runtime }}"
+    validate_certs: "{{ cloud_ui_vault_validate_certs }}"
+  register: cloud_ui_rabbitmq_runtime_secret
+  no_log: true

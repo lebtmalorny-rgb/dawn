@@ -1,0 +1,38 @@
+---
+- name: Create Cloud UI RabbitMQ vhost
+  community.rabbitmq.rabbitmq_vhost:
+    name: "{{ cloud_ui_rabbitmq_vhost }}"
+    state: present
+  no_log: true
+
+- name: Create Cloud UI RabbitMQ user
+  community.rabbitmq.rabbitmq_user:
+    user: "{{ cloud_ui_rabbitmq_user }}"
+    password: "{{ cloud_ui_rabbitmq_runtime_secret.secret.password }}"
+    permissions:
+      - vhost: "{{ cloud_ui_rabbitmq_vhost }}"
+        configure_priv: "{{ cloud_ui_rabbitmq_permission_configure }}"
+        write_priv: "{{ cloud_ui_rabbitmq_permission_write }}"
+        read_priv: "{{ cloud_ui_rabbitmq_permission_read }}"
+    update_password: always
+    state: present
+  no_log: true
+
+- name: Declare Cloud UI RabbitMQ exchanges
+  community.rabbitmq.rabbitmq_exchange:
+    name: "{{ item }}"
+    vhost: "{{ cloud_ui_rabbitmq_vhost }}"
+    type: direct
+    durable: true
+    state: present
+  loop: "{{ cloud_ui_rabbitmq_exchanges }}"
+  no_log: true
+
+- name: Declare Cloud UI RabbitMQ queues
+  community.rabbitmq.rabbitmq_queue:
+    name: "{{ item }}"
+    vhost: "{{ cloud_ui_rabbitmq_vhost }}"
+    durable: true
+    state: present
+  loop: "{{ cloud_ui_rabbitmq_queues }}"
+  no_log: true

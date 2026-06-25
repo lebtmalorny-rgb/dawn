@@ -1,0 +1,33 @@
+---
+- name: Create Cloud UI database schema
+  community.mysql.mysql_db:
+    name: "{{ cloud_ui_database_name }}"
+    state: present
+    login_unix_socket: "{{ cloud_ui_mariadb_admin_socket | default(omit) }}"
+    login_user: "{{ cloud_ui_mariadb_admin_user | default(omit) }}"
+    login_password: "{{ cloud_ui_mariadb_admin_password | default(omit) }}"
+  no_log: true
+
+- name: Create Cloud UI runtime database user
+  community.mysql.mysql_user:
+    name: "{{ cloud_ui_database_runtime_user }}"
+    host: "%"
+    password: "{{ cloud_ui_mariadb_runtime_secret.secret.password }}"
+    priv: "{{ cloud_ui_database_name }}.*:SELECT,INSERT,UPDATE,DELETE"
+    state: present
+    login_unix_socket: "{{ cloud_ui_mariadb_admin_socket | default(omit) }}"
+    login_user: "{{ cloud_ui_mariadb_admin_user | default(omit) }}"
+    login_password: "{{ cloud_ui_mariadb_admin_password | default(omit) }}"
+  no_log: true
+
+- name: Create Cloud UI migration database user
+  community.mysql.mysql_user:
+    name: "{{ cloud_ui_database_migration_user }}"
+    host: "%"
+    password: "{{ cloud_ui_mariadb_migration_secret.secret.password }}"
+    priv: "{{ cloud_ui_database_name }}.*:ALL"
+    state: present
+    login_unix_socket: "{{ cloud_ui_mariadb_admin_socket | default(omit) }}"
+    login_user: "{{ cloud_ui_mariadb_admin_user | default(omit) }}"
+    login_password: "{{ cloud_ui_mariadb_admin_password | default(omit) }}"
+  no_log: true

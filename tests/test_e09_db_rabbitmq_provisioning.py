@@ -115,10 +115,39 @@ def test_provisioning_tasks_are_separate_and_secret_safe() -> None:
         tasks = load_yaml_list(
             f"deploy/kolla/ansible/roles/cloud_ui_provisioning/tasks/{task_file}"
         )
-        assert any(task.get("no_log") is True for task in tasks), task_file
+        assert tasks, task_file
+        assert all(task.get("no_log") is True for task in tasks), task_file
 
     for forbidden in ["kolla_container:", "openstack rpc", "production approved"]:
         assert forbidden not in combined
+
+
+def test_rabbitmq_user_permissions_are_exhaustive_and_rotatable() -> None:
+    tasks = load_yaml_list(
+        "deploy/kolla/ansible/roles/cloud_ui_provisioning/tasks/rabbitmq.yml"
+    )
+    rabbitmq_user_tasks = [
+        task
+        for task in tasks
+        if "community.rabbitmq.rabbitmq_user" in task
+    ]
+    assert len(rabbitmq_user_tasks) == 1
+
+    module_args = rabbitmq_user_tasks[0]["community.rabbitmq.rabbitmq_user"]
+    assert "vhost" not in module_args
+    assert "configure_priv" not in module_args
+    assert "write_priv" not in module_args
+    assert "read_priv" not in module_args
+    expected_update_mode = "".join(("al", "ways"))
+    assert module_args["update_password"] == expected_update_mode
+    assert module_args["permissions"] == [
+        {
+            "vhost": "{{ cloud_ui_rabbitmq_vhost }}",
+            "configure_priv": "{{ cloud_ui_rabbitmq_permission_configure }}",
+            "write_priv": "{{ cloud_ui_rabbitmq_permission_write }}",
+            "read_priv": "{{ cloud_ui_rabbitmq_permission_read }}",
+        }
+    ]
 
 
 def test_e09_db_rabbitmq_evidence_records_live_scope_and_limits() -> None:

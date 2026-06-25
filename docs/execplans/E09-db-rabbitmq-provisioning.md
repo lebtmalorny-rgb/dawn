@@ -108,7 +108,13 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   `docs/generated/e09-db-rabbitmq-provisioning.md` do not exist yet. Ruff command
   `cd backend && /Users/dmitry/Desktop/dawn/backend/.venv/bin/python -m ruff check ../tests/test_e09_db_rabbitmq_provisioning.py`
   exited 0 with `All checks passed!`.
-- [ ] Provisioning role skeleton.
+- [x] 2026-06-25: Provisioning role skeleton added with disabled defaults, fail-closed object/path
+  validation, Vault KV reads, MariaDB schema/users, RabbitMQ vhost/user/exchange/queue tasks and
+  README scope notes. Contract command
+  `/Users/dmitry/Desktop/dawn/backend/.venv/bin/python -m pytest tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_ansible_role.py -q`
+  exited 1 with expected Task 3-only missing evidence failures: 2 failed, 10 passed. Ruff command
+  `cd backend && /Users/dmitry/Desktop/dawn/backend/.venv/bin/python -m ruff check ../tests/test_e09_db_rabbitmq_provisioning.py`
+  exited 0 with `All checks passed!`.
 - [ ] Remote Vault bootstrap and sanitized evidence.
 - [ ] Remote DB/RabbitMQ provisioning and least-privilege evidence.
 - [ ] Traceability, risk register and final verification.

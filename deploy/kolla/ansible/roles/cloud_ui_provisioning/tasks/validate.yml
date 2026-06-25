@@ -1,0 +1,24 @@
+---
+- name: Validate Cloud UI provisioning names
+  ansible.builtin.assert:
+    that:
+      - cloud_ui_database_name == 'cloud_ui'
+      - cloud_ui_database_runtime_user == 'cloud_ui'
+      - cloud_ui_database_migration_user == 'cloud_ui_migration'
+      - cloud_ui_rabbitmq_vhost == '/cloud-ui'
+      - cloud_ui_rabbitmq_user == 'cloud_ui'
+      - cloud_ui_rabbitmq_exchanges | sort == ['cloud-ui.audit', 'cloud-ui.dlx', 'cloud-ui.events', 'cloud-ui.jobs']
+      - cloud_ui_rabbitmq_queues | sort == ['cloud-ui.audit', 'cloud-ui.dead', 'cloud-ui.events', 'cloud-ui.jobs']
+      - cloud_ui_rabbitmq_permission_configure == '^cloud-ui\.'
+      - cloud_ui_rabbitmq_permission_write == '^cloud-ui\.'
+      - cloud_ui_rabbitmq_permission_read == '^cloud-ui\.'
+    fail_msg: "Cloud UI provisioning names must stay scoped to cloud_ui and /cloud-ui."
+
+- name: Validate Cloud UI Vault secret path scope
+  ansible.builtin.assert:
+    that:
+      - cloud_ui_vault_kv_mount == 'kv'
+      - cloud_ui_vault_secret_paths.mariadb_runtime == 'cloud-ui/local/mariadb/runtime'
+      - cloud_ui_vault_secret_paths.mariadb_migration == 'cloud-ui/local/mariadb/migration'
+      - cloud_ui_vault_secret_paths.rabbitmq_runtime == 'cloud-ui/local/rabbitmq/runtime'
+    fail_msg: "Cloud UI Vault paths must stay under kv/cloud-ui/local."
