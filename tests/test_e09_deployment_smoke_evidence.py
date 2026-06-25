@@ -28,9 +28,15 @@ def test_digest_validation_accepts_sha256_and_rejects_tags() -> None:
     assert module.is_digest_ref("registry.test/cloud-ui-backend@sha256:" + "a" * 64)
     assert not module.is_digest_ref("registry.test/cloud-ui-backend:2026.06.25")
     assert not module.is_digest_ref("registry.test/cloud-ui-backend:latest")
+    assert not module.is_digest_ref("registry.test/cloud-ui-backend@sha256:" + "a" * 63)
+    assert not module.is_digest_ref("registry.test/cloud-ui-backend@sha256:" + "z" * 64)
+    assert not module.is_digest_ref("registry.test/cloud-ui-backend@sha256:")
+    assert not module.is_digest_ref(
+        "registry.test/cloud-ui-backend:tag@sha256:" + "a" * 64
+    )
 
 
-def test_preflight_requires_test_marker_and_rejects_production_inventory(tmp_path: Path) -> None:
+def test_preflight_rejects_production_inventory_filename(tmp_path: Path) -> None:
     module = load_module()
     inventory = tmp_path / "production-inventory.ini"
     inventory.write_text("cloud_ui_test_stand=true\n", encoding="utf-8")
@@ -185,6 +191,39 @@ def test_preflight_rejects_swapped_frontend_and_backend_images(tmp_path: Path) -
     assert "frontend image" in " ".join(result.errors)
 
 
+def test_cli_preflight_fails_closed_without_running_commands_or_writing_output(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    inventory = tmp_path / "test-inventory.ini"
+    inventory.write_text("environment=production\n", encoding="utf-8")
+    output_path = tmp_path / "e09-deployment-smoke-evidence.md"
+    calls = []
+
+    def fake_executor(*args, **kwargs):
+        calls.append((args, kwargs))
+        return "unexpected command output"
+
+    exit_code = module.main(
+        [
+            "--inventory",
+            str(inventory),
+            "--output",
+            str(output_path),
+            "--backend-image",
+            "registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+            "--frontend-image",
+            "registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+            "--rollback-window-open",
+        ],
+        command_executor=fake_executor,
+    )
+
+    assert exit_code != 0
+    assert calls == []
+    assert not output_path.exists()
+
+
 def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None:
     module = load_module()
     evidence = module.render_evidence(
@@ -236,8 +275,22 @@ def test_generated_evidence_traceability_and_risk_register_are_updated() -> None
     evidence = (ROOT / "docs/generated/e09-deployment-smoke-evidence.md").read_text(encoding="utf-8")
     traceability = (ROOT / "docs/11_DKB_TRACEABILITY.md").read_text(encoding="utf-8")
     risk_register = (ROOT / "docs/generated/risk-register.md").read_text(encoding="utf-8")
+    normalized = evidence.lower()
 
     assert "Stage: E09.8 Deployment smoke/evidence" in evidence
+    assert "pending_external_evidence" in evidence
+    assert "partial" in normalized
+    assert "test-stand" in normalized
+    assert "rollback pending" in normalized
+    assert "one-shot migration" in normalized
+    assert "DB/RabbitMQ" in evidence
+    assert "HAProxy/TLS" in evidence
+    assert (
+        "container hardening" in normalized
+        or "user/caps/mounts/selinux" in normalized
+    )
+    assert "API/UI smoke" in evidence
+    assert "ДКБ-69/70" in evidence
     assert "R-068" in risk_register
     assert "E09.8 Deployment smoke/evidence" in traceability
-    assert "production approved" not in evidence.lower()
+    assert "production approved" not in normalized
