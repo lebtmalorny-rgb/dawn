@@ -44,7 +44,7 @@ CREDENTIAL_URL_RE = re.compile(
 PEM_PRIVATE_KEY_RE = re.compile(
     r"(?is)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----"
 )
-COOKIE_RE = re.compile(r"(?i)\b((?:set-)?cookie\s*:\s*[^=\s;]+)=([^;\s|`]+)")
+COOKIE_RE = re.compile(r"(?i)\b((?:set-)?cookie\s*:\s*)[^\n|`]+")
 
 
 @dataclass(frozen=True)
@@ -103,7 +103,7 @@ def redact(value: str) -> str:
         value,
     )
     value = COOKIE_RE.sub(
-        lambda match: f"{match.group(1)}=[REDACTED]",
+        lambda match: f"{match.group(1)}[REDACTED]",
         value,
     )
     value = JSON_SECRET_RE.sub(

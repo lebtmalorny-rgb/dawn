@@ -416,7 +416,10 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
             module.CommandSummary(
                 "cookies",
                 "passed",
-                "Cookie: session=abc; theme=light Set-Cookie: session=abc; HttpOnly",
+                (
+                    "Cookie: session=abc; csrf=csrf-secret; auth=auth-secret "
+                    "Set-Cookie: session=abc; Path=/; HttpOnly"
+                ),
             ),
             module.CommandSummary("container_count", "pending", "12 expected"),
         ],
@@ -440,6 +443,8 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
     assert "user:pass@" not in evidence
     assert "PEMSECRET" not in evidence
     assert "session=abc" not in evidence
+    assert "csrf-secret" not in evidence
+    assert "auth-secret" not in evidence
     assert "[REDACTED]" in evidence
     assert "ДКБ-69/70" in evidence
 
