@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +11,7 @@ def load_module():
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -63,7 +65,7 @@ def test_preflight_rejects_missing_marker_and_non_digest_images(tmp_path: Path) 
     assert "rollback window" in " ".join(result.errors)
 
 
-def test_rendered_evidence_contains_required_rows_and_no_secret_values(tmp_path: Path) -> None:
+def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None:
     module = load_module()
     evidence = module.render_evidence(
         inventory_name="test-inventory.ini",
