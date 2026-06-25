@@ -2,3 +2,14 @@
 - name: Publish Cloud UI container definitions for later Kolla deployment tasks
   ansible.builtin.set_fact:
     cloud_ui_container_definitions: "{{ cloud_ui_services }}"
+
+- name: Publish Cloud UI process topology for three-node rollout evidence
+  ansible.builtin.set_fact:
+    cloud_ui_process_topology_effective: "{{ cloud_ui_process_topology }}"
+
+- name: Publish Cloud UI process topology summary
+  ansible.builtin.set_fact:
+    cloud_ui_process_topology_summary:
+      control_ui_nodes: "{{ cloud_ui_control_ui_nodes | length }}"
+      permanent_services_per_node: "{{ cloud_ui_permanent_container_count_per_node }}"
+      permanent_containers_total: "{{ cloud_ui_process_topology | length }}"

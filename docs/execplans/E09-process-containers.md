@@ -65,11 +65,22 @@ summary counts.
 
 - [x] 2026-06-25: Исследование фактического состояния. Evidence: E09 docs and E08 security review
   read; role defaults/tasks/tests inspected; baseline `make test` and root `tests` passed.
-- [ ] Контракт и тестовый double.
-- [ ] Минимальная реализация.
-- [ ] Отрицательные сценарии и безопасность.
-- [ ] Интеграционные и пользовательские проверки.
-- [ ] Документация, evidence и review.
+- [x] 2026-06-25: Контракт и тестовый double. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_process_containers.py -q` failed with missing
+  topology defaults, missing topology facts, missing generated evidence and missing traceability/risk
+  references.
+- [x] 2026-06-25: Минимальная реализация. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_process_containers.py -q` passed `8 passed`.
+- [x] 2026-06-25: Отрицательные сценарии и безопасность. Evidence: tests verify migration job is not
+  part of permanent topology, topology contains no secret keywords, and evidence does not claim
+  production approval or live 12-container proof.
+- [x] 2026-06-25: Интеграционные и пользовательские проверки. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_process_containers.py tests/test_e09_kolla_ansible_role.py tests/test_e09_migration_job.py -q`
+  passed `24 passed`.
+- [x] 2026-06-25: Документация, evidence и review. Evidence: generated E09.5 evidence,
+  traceability, risk register and adjacent E09.2/E09.4 evidence were updated; `backend/.venv/bin/python
+  -m pytest tests -q`, `make lint`, `make typecheck`, `make security`, `make test` and
+  `git diff --check` passed.
 
 ## Неожиданные открытия
 
@@ -145,6 +156,10 @@ database schema, RabbitMQ, Vault, registry or Kolla inventory, so no live cleanu
 
 ## Итог и остаточные риски
 
-Not completed yet. Expected residual risks: no live 12-container inspection, no registry digest pull,
-no SELinux/caps/mount proof, no HAProxy/TLS URL, no rolling update or rollback execution and no
-production SecMan/registry/network owner evidence.
+Implemented E09.5 as a tested repository-side process topology contract. The role defines three
+synthetic control/UI nodes, twelve permanent topology entries, topology summary facts and validation
+for the 3x4=12 contract while keeping `cloud_ui_db_migrate` outside the permanent set.
+
+Residual risks: no live 12-container inspection, no registry digest pull, no SELinux/caps/mount
+proof, no HAProxy/TLS URL, no rolling update or rollback execution and no production
+SecMan/registry/network owner evidence.

@@ -50,6 +50,7 @@ certificate or live deployment output was added.
 | one-shot `cloud-ui db-upgrade` migration ordering | completed_repository_evidence | E09.4 adds `cloud_ui_db_migrate` job metadata outside the permanent container set; live execution remains pending. |
 | HAProxy/TLS routing | pending_external_evidence | Requires Kolla TLS/HAProxy configuration and certificate evidence. |
 | SELinux labels and host enforcement proof | pending_external_evidence | Requires Rocky/Kolla host inspection. |
+| 12-container topology contract | completed_repository_evidence | E09.5 adds synthetic three-node process topology for 12 permanent containers. |
 | 12 live containers on three control/UI nodes | pending_external_evidence | Requires the deployment stand and container inspection. |
 | rollback/reconfigure execution | pending_external_evidence | Requires live deployment state. |
 
@@ -74,6 +75,13 @@ E09.4 extends this role with `deploy/kolla/ansible/roles/cloud_ui/tasks/migratio
 `cloud_ui_migration_job` defaults. The migration job uses `cloud-ui db-upgrade`, remains outside
 `cloud_ui_services`, and preserves the four-permanent-containers-per-node contract. This is
 repository evidence only; live migration execution, failure logs and rollback proof remain pending.
+
+## E09.5 Update
+
+E09.5 extends this role with `cloud_ui_process_topology`, `cloud_ui_control_ui_nodes` and topology
+summary facts. The role now records the expected three-node, twelve-permanent-container layout while
+keeping `cloud_ui_db_migrate` outside the permanent set. This is synthetic repository evidence only;
+live container inspection remains pending.
 
 ## Rollback
 

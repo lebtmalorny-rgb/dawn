@@ -6,6 +6,12 @@ cloud_ui_public_base_url: "/"
 cloud_ui_log_level: "INFO"
 
 cloud_ui_permanent_container_count_per_node: 4
+cloud_ui_expected_control_ui_node_count: 3
+cloud_ui_expected_permanent_containers_total: 12
+cloud_ui_control_ui_nodes:
+  - control-ui-01
+  - control-ui-02
+  - control-ui-03
 
 cloud_ui_frontend_group: "cloud-ui-frontend"
 cloud_ui_api_group: "cloud-ui-api"
@@ -125,3 +131,101 @@ cloud_ui_migration_execution_policy:
   precheck_command: "cloud-ui db-upgrade --check"
   upgrade_command: "cloud-ui db-upgrade"
   log_path: "/var/log/kolla/cloud-ui/db-upgrade.log"
+
+cloud_ui_process_topology:
+  - node: control-ui-01
+    service: cloud_ui_frontend
+    process: frontend
+    container_name: cloud_ui_frontend_control-ui-01
+    image: "{{ cloud_ui_frontend_image_full }}"
+    command: "nginx -g 'daemon off;'"
+    config_dir: cloud-ui-frontend
+    permanent: true
+  - node: control-ui-01
+    service: cloud_ui_api
+    process: api
+    container_name: cloud_ui_api_control-ui-01
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui api"
+    config_dir: cloud-ui-backend
+    permanent: true
+  - node: control-ui-01
+    service: cloud_ui_worker
+    process: worker
+    container_name: cloud_ui_worker_control-ui-01
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui worker"
+    config_dir: cloud-ui-backend
+    permanent: true
+  - node: control-ui-01
+    service: cloud_ui_events
+    process: events
+    container_name: cloud_ui_events_control-ui-01
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui events"
+    config_dir: cloud-ui-backend
+    permanent: true
+  - node: control-ui-02
+    service: cloud_ui_frontend
+    process: frontend
+    container_name: cloud_ui_frontend_control-ui-02
+    image: "{{ cloud_ui_frontend_image_full }}"
+    command: "nginx -g 'daemon off;'"
+    config_dir: cloud-ui-frontend
+    permanent: true
+  - node: control-ui-02
+    service: cloud_ui_api
+    process: api
+    container_name: cloud_ui_api_control-ui-02
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui api"
+    config_dir: cloud-ui-backend
+    permanent: true
+  - node: control-ui-02
+    service: cloud_ui_worker
+    process: worker
+    container_name: cloud_ui_worker_control-ui-02
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui worker"
+    config_dir: cloud-ui-backend
+    permanent: true
+  - node: control-ui-02
+    service: cloud_ui_events
+    process: events
+    container_name: cloud_ui_events_control-ui-02
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui events"
+    config_dir: cloud-ui-backend
+    permanent: true
+  - node: control-ui-03
+    service: cloud_ui_frontend
+    process: frontend
+    container_name: cloud_ui_frontend_control-ui-03
+    image: "{{ cloud_ui_frontend_image_full }}"
+    command: "nginx -g 'daemon off;'"
+    config_dir: cloud-ui-frontend
+    permanent: true
+  - node: control-ui-03
+    service: cloud_ui_api
+    process: api
+    container_name: cloud_ui_api_control-ui-03
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui api"
+    config_dir: cloud-ui-backend
+    permanent: true
+  - node: control-ui-03
+    service: cloud_ui_worker
+    process: worker
+    container_name: cloud_ui_worker_control-ui-03
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui worker"
+    config_dir: cloud-ui-backend
+    permanent: true
+  - node: control-ui-03
+    service: cloud_ui_events
+    process: events
+    container_name: cloud_ui_events_control-ui-03
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui events"
+    config_dir: cloud-ui-backend
+    permanent: true

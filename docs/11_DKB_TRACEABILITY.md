@@ -395,6 +395,22 @@ E09.4 добавляет repository-side contract для one-shot DB migration j
 Evidence: `tests/test_e09_migration_job.py`, `docs/generated/e09-migration-job.md`,
 `docs/generated/risk-register.md` and ExecPlan `docs/execplans/E09-migration-job.md`.
 
+## Обновление требований 2026-06-25: E09.5 Process containers
+
+E09.5 adds synthetic repository topology evidence for the permanent Cloud UI process layout:
+
+- ДКБ-69/70: `cloud_ui_process_topology` preserves the two-image contract: `cloud-ui-frontend` for
+  frontend and `cloud-ui-backend` for API, worker and events. Registry digest pull, scanner,
+  signature/provenance evidence and the ДКБ-69 Python interpreter waiver remain pending.
+- ДКБ-76/77/80: the role records 3 control/UI nodes and 12 permanent containers as synthetic
+  repository topology. `cloud_ui_db_migrate` remains a separate one-shot job. live container inspection remains pending;
+  no Kolla deploy/reconfigure, HAProxy/TLS or network ACL proof is claimed by this slice.
+- ДКБ-82: rollback is repository-only by Git revert. Live rolling update and failed-update rollback
+  remain later E09 evidence.
+
+Evidence: `tests/test_e09_process_containers.py`, `docs/generated/e09-process-containers.md`,
+`docs/generated/risk-register.md` and ExecPlan `docs/execplans/E09-process-containers.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

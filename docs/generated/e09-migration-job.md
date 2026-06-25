@@ -62,6 +62,6 @@ this slice.
 
 ## Safe Next Step
 
-E09.5 can wire process containers while keeping the migration job as a separate pre-rollout step.
-Live migration should be executed only after an approved lab run plan confirms backup/precheck,
-advisory lock, sanitized logs and rollback window.
+E09.5 now records the permanent process-container topology while keeping the migration job as a
+separate pre-rollout step. Live migration should be executed only after an approved lab run plan
+confirms backup/precheck, advisory lock, sanitized logs and rollback window.
