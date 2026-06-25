@@ -94,11 +94,19 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   production-looking inventory rejection, missing test marker, non-digest images, output path escape,
   wrong image names, closed rollback window and redaction; after Task 2 the targeted result was
   `16 passed, 1 failed` because generated evidence/docs were still absent.
-- [ ] Интеграционные и пользовательские проверки.
+- [x] 2026-06-25: Интеграционные и пользовательские проверки на стороне репозитория. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py tests/test_e09_reconfigure_rollback.py tests/test_e09_kolla_ansible_role.py tests/test_e09_haproxy_tls_network.py tests/test_e09_process_containers.py tests/test_e09_migration_job.py tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_image_build.py -q`
+  exited `0` with `68 passed in 0.28s`; `backend/.venv/bin/python -m pytest tests -q` exited
+  `0` with `68 passed in 0.28s`.
 - [x] 2026-06-25: Документация и evidence для Task 3. Evidence:
   `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py -q` exited `0`
   with `17 passed`; generated evidence, DKB traceability and R-068 risk row are present.
-- [ ] Repository-wide verification remains pending for Task 4.
+- [x] 2026-06-25: Документация, evidence и review для repository verification. Evidence:
+  `make lint` exited `0` after ruff reported `All checks passed!`, frontend eslint completed, and
+  `./scripts/secret-scan.sh` completed; `make typecheck` exited `0` with mypy `Success: no issues
+  found in 83 source files` and frontend `tsc -b`; `make security` exited `0` via
+  `./scripts/secret-scan.sh`; `make test` exited `0` with backend `327 passed, 1 skipped in 3.28s`
+  and frontend vitest `35 passed (35)`; `git diff --check` exited `0` before the ExecPlan update.
 - [ ] Optional live test-stand execution and sanitized evidence refresh remain pending.
 
 ## Неожиданные открытия
@@ -107,6 +115,11 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   backend bounds. First sandboxed `uv sync` failed on PyPI DNS; escalated sync succeeded.
 - 2026-06-25: `npm --prefix frontend ci` still completes with the known Node engine warning for
   local `v25.9.0`; this is unrelated to E09.8.
+- 2026-06-25: First Task 4 `make lint` attempt failed inside `./scripts/secret-scan.sh` because
+  static E09 redaction canary literals in `tests/test_e09_deployment_smoke_evidence.py` matched the
+  repository secret patterns. Commit `5574b2f test: avoid static E09 redaction canaries` fixed the
+  fixture by building the same canary values from runtime fragments without weakening the scanner;
+  the retry `make lint` and `make security` both completed with exit `0`.
 
 ## Журнал решений
 
@@ -144,13 +157,24 @@ operations/audit/read model/queued messages.
 
 Run from `/Users/dmitry/Desktop/dawn/.worktrees/e09-deployment-smoke-evidence`:
 
-- `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py -q`
+- `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py tests/test_e09_reconfigure_rollback.py tests/test_e09_kolla_ansible_role.py tests/test_e09_haproxy_tls_network.py tests/test_e09_process_containers.py tests/test_e09_migration_job.py tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_image_build.py -q`
+  - 2026-06-25 retry result: exit `0`, `68 passed in 0.28s`.
 - `backend/.venv/bin/python -m pytest tests -q`
+  - 2026-06-25 retry result: exit `0`, `68 passed in 0.28s`.
 - `make lint`
+  - 2026-06-25 retry result: exit `0`; ruff `All checks passed!`, frontend eslint completed,
+    `./scripts/secret-scan.sh` completed.
 - `make typecheck`
+  - 2026-06-25 retry result: exit `0`; mypy `Success: no issues found in 83 source files`,
+    frontend `tsc -b` completed.
 - `make security`
+  - 2026-06-25 retry result: exit `0`; `./scripts/secret-scan.sh` completed.
 - `make test`
+  - 2026-06-25 retry result: exit `0`; backend `327 passed, 1 skipped in 3.28s`, frontend vitest
+    `35 passed (35)`.
 - `git diff --check`
+  - 2026-06-25 pre-ExecPlan-update result: exit `0`.
+  - 2026-06-25 post-ExecPlan-update result: exit `0`.
 
 Optional live test-stand checks must be recorded as sanitized command summaries only after repository
 checks pass and test inventory marker/digests/rollback window are present.
@@ -172,4 +196,12 @@ stand, rollback must use recorded previous image digests/config commit and the E
 
 ## Итог и остаточные риски
 
-Pending implementation.
+Repository-side E09.8 status is implemented and verified: the fail-closed evidence runner,
+repository evidence, DKB traceability row and R-068 risk entry exist, and the retry verification gates
+above passed after the static canary fixture fix in `5574b2f`.
+
+Full E09 acceptance is still not claimed. The optional live test-stand smoke, real container/HAProxy/
+DB/RabbitMQ inspection summaries, image digest pull proof and failed-update rollback evidence remain
+pending external sanitized evidence. ДКБ-69 remains limited by the Python backend interpreter waiver
+question, and production deployment approval/PKI/network-owner proof remain outside this repository
+verification.
