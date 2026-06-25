@@ -135,8 +135,7 @@ def test_rendered_evidence_states_acceptance_rows_and_partial_scope() -> None:
         or "user/caps/mounts/selinux" in normalized
     )
     assert "api/ui smoke" in normalized
-    assert "rollback" in normalized
-    assert "pending" in normalized
+    assert "rollback pending" in normalized
     assert "partial" in normalized
     assert "test-stand" in normalized
 
