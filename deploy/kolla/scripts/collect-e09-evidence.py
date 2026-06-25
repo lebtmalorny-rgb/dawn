@@ -32,8 +32,8 @@ ASSIGNMENT_SECRET_RE = re.compile(
     r"application_credential(?:_secret)?)[A-Za-z0-9_-]*)(\s*[:=]\s*)"
     r"(?:\"[^\"]*\"|'[^']*'|[^\n|`]+)"
 )
-AUTHORIZATION_BEARER_RE = re.compile(
-    r"(?i)\b(authorization\s*:\s*bearer\s+)[^\s,|`]+"
+AUTHORIZATION_HEADER_RE = re.compile(
+    r"(?i)\b((?:proxy-)?authorization\s*:\s*)[^\n|`]+"
 )
 SENSITIVE_KEY_RE = re.compile(
     r"(?i)(authorization|cookie|password|passwd|token|secret|private[_-]?key|"
@@ -96,7 +96,7 @@ def redact(value: str) -> str:
 
 
 def _redact_non_json(value: str) -> str:
-    value = AUTHORIZATION_BEARER_RE.sub(
+    value = AUTHORIZATION_HEADER_RE.sub(
         lambda match: f"{match.group(1)}[REDACTED]",
         value,
     )

@@ -391,6 +391,16 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
                 "Authorization: Bearer eyJsecret",
             ),
             module.CommandSummary(
+                "authorization_schemes",
+                "passed",
+                (
+                    "Authorization: Basic dXNlcjpwYXNz "
+                    "Proxy-Authorization: Basic proxy-secret "
+                    "Authorization: Token token-secret "
+                    "Authorization: Custom custom-secret"
+                ),
+            ),
+            module.CommandSummary(
                 "xauth",
                 "passed",
                 fixture_value("X-Auth-", "Token: xauth-secret"),
@@ -461,6 +471,10 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
     assert "app-secret" not in evidence
     assert "json-secret" not in evidence
     assert "eyJsecret" not in evidence
+    assert "dXNlcjpwYXNz" not in evidence
+    assert "proxy-secret" not in evidence
+    assert "token-secret" not in evidence
+    assert "custom-secret" not in evidence
     assert "xauth-secret" not in evidence
     assert "very secret value" not in evidence
     assert "nested-secret" not in evidence
