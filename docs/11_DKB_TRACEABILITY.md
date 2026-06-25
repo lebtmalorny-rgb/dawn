@@ -453,6 +453,28 @@ Evidence: `tests/test_e09_reconfigure_rollback.py`,
 `docs/generated/e09-reconfigure-rollback.md`, `docs/generated/risk-register.md` and ExecPlan
 `docs/execplans/E09-reconfigure-rollback.md`.
 
+## Обновление требований 2026-06-25: E09.8 Deployment smoke/evidence
+
+E09.8 adds a fail-closed evidence runner for approved test-stand deployment smoke:
+
+- ДКБ-22.02/24: TLS and health evidence can be recorded from the test stand. Corporate PKI/mTLS
+  approval and negative certificate tests remain external.
+- ДКБ-42-44/77/80: container count, management network and ACL evidence can be attached only after
+  sanitized test-stand output is collected.
+- ДКБ-55/56: the runner rejects or redacts secret-like output and stores no credentials in Git.
+  Full secret rotation and revoke evidence remain external.
+- ДКБ-65: container user/capability/mount/SELinux inspection is represented as live evidence rows.
+- ДКБ-69/70: digest-pinned image evidence is required, but ДКБ-69 remains open without the Python
+  interpreter waiver and image policy evidence.
+- ДКБ-82: deployment smoke evidence improves operational proof; full E09 acceptance still requires
+  executed rollback evidence.
+
+Evidence: `tests/test_e09_deployment_smoke_evidence.py`,
+`deploy/kolla/scripts/collect-e09-evidence.py`,
+`docs/generated/e09-deployment-smoke-evidence.md`,
+`docs/generated/risk-register.md` and ExecPlan
+`docs/execplans/E09-deployment-smoke-evidence.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

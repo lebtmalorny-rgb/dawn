@@ -86,10 +86,20 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   `1` with `14 failed`; failures are the expected RED state because
   `deploy/kolla/scripts/collect-e09-evidence.py` and
   `docs/generated/e09-deployment-smoke-evidence.md` do not exist yet.
-- [ ] Минимальная реализация.
-- [ ] Отрицательные сценарии и безопасность.
+- [x] 2026-06-25: Минимальная реализация runner. Evidence: current branch HEAD
+  `29ec0f8 deploy: redact JSON evidence string values` contains
+  `deploy/kolla/scripts/collect-e09-evidence.py`; targeted pytest after Task 2 reached
+  `16 passed, 1 failed`, with the single known failure being missing generated evidence/docs.
+- [x] 2026-06-25: Отрицательные сценарии и безопасность. Evidence: current branch tests cover
+  production-looking inventory rejection, missing test marker, non-digest images, output path escape,
+  wrong image names, closed rollback window and redaction; after Task 2 the targeted result was
+  `16 passed, 1 failed` because generated evidence/docs were still absent.
 - [ ] Интеграционные и пользовательские проверки.
-- [ ] Документация, evidence и review.
+- [x] 2026-06-25: Документация и evidence для Task 3. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py -q` exited `0`
+  with `17 passed`; generated evidence, DKB traceability and R-068 risk row are present.
+- [ ] Repository-wide verification remains pending for Task 4.
+- [ ] Optional live test-stand execution and sanitized evidence refresh remain pending.
 
 ## Неожиданные открытия
 
