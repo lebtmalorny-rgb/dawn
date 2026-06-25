@@ -54,3 +54,39 @@ def test_secret_scan_still_reports_regular_secret(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "unsafe.env" in result.stdout
+
+
+def test_secret_scan_allows_cloud_ui_ansible_vault_references(tmp_path: Path) -> None:
+    copy_secret_scan(tmp_path)
+    task_dir = (
+        tmp_path
+        / "deploy"
+        / "kolla"
+        / "ansible"
+        / "roles"
+        / "cloud_ui_provisioning"
+        / "tasks"
+    )
+    task_dir.mkdir(parents=True)
+    (task_dir / "database.yml").write_text(
+        "---\n"
+        "- name: Create Cloud UI runtime database user\n"
+        "  community.mysql.mysql_user:\n"
+        "    login_password: \"{{ cloud_ui_mariadb_admin_password | default(omit) }}\"\n"
+        "    password: \"{{ cloud_ui_mariadb_runtime_secret.secret.password }}\"\n"
+        "  no_log: true\n",
+        encoding="utf-8",
+    )
+    (task_dir / "rabbitmq.yml").write_text(
+        "---\n"
+        "- name: Create Cloud UI RabbitMQ user\n"
+        "  community.rabbitmq.rabbitmq_user:\n"
+        "    password: \"{{ cloud_ui_rabbitmq_runtime_secret.secret.password }}\"\n"
+        "    update_password: always\n"
+        "  no_log: true\n",
+        encoding="utf-8",
+    )
+
+    result = run_secret_scan(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr

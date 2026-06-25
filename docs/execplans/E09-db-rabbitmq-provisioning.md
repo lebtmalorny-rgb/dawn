@@ -116,13 +116,42 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   `cd backend && /Users/dmitry/Desktop/dawn/backend/.venv/bin/python -m ruff check ../tests/test_e09_db_rabbitmq_provisioning.py`
   exited 0 with `All checks passed!`.
 - [ ] Remote Vault bootstrap and sanitized evidence.
+  - 2026-06-25: Read-only precheck confirmed host `ansible.example.local`, Kolla-Ansible and
+    `/etc/kolla/all-in-one` present, Vault CLI missing, Vault service inactive and no `:8200/:8201`
+    listeners.
+  - 2026-06-25: Approved package-source check
+    `ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/dawn_known_hosts -o BatchMode=yes root@192.168.10.15 ...`
+    exited 20 with `vault_package_unavailable`. Per plan, live Vault bootstrap stopped and sanitized
+    blocker evidence was recorded in `docs/generated/e09-db-rabbitmq-provisioning.md`.
 - [ ] Remote DB/RabbitMQ provisioning and least-privilege evidence.
+  - 2026-06-25: Not executed because the protected secret mechanism is unavailable on the selected
+    test host.
 - [ ] Traceability, risk register and final verification.
+  - 2026-06-25: Added `docs/generated/e09-db-rabbitmq-provisioning.md`, DKB traceability update and
+    risk `R-063` to record the external blocker without claiming live DB/MQ proof.
+  - 2026-06-25: `make lint` initially failed because the secret scanner flagged safe Ansible
+    Vault-backed template references in `cloud_ui_provisioning` tasks. Added a narrow regression test
+    and allowlist for those exact no-log role paths; direct scanner run then passed.
+  - 2026-06-25: Verification passed:
+    `backend/.venv/bin/python -m pytest backend/tests/test_secret_scan_script.py -q` -> 3 passed;
+    `/Users/dmitry/Desktop/dawn/backend/.venv/bin/python -m pytest tests/test_e09_kolla_image_build.py tests/test_e09_kolla_ansible_role.py tests/test_e09_db_rabbitmq_provisioning.py -q` -> 19 passed;
+    `make lint` -> backend Ruff, frontend ESLint and secret scan passed;
+    `make typecheck` -> backend mypy and frontend TypeScript passed;
+    `make test` -> backend 327 passed, 1 skipped; frontend 35 passed;
+    `make security` -> secret scan passed;
+    `git diff --check` -> passed.
 
 ## Неожиданные открытия
 
 - Vault is not installed/active on the selected Ansible host even though E09.3 selected Vault/SecMan as
   the secret mechanism. The plan therefore has to bootstrap lab Vault before DB/MQ provisioning.
+- The selected test host does not currently expose an approved Vault package through `dnf`; the remote
+  check returned `vault_package_unavailable`. E09.3 cannot safely proceed to DB/MQ mutation until an
+  approved Vault/SecMan source or pre-installed approved lab Vault is available.
+- The repository secret scanner intentionally flags password-like YAML keys. E09.3 Ansible modules
+  need those module argument names for Vault-derived values, so `scripts/secret-scan.sh` now has a
+  narrow path-and-expression allowlist plus `backend/tests/test_secret_scan_script.py` regression
+  coverage.
 
 ## Журнал решений
 
@@ -136,6 +165,14 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
 - 2026-06-24: Fail closed if Vault package source or safe RabbitMQ queue declaration tooling is absent.
   Alternative: hand-roll ad hoc install/queue commands. Reason: E09 evidence must not fake production
   integration or leak credentials. Consequence: a blocker may be recorded instead of full live proof.
+- 2026-06-25: Do not install Vault outside the approved package-source path after `dnf` returned
+  `vault_package_unavailable`. Alternative: download/install Vault through an ad hoc path. Reason:
+  E09.3 requires an approved secret mechanism and package provenance before live DB/MQ mutation.
+  Consequence: E09.3 is blocked with repository contract and blocker evidence only.
+- 2026-06-25: Allowlist only exact Cloud UI provisioning Ansible template references in the secret
+  scanner. Alternative: weaken the generic password-key pattern. Reason: the role needs Ansible module
+  argument names, but arbitrary literal secret values must remain blocked. Consequence: `make lint`
+  passes while the scanner regression still reports ordinary secret literals.
 
 ## Детальный план реализации
 
@@ -195,6 +232,8 @@ Remote verification:
 ## Доказательства
 
 - `tests/test_e09_db_rabbitmq_provisioning.py`;
+- `backend/tests/test_secret_scan_script.py`;
+- `scripts/secret-scan.sh`;
 - `deploy/kolla/ansible/roles/cloud_ui_provisioning/*`;
 - `docs/generated/e09-db-rabbitmq-provisioning.md`;
 - `docs/generated/risk-register.md`;
@@ -227,8 +266,14 @@ Preserve `/opt/vault/data` unless destructive cleanup is explicitly approved.
 
 ## Итог и остаточные риски
 
-To be completed after implementation. Expected residual risks:
+Current status: blocked before live DB/RabbitMQ mutation. The repository contract and sanitized
+external blocker evidence are present, but E09.3 live provisioning is not complete because the
+selected test host has no approved Vault package source.
 
+- approved Vault/SecMan package source or pre-installed approved lab Vault is required before DB/MQ
+  provisioning can run;
+- live MariaDB schema/users and RabbitMQ vhost/user/permissions were not created;
+- least-privilege negative DB/MQ checks were not executed;
 - lab all-in-one evidence is not HA production evidence;
 - corporate PKI, Vault HA/backup/auto-unseal and production owner approval remain external;
 - MariaDB backup/failover and RabbitMQ quorum/HA remain E10/external;

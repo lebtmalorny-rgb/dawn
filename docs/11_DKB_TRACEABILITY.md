@@ -352,6 +352,26 @@ Evidence: `tests/test_e09_kolla_ansible_role.py`, `deploy/kolla/ansible/README.m
 `deploy/kolla/ansible/roles/cloud_ui/*`, `docs/generated/e09-kolla-ansible-role.md`,
 `docs/generated/risk-register.md` and ExecPlan `docs/execplans/E09-kolla-ansible-role.md`.
 
+## Обновление требований 2026-06-25: E09.3 DB/RabbitMQ provisioning
+
+E09.3 добавляет repository-side contract для one-time Cloud UI MariaDB/RabbitMQ provisioning, но live
+provisioning остановлен на безопасном external blocker:
+
+- ДКБ-55/56: `deploy/kolla/ansible/roles/cloud_ui_provisioning` фиксирует Vault/SecMan lab path
+  `kv/cloud-ui/local/*`, отдельные Cloud UI DB/MQ principals and `no_log` task shape. На выбранном
+  test Ansible host `192.168.10.15` approved package-source check returned
+  `vault_package_unavailable`; поэтому live secret material, MariaDB schema/users and RabbitMQ
+  vhost/user/permissions remain `pending_external_evidence`.
+- ДКБ-42-44/76/77/80: роль документирует DB/MQ object boundaries only. Network/VLAN/ACL,
+  management-zone placement, unused-interface blocking and live RabbitMQ/MariaDB access checks remain
+  external E09/E10 evidence.
+- ДКБ-69/70/82: E09.3 не меняет image build, registry, scanner/signing or rollback proof. Repository
+  rollback is Git revert; live cleanup is not required because provisioning stopped before mutation.
+
+Evidence: `tests/test_e09_db_rabbitmq_provisioning.py`,
+`docs/generated/e09-db-rabbitmq-provisioning.md`, `docs/generated/risk-register.md` and ExecPlan
+`docs/execplans/E09-db-rabbitmq-provisioning.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

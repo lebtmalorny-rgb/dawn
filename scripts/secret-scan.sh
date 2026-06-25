@@ -34,6 +34,10 @@ trap 'rm -f "$pattern_file" "$allow_file" "$match_file"' EXIT
   printf '%s\n' '^\./backend/src/cloud_ui/audit/redaction\.py:[[:digit:]]+:[[:space:]]+"BEGIN PRIVATE KEY",$'
   printf '%s\n' '^\./backend/tests/audit/test_audit_redaction\.py:[[:digit:]]+:[[:space:]]+"-----BEGIN PRIVATE KEY-----DKB_CANARY_KEY",$'
   printf '%s\n' '^\./docs/execplans/E07-audit\.md:[[:digit:]]+:[[:space:]]+- `private_key=-----BEGIN PRIVATE KEY-----DKB_CANARY_KEY`$'
+  printf '%s\n' '^\./deploy/kolla/ansible/roles/cloud_ui_provisioning/tasks/database\.yml:[[:digit:]]+:[[:space:]]+login_password: "\{\{ cloud_ui_mariadb_admin_password \| default\(omit\) \}\}"$'
+  printf '%s\n' '^\./deploy/kolla/ansible/roles/cloud_ui_provisioning/tasks/database\.yml:[[:digit:]]+:[[:space:]]+password: "\{\{ cloud_ui_mariadb_(runtime|migration)_secret\.secret\.password \}\}"$'
+  printf '%s\n' '^\./deploy/kolla/ansible/roles/cloud_ui_provisioning/tasks/rabbitmq\.yml:[[:digit:]]+:[[:space:]]+password: "\{\{ cloud_ui_rabbitmq_runtime_secret\.secret\.password \}\}"$'
+  printf '%s\n' '^\./deploy/kolla/ansible/roles/cloud_ui_provisioning/tasks/rabbitmq\.yml:[[:digit:]]+:[[:space:]]+update_password: always$'
 } > "$allow_file"
 
 report_matches() {
