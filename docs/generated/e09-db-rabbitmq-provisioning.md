@@ -44,6 +44,8 @@ Read-only checks were run against the approved test Ansible host before any DB/R
 | Vault listeners | none observed on `:8200` or `:8201` |
 | Vault package source | `vault_package_unavailable` from the approved `dnf` package-source check |
 | Official HashiCorp RPM repository | approved for lab use, but `https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo` returned HTTP `404` with `x-amzn-waf-reason: geo` from the test host |
+| Internal mirror candidate | `http://192.168.10.17:8080/` reachable from `192.168.10.15`; repo metadata is valid |
+| Internal mirror packages | `terraform` only; no `vault` package indexed and no local `vault*.rpm` found on the mirror host |
 | Vault package after approved repository attempt | not installed |
 | HashiCorp repo file | absent |
 | Remote package side effect | `yum-utils` installed and `dnf-plugins-core` updated before the repository add failed |
@@ -55,8 +57,8 @@ source. DB/MQ provisioning was therefore not attempted.
 
 | Evidence | Status | Reason |
 |---|---|---|
-| Vault/SecMan lab service on `192.168.10.15` | pending_external_evidence | The official HashiCorp RPM endpoint is geo-blocked from the test host. |
-| Cloud UI DB/MQ secret material in Vault | pending_external_evidence | Requires reachable Vault package provenance, a pre-installed approved lab Vault or another approved SecMan mechanism. |
+| Vault/SecMan lab service on `192.168.10.15` | pending_external_evidence | The official HashiCorp RPM endpoint is geo-blocked from the test host, and the reachable internal mirror lacks a Vault package. |
+| Cloud UI DB/MQ secret material in Vault | pending_external_evidence | Requires reachable Vault package provenance, an internal mirror containing Vault, a pre-installed approved lab Vault or another approved SecMan mechanism. |
 | MariaDB schema `cloud_ui` | pending_external_evidence | Not created because the protected secret mechanism is unavailable. |
 | MariaDB users `cloud_ui` and `cloud_ui_migration` | pending_external_evidence | Not created because DB credentials must come from the protected secret mechanism. |
 | RabbitMQ vhost `/cloud-ui` and user `cloud_ui` | pending_external_evidence | Not created because MQ credentials must come from the protected secret mechanism. |
@@ -81,6 +83,7 @@ source. DB/MQ provisioning was therefore not attempted.
 
 ## Safe Next Step
 
-Provide a reachable approved Vault/SecMan package source, an internal mirror of the approved
-HashiCorp package, or a pre-installed approved lab Vault on `192.168.10.15`, then rerun the E09.3
-remote bootstrap steps before attempting MariaDB/RabbitMQ provisioning.
+Publish an approved Vault package to the reachable internal mirror at `192.168.10.17:8080`, provide
+another reachable approved Vault/SecMan package source, or pre-install an approved lab Vault on
+`192.168.10.15`, then rerun the E09.3 remote bootstrap steps before attempting MariaDB/RabbitMQ
+provisioning.

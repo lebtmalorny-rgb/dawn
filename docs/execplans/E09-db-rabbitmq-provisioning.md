@@ -128,6 +128,10 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
     with `x-amzn-waf-reason: geo`. Vault remains not installed, `/etc/yum.repos.d/hashicorp.repo` is
     absent and DB/MQ provisioning remains stopped. Remote side effect: `yum-utils` installed and
     `dnf-plugins-core` updated before the repository add failed.
+  - 2026-06-25: Checked internal mirror candidate `192.168.10.17`. It is reachable from
+    `192.168.10.15` at `http://192.168.10.17:8080/repodata/repomd.xml`, but its metadata indexes only
+    `terraform`; no `vault` package is available and no local `vault*.rpm` was found on the mirror
+    host.
 - [ ] Remote DB/RabbitMQ provisioning and least-privilege evidence.
   - 2026-06-25: Not executed because the protected secret mechanism is unavailable on the selected
     test host.
@@ -162,6 +166,8 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
 - The user approved the official HashiCorp RPM repository, but `rpm.releases.hashicorp.com` returns
   CloudFront HTTP `404` with `x-amzn-waf-reason: geo` from the test host. This is an external network
   policy/source reachability blocker, not a repository contract issue.
+- Internal mirror candidate `192.168.10.17:8080` is reachable and has valid yum metadata, but it
+  currently mirrors only `terraform`, not `vault`.
 - The repository secret scanner intentionally flags password-like YAML keys. E09.3 Ansible modules
   need those module argument names for Vault-derived values, so `scripts/secret-scan.sh` now has a
   narrow path-and-expression allowlist plus `backend/tests/test_secret_scan_script.py` regression
@@ -188,6 +194,10 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   different network path. Reason: the approved source must be reachable from the lab or mirrored by an
   approved process to preserve package provenance evidence. Consequence: Vault bootstrap remains
   pending external evidence.
+- 2026-06-25: Do not use `192.168.10.17:8080` for Vault installation until it contains a Vault RPM and
+  updated repository metadata. Alternative: configure the mirror anyway and let `dnf install vault`
+  fail. Reason: direct metadata inspection already proves the package is absent. Consequence: the next
+  safe path is to publish Vault to that mirror or provide another approved source.
 - 2026-06-25: Allowlist only exact Cloud UI provisioning Ansible template references in the secret
   scanner. Alternative: weaken the generic password-key pattern. Reason: the role needs Ansible module
   argument names, but arbitrary literal secret values must remain blocked. Consequence: `make lint`
@@ -287,7 +297,8 @@ Preserve `/opt/vault/data` unless destructive cleanup is explicitly approved.
 
 Current status: blocked before live DB/RabbitMQ mutation. The repository contract and sanitized
 external blocker evidence are present, but E09.3 live provisioning is not complete because the
-selected test host cannot reach the approved HashiCorp RPM source.
+selected test host cannot reach the approved HashiCorp RPM source and the reachable internal mirror
+does not contain Vault.
 
 - reachable approved Vault/SecMan package source, approved mirror, or pre-installed approved lab Vault
   is required before DB/MQ provisioning can run;
