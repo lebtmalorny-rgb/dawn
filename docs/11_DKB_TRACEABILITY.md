@@ -354,20 +354,22 @@ Evidence: `tests/test_e09_kolla_ansible_role.py`, `deploy/kolla/ansible/README.m
 
 ## Обновление требований 2026-06-25: E09.3 DB/RabbitMQ provisioning
 
-E09.3 добавляет repository-side contract для one-time Cloud UI MariaDB/RabbitMQ provisioning, но live
-provisioning остановлен на безопасном external blocker:
+E09.3 добавляет repository-side contract and sanitized all-in-one lab evidence для one-time Cloud UI
+MariaDB/RabbitMQ provisioning:
 
 - ДКБ-55/56: `deploy/kolla/ansible/roles/cloud_ui_provisioning` фиксирует Vault/SecMan lab path
-  `kv/cloud-ui/local/*`, отдельные Cloud UI DB/MQ principals and `no_log` task shape. На выбранном
-  test Ansible host `192.168.10.15` approved package-source check returned
-  `vault_package_unavailable`; after approval of the official HashiCorp RPM repository, the host
-  received HTTP `404` with `x-amzn-waf-reason: geo` from that endpoint. Therefore live secret
-  material, MariaDB schema/users and RabbitMQ vhost/user/permissions remain `pending_external_evidence`.
-- ДКБ-42-44/76/77/80: роль документирует DB/MQ object boundaries only. Network/VLAN/ACL,
-  management-zone placement, unused-interface blocking and live RabbitMQ/MariaDB access checks remain
-  external E09/E10 evidence.
-- ДКБ-69/70/82: E09.3 не меняет image build, registry, scanner/signing or rollback proof. Repository
-  rollback is Git revert; live cleanup is not required because provisioning stopped before mutation.
+  `kv/cloud-ui/local/*`, отдельные Cloud UI DB/MQ principals and `no_log` task shape. Lab Vault
+  `2.0.3` installed from approved internal mirror `192.168.10.17:8080`, initialized/unsealed on
+  `192.168.10.15`, with KV and file audit enabled. Cloud UI DB/MQ secrets were generated on the test
+  host and stored in Vault without committing or printing secret values. Production SecMan endpoint,
+  HA, backup, auto-unseal, rotation and owner approval remain external.
+- ДКБ-42-44/76/77/80: lab MariaDB schema/users and RabbitMQ vhost/user/exchanges/queues were created
+  with least-privilege checks: DB runtime user denied `mysql`; RabbitMQ `cloud_ui` has only
+  `/cloud-ui` permissions matching `^cloud-ui\\.` and no root-vhost permission. Network/VLAN/ACL,
+  management-zone placement, unused-interface blocking and HA evidence remain external E09/E10 proof.
+- ДКБ-69/70/82: E09.3 не меняет image build, registry, scanner/signing or full rollback proof.
+  Repository rollback is Git revert; live cleanup requires explicit approval for Vault paths,
+  MariaDB users/schema and RabbitMQ user/vhost.
 
 Evidence: `tests/test_e09_db_rabbitmq_provisioning.py`,
 `docs/generated/e09-db-rabbitmq-provisioning.md`, `docs/generated/risk-register.md` and ExecPlan

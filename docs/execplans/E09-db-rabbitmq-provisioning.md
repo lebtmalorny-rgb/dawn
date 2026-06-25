@@ -115,7 +115,7 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   exited 1 with expected Task 3-only missing evidence failures: 2 failed, 10 passed. Ruff command
   `cd backend && /Users/dmitry/Desktop/dawn/backend/.venv/bin/python -m ruff check ../tests/test_e09_db_rabbitmq_provisioning.py`
   exited 0 with `All checks passed!`.
-- [ ] Remote Vault bootstrap and sanitized evidence.
+- [x] Remote Vault bootstrap and sanitized evidence.
   - 2026-06-25: Read-only precheck confirmed host `ansible.example.local`, Kolla-Ansible and
     `/etc/kolla/all-in-one` present, Vault CLI missing, Vault service inactive and no `:8200/:8201`
     listeners.
@@ -132,9 +132,21 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
     `192.168.10.15` at `http://192.168.10.17:8080/repodata/repomd.xml`, but its metadata indexes only
     `terraform`; no `vault` package is available and no local `vault*.rpm` was found on the mirror
     host.
-- [ ] Remote DB/RabbitMQ provisioning and least-privilege evidence.
-  - 2026-06-25: Not executed because the protected secret mechanism is unavailable on the selected
-    test host.
+  - 2026-06-25: Internal mirror later published `vault-2.0.3-1.x86_64.rpm`; user approved it as the
+    source. Installed `Vault v2.0.3` on `192.168.10.15`, wrote `/etc/vault.d/vault.hcl`, started
+    service on `192.168.10.15:8200`, initialized/unsealed Vault, enabled `kv/` and file audit, and
+    created Cloud UI lab policy/token files with mode `0600`. Health endpoint returned HTTP `200`
+    with initialized true and sealed false.
+- [x] Remote DB/RabbitMQ provisioning and least-privilege evidence.
+  - 2026-06-25: Generated Cloud UI DB/MQ secrets on `192.168.10.15` and wrote only Vault paths
+    `kv/cloud-ui/local/mariadb/runtime`, `kv/cloud-ui/local/mariadb/migration` and
+    `kv/cloud-ui/local/rabbitmq/runtime`; command output printed metadata confirmations only.
+  - 2026-06-25: Provisioned MariaDB schema `cloud_ui`, runtime user `cloud_ui` and migration user
+    `cloud_ui_migration` on the all-in-one `mariadb` container. Verified runtime user can connect to
+    `cloud_ui` and is denied access to `mysql`.
+  - 2026-06-25: Provisioned RabbitMQ vhost `/cloud-ui`, user `cloud_ui`, scoped permissions
+    `^cloud-ui\\.` and durable Cloud UI exchanges/queues. Verified `cloud_ui` has no root-vhost
+    permission and final `/cloud-ui` permissions list only `cloud_ui`.
 - [ ] Traceability, risk register and final verification.
   - 2026-06-25: Added `docs/generated/e09-db-rabbitmq-provisioning.md`, DKB traceability update and
     risk `R-063` to record the external blocker without claiming live DB/MQ proof.
@@ -155,6 +167,13 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
     `make test` -> backend 327 passed, 1 skipped; frontend 35 passed;
     `./scripts/secret-scan.sh` -> passed;
     `git diff --check` -> passed.
+  - 2026-06-25 after live Vault/DB/RabbitMQ provisioning:
+    `backend/.venv/bin/python -m pytest tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_ansible_role.py backend/tests/test_secret_scan_script.py -q` -> 16 passed;
+    `make lint` -> backend Ruff, frontend ESLint and secret scan passed;
+    `make typecheck` -> backend mypy and frontend TypeScript passed;
+    `make test` -> backend 327 passed, 1 skipped; frontend 35 passed;
+    `make security` -> secret scan passed;
+    `git diff --check` -> passed.
 
 ## Неожиданные открытия
 
@@ -168,6 +187,13 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   policy/source reachability blocker, not a repository contract issue.
 - Internal mirror candidate `192.168.10.17:8080` is reachable and has valid yum metadata, but it
   currently mirrors only `terraform`, not `vault`.
+- The internal mirror can be refreshed independently. After `vault-2.0.3-1.x86_64.rpm` appeared in
+  `192.168.10.17:8080` metadata, `192.168.10.15` could install Vault from the approved mirror.
+- Vault package postinstall generated TLS material under `/opt/vault/tls`; E09.3 active config uses
+  `/etc/vault.d/tls` instead. The root path `https://192.168.10.15:8200/` returns HTTP `404` because
+  this is an API endpoint with `ui = false`; `/v1/sys/health` returns HTTP `200`.
+- The packaged Vault systemd unit runs as `vault:vault`. The lab TLS private key needed mode `0640`
+  with owner `root:vault`; mode `0600 root:vault` caused a service start failure.
 - The repository secret scanner intentionally flags password-like YAML keys. E09.3 Ansible modules
   need those module argument names for Vault-derived values, so `scripts/secret-scan.sh` now has a
   narrow path-and-expression allowlist plus `backend/tests/test_secret_scan_script.py` regression
@@ -198,6 +224,15 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   updated repository metadata. Alternative: configure the mirror anyway and let `dnf install vault`
   fail. Reason: direct metadata inspection already proves the package is absent. Consequence: the next
   safe path is to publish Vault to that mirror or provide another approved source.
+- 2026-06-25: Use the refreshed internal mirror `192.168.10.17:8080` as the approved Vault package
+  source after it published `vault-2.0.3-1.x86_64.rpm`. Alternative: keep waiting for the external
+  HashiCorp endpoint. Reason: the mirror is reachable from the test stand and has valid yum metadata.
+  Consequence: Vault bootstrap and DB/MQ provisioning can proceed as lab evidence.
+- 2026-06-25: Declare RabbitMQ exchanges/queues through the management HTTP API with temporary
+  provisioning permissions for Kolla user `openstack`, then clear those permissions. Alternative:
+  grant the runtime `cloud_ui` user a management tag or leave queues undeclared. Reason: the RabbitMQ
+  container lacks `rabbitmqadmin` and Python `pika`; runtime user should keep only AMQP permissions.
+  Consequence: final `/cloud-ui` permissions are scoped to `cloud_ui` only.
 - 2026-06-25: Allowlist only exact Cloud UI provisioning Ansible template references in the secret
   scanner. Alternative: weaken the generic password-key pattern. Reason: the role needs Ansible module
   argument names, but arbitrary literal secret values must remain blocked. Consequence: `make lint`
@@ -295,15 +330,10 @@ Preserve `/opt/vault/data` unless destructive cleanup is explicitly approved.
 
 ## Итог и остаточные риски
 
-Current status: blocked before live DB/RabbitMQ mutation. The repository contract and sanitized
-external blocker evidence are present, but E09.3 live provisioning is not complete because the
-selected test host cannot reach the approved HashiCorp RPM source and the reachable internal mirror
-does not contain Vault.
+Current status: E09.3 lab DB/RabbitMQ provisioning is implemented on the approved all-in-one test
+stand. The repository contract and sanitized live evidence are present. Vault, MariaDB and RabbitMQ
+live state was changed only on the test hosts `192.168.10.15` and `192.168.10.14`.
 
-- reachable approved Vault/SecMan package source, approved mirror, or pre-installed approved lab Vault
-  is required before DB/MQ provisioning can run;
-- live MariaDB schema/users and RabbitMQ vhost/user/permissions were not created;
-- least-privilege negative DB/MQ checks were not executed;
 - lab all-in-one evidence is not HA production evidence;
 - corporate PKI, Vault HA/backup/auto-unseal and production owner approval remain external;
 - MariaDB backup/failover and RabbitMQ quorum/HA remain E10/external;
