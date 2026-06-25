@@ -81,7 +81,11 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
 - [x] 2026-06-25: Исследование фактического состояния. Evidence: E09 task, listed docs, E08 security
   review, `deploy/AGENTS.md`, existing E09 tests/scripts and approved design were read; worktree
   baseline `make test` passed.
-- [ ] Контракт и тестовый double.
+- [x] 2026-06-25: Контракт и тестовый double. Evidence:
+  `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py -q` exited
+  `1` with `6 failed`; failures are the expected RED state because
+  `deploy/kolla/scripts/collect-e09-evidence.py` and
+  `docs/generated/e09-deployment-smoke-evidence.md` do not exist yet.
 - [ ] Минимальная реализация.
 - [ ] Отрицательные сценарии и безопасность.
 - [ ] Интеграционные и пользовательские проверки.
