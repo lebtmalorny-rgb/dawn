@@ -136,8 +136,9 @@ def test_rendered_evidence_states_acceptance_rows_and_partial_scope() -> None:
     )
     assert "api/ui smoke" in normalized
     assert "rollback" in normalized
-    assert "partial" in normalized or "pending_external_evidence" in evidence
-    assert "not production approval" in normalized or "test-stand" in normalized
+    assert "pending" in normalized
+    assert "partial" in normalized
+    assert "test-stand" in normalized
 
 
 def test_generated_evidence_traceability_and_risk_register_are_updated() -> None:
