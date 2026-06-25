@@ -36,7 +36,8 @@ AUTHORIZATION_BEARER_RE = re.compile(
     r"(?i)\b(authorization\s*:\s*bearer\s+)[^\s,|`]+"
 )
 SENSITIVE_KEY_RE = re.compile(
-    r"(?i)(password|passwd|token|secret|private[_-]?key|application_credential)"
+    r"(?i)(authorization|cookie|password|passwd|token|secret|private[_-]?key|"
+    r"application_credential)"
 )
 CREDENTIAL_URL_RE = re.compile(
     r"(?i)\b([a-z][a-z0-9+.-]*://[^/\s:@]+:)([^@\s/]+)(@)"
@@ -89,10 +90,12 @@ def redact(value: str) -> str:
     try:
         parsed = json.loads(value)
     except json.JSONDecodeError:
-        parsed = None
+        return _redact_non_json(value)
     else:
         return json.dumps(_redact_json(parsed), ensure_ascii=False, sort_keys=True)
 
+
+def _redact_non_json(value: str) -> str:
     value = AUTHORIZATION_BEARER_RE.sub(
         lambda match: f"{match.group(1)}[REDACTED]",
         value,
@@ -124,6 +127,8 @@ def _redact_json(value):
         }
     if isinstance(value, list):
         return [_redact_json(item) for item in value]
+    if isinstance(value, str):
+        return _redact_non_json(value)
     return value
 
 

@@ -400,6 +400,16 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
                 '{"access": {"token": {"id": "keystone-secret"}}}',
             ),
             module.CommandSummary(
+                "json_strings",
+                "passed",
+                (
+                    '{"headers": {"Authorization": "Bearer supersecret"}, '
+                    '"url": "mysql://user:pass@host/db", '
+                    '"stdout": "X-Auth-Token: xauth-secret", '
+                    '"set_cookie": "session=abc"}'
+                ),
+            ),
+            module.CommandSummary(
                 "urls",
                 "passed",
                 (
@@ -440,7 +450,9 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
     assert "very secret value" not in evidence
     assert "nested-secret" not in evidence
     assert "keystone-secret" not in evidence
+    assert "supersecret" not in evidence
     assert "user:pass@" not in evidence
+    assert "xauth-secret" not in evidence
     assert "PEMSECRET" not in evidence
     assert "session=abc" not in evidence
     assert "csrf-secret" not in evidence
