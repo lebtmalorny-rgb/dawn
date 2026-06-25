@@ -114,12 +114,9 @@ def test_migration_tasks_are_ordered_before_permanent_container_definitions() ->
         if include_value is not None:
             actual_imports.append(str(include_value).strip())
 
-    assert actual_imports == [
-        "validate.yml",
-        "config.yml",
-        "migration.yml",
-        "containers.yml",
-    ]
+    assert actual_imports.index("validate.yml") < actual_imports.index("migration.yml")
+    assert actual_imports.index("config.yml") < actual_imports.index("migration.yml")
+    assert actual_imports.index("migration.yml") < actual_imports.index("containers.yml")
 
     migration_tasks = load_yaml_list(
         "deploy/kolla/ansible/roles/cloud_ui/tasks/migration.yml"

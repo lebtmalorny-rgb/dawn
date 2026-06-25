@@ -44,3 +44,19 @@
       - cloud_ui_haproxy_max_body_bytes > 0
       - cloud_ui_management_network_acl_required | bool
     fail_msg: "Cloud UI HAProxy route must keep the E09.6 same-origin TLS/network contract."
+
+- name: Validate Cloud UI lifecycle contract
+  ansible.builtin.assert:
+    that:
+      - cloud_ui_lifecycle_contract_version == 'e09.7-reconfigure-rollback'
+      - cloud_ui_lifecycle_dry_run_only | bool
+      - cloud_ui_lifecycle_live_execution_status == 'pending_external_evidence'
+      - cloud_ui_deploy_reconfigure_phases | map(attribute='name') | list == cloud_ui_deploy_reconfigure_phase_order
+      - cloud_ui_rolling_upgrade_phases | map(attribute='name') | list == cloud_ui_rolling_upgrade_phase_order
+      - cloud_ui_failed_update_rollback_phases | map(attribute='name') | list == cloud_ui_failed_update_rollback_phase_order
+      - cloud_ui_deploy_reconfigure_phases[3].command == 'cloud-ui db-upgrade --check'
+      - cloud_ui_deploy_reconfigure_phases[4].run_once | bool
+      - not cloud_ui_rolling_upgrade_phases[9].contract_migration_allowed
+      - cloud_ui_disable_uninstall_policy.preserve_database | bool
+      - cloud_ui_disable_uninstall_policy.destructive_cleanup_requires_approval | bool
+    fail_msg: "Cloud UI lifecycle must keep the E09.7 dry-run reconfigure/rollback contract."

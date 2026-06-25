@@ -12,6 +12,7 @@ EXPECTED_ROLE_FILES = [
     "deploy/kolla/ansible/roles/cloud_ui/handlers/main.yml",
     "deploy/kolla/ansible/roles/cloud_ui/tasks/main.yml",
     "deploy/kolla/ansible/roles/cloud_ui/tasks/validate.yml",
+    "deploy/kolla/ansible/roles/cloud_ui/tasks/lifecycle.yml",
     "deploy/kolla/ansible/roles/cloud_ui/tasks/config.yml",
     "deploy/kolla/ansible/roles/cloud_ui/tasks/migration.yml",
     "deploy/kolla/ansible/roles/cloud_ui/tasks/containers.yml",
@@ -111,7 +112,13 @@ def test_tasks_are_skeleton_only_and_import_expected_steps() -> None:
             )
 
     assert len(main_tasks) == len(actual_imports)
-    assert actual_imports == ["validate.yml", "config.yml", "migration.yml", "containers.yml"]
+    assert actual_imports == [
+        "validate.yml",
+        "lifecycle.yml",
+        "config.yml",
+        "migration.yml",
+        "containers.yml",
+    ]
 
     assert isinstance(containers_tasks, list)
     set_fact_value = None

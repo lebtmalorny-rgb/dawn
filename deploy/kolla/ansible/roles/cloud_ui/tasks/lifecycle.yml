@@ -1,0 +1,31 @@
+---
+- name: Publish Cloud UI lifecycle contract for dry-run evidence
+  ansible.builtin.set_fact:
+    cloud_ui_lifecycle_plan:
+      contract_version: "{{ cloud_ui_lifecycle_contract_version }}"
+      dry_run_only: "{{ cloud_ui_lifecycle_dry_run_only }}"
+      live_execution_status: "{{ cloud_ui_lifecycle_live_execution_status }}"
+      required_evidence: "{{ cloud_ui_lifecycle_required_evidence }}"
+
+- name: Publish Cloud UI deploy and reconfigure plan
+  ansible.builtin.set_fact:
+    cloud_ui_reconfigure_plan:
+      phase_order: "{{ cloud_ui_deploy_reconfigure_phase_order }}"
+      phases: "{{ cloud_ui_deploy_reconfigure_phases }}"
+
+- name: Publish Cloud UI rolling upgrade plan
+  ansible.builtin.set_fact:
+    cloud_ui_rolling_upgrade_plan:
+      phase_order: "{{ cloud_ui_rolling_upgrade_phase_order }}"
+      phases: "{{ cloud_ui_rolling_upgrade_phases }}"
+
+- name: Publish Cloud UI failed update rollback plan
+  ansible.builtin.set_fact:
+    cloud_ui_failed_update_rollback_plan:
+      phase_order: "{{ cloud_ui_failed_update_rollback_phase_order }}"
+      phases: "{{ cloud_ui_failed_update_rollback_phases }}"
+      decision_table: "{{ cloud_ui_rollback_decision_table }}"
+
+- name: Publish Cloud UI disable and uninstall plan
+  ansible.builtin.set_fact:
+    cloud_ui_disable_uninstall_plan: "{{ cloud_ui_disable_uninstall_policy }}"

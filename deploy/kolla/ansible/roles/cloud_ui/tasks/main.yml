@@ -2,6 +2,9 @@
 - name: Validate Cloud UI role inputs
   ansible.builtin.include_tasks: validate.yml
 
+- name: Publish Cloud UI lifecycle contract
+  ansible.builtin.include_tasks: lifecycle.yml
+
 - name: Prepare Cloud UI config templates
   ansible.builtin.include_tasks: config.yml
   when: cloud_ui_enabled | bool

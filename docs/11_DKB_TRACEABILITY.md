@@ -433,6 +433,26 @@ Evidence: `tests/test_e09_haproxy_tls_network.py`,
 `docs/generated/network-flow-matrix.md`, `docs/generated/risk-register.md` and ExecPlan
 `docs/execplans/E09-haproxy-tls-network.md`.
 
+## Обновление требований 2026-06-25: E09.7 Reconfigure/upgrade/rollback
+
+E09.7 добавляет repository-side lifecycle contract для Cloud UI Kolla deployment без live
+`kolla-ansible` запуска:
+
+- ДКБ-55/56: lifecycle keeps secrets out of Git and references the existing deployment-secret boundary.
+  Full Kolla/OpenStack/MariaDB/RabbitMQ/SIEM/PKI secret rotation remains external evidence.
+- ДКБ-69/70: lifecycle requires image pull by digest before rollout and preserves the two-image
+  contract. Live registry digest pull, scanner/signature/SBOM and the ДКБ-69 Python interpreter waiver
+  remain pending.
+- ДКБ-76/77/80: clean deploy/reconfigure, rolling upgrade, failed update rollback and disable/uninstall
+  phases are documented for test-inventory execution. Firewall/ACL, management-zone scan and disabled
+  unused-interface proof remain external.
+- ДКБ-82: operational lifecycle and rollback path are documented. This is not a live Kolla
+  reconfigure, idempotency run, rolling update, failed rollback execution or production approval.
+
+Evidence: `tests/test_e09_reconfigure_rollback.py`,
+`docs/generated/e09-reconfigure-rollback.md`, `docs/generated/risk-register.md` and ExecPlan
+`docs/execplans/E09-reconfigure-rollback.md`.
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

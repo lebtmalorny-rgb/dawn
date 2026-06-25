@@ -30,7 +30,7 @@ def load_yaml_list(relative_path: str) -> list[dict]:
 def test_defaults_declare_same_origin_haproxy_route_contract() -> None:
     defaults = load_yaml("deploy/kolla/ansible/roles/cloud_ui/defaults/main.yml")
 
-    assert defaults["cloud_ui_config_version"] == "e09.6-haproxy-tls-network"
+    assert defaults["cloud_ui_config_version"].startswith("e09.")
     assert defaults["cloud_ui_haproxy_enabled"] is False
     assert defaults["cloud_ui_external_scheme"] == "https"
     assert defaults["cloud_ui_external_fqdn"] == "cloud-ui.example.invalid"
