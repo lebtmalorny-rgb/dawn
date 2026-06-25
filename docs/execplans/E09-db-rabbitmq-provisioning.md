@@ -133,10 +133,11 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
     `terraform`; no `vault` package is available and no local `vault*.rpm` was found on the mirror
     host.
   - 2026-06-25: Internal mirror later published `vault-2.0.3-1.x86_64.rpm`; user approved it as the
-    source. Installed `Vault v2.0.3` on `192.168.10.15`, wrote `/etc/vault.d/vault.hcl`, started
-    service on `192.168.10.15:8200`, initialized/unsealed Vault, enabled `kv/` and file audit, and
-    created Cloud UI lab policy/token files with mode `0600`. Health endpoint returned HTTP `200`
-    with initialized true and sealed false.
+    source. Installed `Vault v2.0.3` on `192.168.10.15` with GPG checking disabled because package
+    signature validation was not established for that mirror in this slice, wrote
+    `/etc/vault.d/vault.hcl`, started service on `192.168.10.15:8200`, initialized/unsealed Vault,
+    enabled `kv/` and file audit, and created Cloud UI lab policy/token files with mode `0600`.
+    Health endpoint returned HTTP `200` with initialized true and sealed false.
 - [x] Remote DB/RabbitMQ provisioning and least-privilege evidence.
   - 2026-06-25: Generated Cloud UI DB/MQ secrets on `192.168.10.15` and wrote only Vault paths
     `kv/cloud-ui/local/mariadb/runtime`, `kv/cloud-ui/local/mariadb/migration` and
@@ -189,6 +190,8 @@ DB/MQ provisioning role, live lab DB/MQ least-privilege evidence or E09.3 genera
   currently mirrors only `terraform`, not `vault`.
 - The internal mirror can be refreshed independently. After `vault-2.0.3-1.x86_64.rpm` appeared in
   `192.168.10.17:8080` metadata, `192.168.10.15` could install Vault from the approved mirror.
+- Package signature evidence for the internal mirror was not established in this slice; the lab Vault
+  install used GPG checking disabled and therefore is not production supply-chain evidence.
 - Vault package postinstall generated TLS material under `/opt/vault/tls`; E09.3 active config uses
   `/etc/vault.d/tls` instead. The root path `https://192.168.10.15:8200/` returns HTTP `404` because
   this is an API endpoint with `ui = false`; `/v1/sys/health` returns HTTP `200`.

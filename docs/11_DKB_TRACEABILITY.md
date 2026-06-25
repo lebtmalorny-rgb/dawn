@@ -361,8 +361,10 @@ MariaDB/RabbitMQ provisioning:
   `kv/cloud-ui/local/*`, отдельные Cloud UI DB/MQ principals and `no_log` task shape. Lab Vault
   `2.0.3` installed from approved internal mirror `192.168.10.17:8080`, initialized/unsealed on
   `192.168.10.15`, with KV and file audit enabled. Cloud UI DB/MQ secrets were generated on the test
-  host and stored in Vault without committing or printing secret values. Production SecMan endpoint,
-  HA, backup, auto-unseal, rotation and owner approval remain external.
+  host and stored in Vault without committing or printing secret values. Package signature evidence
+  for that mirror was not established in this slice, so the lab install does not close production
+  supply-chain controls. Production SecMan endpoint, HA, backup, auto-unseal, rotation and owner
+  approval remain external.
 - ДКБ-42-44/76/77/80: lab MariaDB schema/users and RabbitMQ vhost/user/exchanges/queues were created
   with least-privilege checks: DB runtime user denied `mysql`; RabbitMQ `cloud_ui` has only
   `/cloud-ui` permissions matching `^cloud-ui\\.` and no root-vhost permission. Network/VLAN/ACL,

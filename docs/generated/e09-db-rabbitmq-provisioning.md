@@ -58,6 +58,7 @@ DB/MQ provisioning then proceeded with secret material stored only in Vault.
 | Check | Result |
 |---|---|
 | Package source | internal mirror `http://192.168.10.17:8080/` |
+| Package signature evidence | not established in this slice; lab install used the approved internal mirror with GPG check disabled |
 | Vault version | `2.0.3` |
 | Service | active |
 | API listener | `192.168.10.15:8200` |
