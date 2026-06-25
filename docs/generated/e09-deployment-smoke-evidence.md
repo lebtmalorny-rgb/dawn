@@ -27,6 +27,9 @@
 - ДКБ-69 waiver remains pending because the Python backend still requires an interpreter.
 - Network-owner ACL proof for management/API zones remains pending.
 - Rollback execution on the approved test stand remains pending.
+- Read-only discovery on 2026-06-25 did not attach live evidence: SSH host identity for the provided
+  test address must be confirmed, and no approved inventory path, backend/frontend image digests or
+  Cloud UI/Kolla container summaries were available to record.
 
 ## DKB scope
 

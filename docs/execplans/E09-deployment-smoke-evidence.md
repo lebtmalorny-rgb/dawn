@@ -107,7 +107,11 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   found in 83 source files` and frontend `tsc -b`; `make security` exited `0` via
   `./scripts/secret-scan.sh`; `make test` exited `0` with backend `327 passed, 1 skipped in 3.28s`
   and frontend vitest `35 passed (35)`; `git diff --check` exited `0` before the ExecPlan update.
-- [ ] Optional live test-stand execution and sanitized evidence refresh remain pending.
+- [ ] Optional live test-stand execution and sanitized evidence refresh remain pending. Read-only
+  discovery against the provided test address on 2026-06-25 did not produce attachable live evidence:
+  OpenSSH reported a host-key mismatch, `podman` was present but Cloud UI/Kolla containers/images were
+  not found by name, `kolla-ansible`/`kolla-build` were not on PATH, and no approved inventory path or
+  backend/frontend image digests were available.
 
 ## Неожиданные открытия
 
@@ -120,6 +124,11 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   repository secret patterns. Commit `5574b2f test: avoid static E09 redaction canaries` fixed the
   fixture by building the same canary values from runtime fragments without weakening the scanner;
   the retry `make lint` and `make security` both completed with exit `0`.
+- 2026-06-25: Optional live test-stand discovery was kept read-only. OpenSSH reported that the known
+  ED25519 host key for the provided test address changed, so no mutating `kolla-ansible` command was
+  run. Additional read-only probes found `/usr/bin/podman`, but no Cloud UI/Kolla containers/images by
+  name, no `kolla-ansible`/`kolla-build` on PATH and no approved inventory/digest inputs to feed into
+  the evidence runner.
 
 ## Журнал решений
 
@@ -202,6 +211,7 @@ above passed after the static canary fixture fix in `5574b2f`.
 
 Full E09 acceptance is still not claimed. The optional live test-stand smoke, real container/HAProxy/
 DB/RabbitMQ inspection summaries, image digest pull proof and failed-update rollback evidence remain
-pending external sanitized evidence. ДКБ-69 remains limited by the Python backend interpreter waiver
-question, and production deployment approval/PKI/network-owner proof remain outside this repository
-verification.
+pending external sanitized evidence. The provided test address also needs host-key confirmation and
+operator-provided inventory/image digest inputs before any live command can be used as evidence.
+ДКБ-69 remains limited by the Python backend interpreter waiver question, and production deployment
+approval/PKI/network-owner proof remain outside this repository verification.
