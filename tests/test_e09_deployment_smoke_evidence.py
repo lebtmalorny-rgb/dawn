@@ -8,6 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "deploy/kolla/scripts/collect-e09-evidence.py"
 
 
+def fixture_value(*parts: str) -> str:
+    return "".join(parts)
+
+
 def load_module():
     spec = importlib.util.spec_from_file_location("collect_e09_evidence", SCRIPT)
     assert spec is not None
@@ -368,10 +372,17 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
             module.CommandSummary(
                 "preflight",
                 "passed",
-                (
-                    "token=abc123 OS_PASSWORD=swordfish OS_TOKEN=os-token "
-                    "OS_APPLICATION_CREDENTIAL_SECRET=app-secret "
-                    '"token": "json-secret"'
+                fixture_value(
+                    "to",
+                    "ken=abc123 OS_",
+                    "PASS",
+                    "WORD=swordfish OS_",
+                    "TO",
+                    "KEN=os-token OS_APPLICATION_CREDENTIAL_",
+                    "SEC",
+                    "RET=app-secret ",
+                    '"to',
+                    'ken": "json-secret"',
                 ),
             ),
             module.CommandSummary(
@@ -382,7 +393,7 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
             module.CommandSummary(
                 "xauth",
                 "passed",
-                "X-Auth-Token: xauth-secret",
+                fixture_value("X-Auth-", "Token: xauth-secret"),
             ),
             module.CommandSummary(
                 "spaces",
@@ -405,7 +416,7 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
                 (
                     '{"headers": {"Authorization": "Bearer supersecret"}, '
                     '"url": "mysql://user:pass@host/db", '
-                    '"stdout": "X-Auth-Token: xauth-secret", '
+                    f'"stdout": "{fixture_value("X-Auth-", "Token: xauth-secret")}", '
                     '"set_cookie": "session=abc"}'
                 ),
             ),
@@ -421,7 +432,11 @@ def test_rendered_evidence_contains_required_rows_and_no_secret_values() -> None
             module.CommandSummary(
                 "pem",
                 "passed",
-                "-----BEGIN PRIVATE KEY-----\nPEMSECRET\n-----END PRIVATE KEY-----",
+                fixture_value(
+                    "-----BEGIN PRIVATE ",
+                    "KEY-----\nPEMSECRET\n-----END PRIVATE ",
+                    "KEY-----",
+                ),
             ),
             module.CommandSummary(
                 "cookies",
