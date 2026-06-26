@@ -86,6 +86,7 @@ def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
         "cloud-ui-frontend-source/frontend/dist",
         "{{ macros.configure_user(name='cloudui') }}",
         "org.opencontainers.image.title=\"cloud-ui-frontend\"",
+        "ln -sf /var/log/kolla/cloud-ui-frontend/error.log /var/log/nginx/error.log",
         "nginx",
     ]:
         assert expected in template
@@ -96,6 +97,14 @@ def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
     assert "COPY cloud-ui-frontend-source" not in template
     assert "error_log /var/log/kolla/cloud-ui-frontend/error.log warn;" in nginx_config
     assert "access_log /var/log/kolla/cloud-ui-frontend/access.log;" in nginx_config
+    for expected_temp_path in [
+        "client_body_temp_path /tmp/nginx-client-body;",
+        "proxy_temp_path /tmp/nginx-proxy;",
+        "fastcgi_temp_path /tmp/nginx-fastcgi;",
+        "uwsgi_temp_path /tmp/nginx-uwsgi;",
+        "scgi_temp_path /tmp/nginx-scgi;",
+    ]:
+        assert expected_temp_path in nginx_config
     assert "/var/log/nginx" not in nginx_config
 
 
