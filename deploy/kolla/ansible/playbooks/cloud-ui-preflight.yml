@@ -1,0 +1,31 @@
+---
+- name: Cloud UI live reconfigure preflight
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    cloud_ui_enabled: true
+  tasks:
+    - name: Validate Cloud UI test marker and rollback window
+      ansible.builtin.assert:
+        that:
+          - cloud_ui_test_stand | bool
+          - cloud_ui_rollback_window_open | bool
+
+    - name: Validate Cloud UI image digests
+      ansible.builtin.assert:
+        that:
+          - cloud_ui_backend_image_digest is match('^sha256:[0-9a-f]{64}$')
+          - cloud_ui_frontend_image_digest is match('^sha256:[0-9a-f]{64}$')
+
+    - name: Validate Cloud UI DB and MQ runtime inputs
+      ansible.builtin.assert:
+        that:
+          - cloud_ui_database_url | length > 0
+          - cloud_ui_rabbitmq_url | length > 0
+      no_log: true
+
+    - name: Import Cloud UI role validation
+      ansible.builtin.import_role:
+        name: cloud_ui
+        tasks_from: validate

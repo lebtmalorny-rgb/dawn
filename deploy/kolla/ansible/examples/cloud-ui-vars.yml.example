@@ -1,0 +1,9 @@
+---
+# Copy this file outside Git before live test-stand use.
+cloud_ui_test_stand: true
+cloud_ui_rollback_window_open: false
+cloud_ui_enabled: true
+cloud_ui_backend_image_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+cloud_ui_frontend_image_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+cloud_ui_database_url: "{{ lookup('ansible.builtin.env', 'CLOUD_UI_DATABASE_URL') }}"
+cloud_ui_rabbitmq_url: "{{ lookup('ansible.builtin.env', 'CLOUD_UI_RABBITMQ_URL') }}"
