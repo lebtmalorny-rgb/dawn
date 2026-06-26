@@ -173,6 +173,24 @@ def test_e09_db_rabbitmq_evidence_records_live_scope_and_limits() -> None:
     assert "client token" not in evidence.lower()
 
 
+def test_db_mq_auth_boundary_docs_do_not_blame_keystone() -> None:
+    deploy_doc = read_text("docs/12_DEPLOY_ROCKY_KOLLA.md")
+    provisioning_evidence = read_text("docs/generated/e09-db-rabbitmq-provisioning.md")
+    smoke_evidence = read_text("docs/generated/e09-deployment-smoke-evidence.md")
+
+    for text in (deploy_doc, provisioning_evidence):
+        assert "Keystone" in text
+        assert "MariaDB" in text
+        assert "RabbitMQ" in text
+        assert "oslo.messaging" in text
+        assert "transport URL" in text
+        assert "not Keystone" in text or "не Keystone" in text
+
+    assert "not Keystone RBAC" in smoke_evidence
+    assert "1045 Access denied" in smoke_evidence
+    assert "403 ACCESS_REFUSED" in smoke_evidence
+
+
 def test_risk_register_ids_are_unique_after_e09_3() -> None:
     risk_register = read_text("docs/generated/risk-register.md")
     risk_ids = re.findall(r"^\| (R-\d{3}) \|", risk_register, flags=re.MULTILINE)

@@ -133,6 +133,11 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
     `cloud_ui_db_migrate` or `cloud-ui db-upgrade` container was found. Remote Cloud UI custom
     role/config was not found on the Ansible host, so `kolla-ansible reconfigure --tags cloud-ui`
     was not run as acceptance evidence.
+  - 2026-06-26: read-only dependency diagnostics confirmed that API-container TCP connectivity to
+    MariaDB `3306` and RabbitMQ `5672` is open, but application-level auth fails: MariaDB returns
+    `1045 Access denied` for `cloud_ui`, and RabbitMQ returns `403 ACCESS_REFUSED` on `/cloud-ui`.
+    This is recorded as runtime DB/MQ secret injection or principal drift, not as a Keystone RBAC
+    failure.
 
 ## Неожиданные открытия
 

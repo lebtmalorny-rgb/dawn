@@ -93,6 +93,31 @@ Custom role отвечает за:
 
 Не использовать root MariaDB в runtime. Не читать OpenStack service tables.
 
+## Модель доступа Keystone, MariaDB и RabbitMQ
+
+Keystone авторизует пользователей и service users для OpenStack API и service-to-service API
+вызовов. Он не является механизмом аутентификации для прямого подключения приложения к MariaDB или
+RabbitMQ.
+
+Для Cloud UI разделяются три класса учетных данных:
+
+- OpenStack/Keystone service credential или application credential для вызовов Keystone/Nova и других
+  OpenStack API через backend;
+- MariaDB runtime/migration users для собственной schema `cloud_ui`;
+- RabbitMQ user/vhost для собственного transport namespace `/cloud-ui`.
+
+`oslo.messaging` задает стандартную модель transport для OpenStack services, но при backend broker
+RabbitMQ сама аутентификация transport остается broker-level: user/password, vhost, permissions и TLS
+из `transport_url`/секретного runtime config. Это не Keystone token flow. Поэтому ошибка MariaDB
+`1045 Access denied` или RabbitMQ `ACCESS_REFUSED` на `/cloud-ui` означает проблему DB/MQ principal,
+пароля, vhost/permissions или secret injection, а не отказ Keystone RBAC.
+
+Ссылки на upstream-модель:
+
+- OpenStack Keystone service users/service tokens: `https://docs.openstack.org/keystone/latest/admin/manage-services.html`;
+- `oslo.messaging` transport URLs: `https://docs.openstack.org/oslo.messaging/latest/reference/transport.html`;
+- Kolla-Ansible password classes: `https://docs.openstack.org/kolla-ansible/latest/admin/password-rotation.html`.
+
 ## RabbitMQ
 
 Создаются:

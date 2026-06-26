@@ -369,6 +369,11 @@ MariaDB/RabbitMQ provisioning:
   with least-privilege checks: DB runtime user denied `mysql`; RabbitMQ `cloud_ui` has only
   `/cloud-ui` permissions matching `^cloud-ui\\.` and no root-vhost permission. Network/VLAN/ACL,
   management-zone placement, unused-interface blocking and HA evidence remain external E09/E10 proof.
+- Auth boundary clarification: Keystone service users/service tokens authorize OpenStack API and
+  service-to-service calls. MariaDB sessions and RabbitMQ broker sessions are authenticated by their
+  own DB/MQ principals and deployment secrets. `oslo.messaging` defines the messaging transport, but
+  with RabbitMQ it still uses broker credentials, vhost permissions and TLS from the transport URL.
+  DB/MQ `Access denied`/`ACCESS_REFUSED` readiness failures are therefore not Keystone RBAC failures.
 - ДКБ-69/70/82: E09.3 не меняет image build, registry, scanner/signing or full rollback proof.
   Repository rollback is Git revert; live cleanup requires explicit approval for Vault paths,
   MariaDB users/schema and RabbitMQ user/vhost.

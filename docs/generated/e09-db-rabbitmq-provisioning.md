@@ -30,6 +30,29 @@ The role tasks are fail-closed around the Cloud UI object names and use `no_log:
 MariaDB and RabbitMQ tasks. No runtime secret value, Kolla secret file, registry credential or
 production inventory was added to the repository.
 
+## Auth Boundary Clarification
+
+Keystone covers OpenStack API identity, project/service scope and service-to-service API tokens. It
+does not authenticate direct MariaDB sessions or RabbitMQ broker sessions.
+
+The Cloud UI deployment therefore needs separate runtime secret injection for:
+
+- OpenStack API access through backend-side Keystone credentials;
+- MariaDB `cloud_ui`/`cloud_ui_migration` users for the Cloud UI schema;
+- RabbitMQ `cloud_ui` user on vhost `/cloud-ui`.
+
+`oslo.messaging` is the OpenStack messaging library and transport abstraction. With RabbitMQ as the
+transport backend, the effective connection still authenticates to RabbitMQ with broker credentials,
+vhost permissions and optional TLS from the transport URL. DB/MQ readiness failures such as MariaDB
+`1045 Access denied` or RabbitMQ `ACCESS_REFUSED` are therefore DB/MQ credential or permission
+failures, not Keystone authorization failures.
+
+Upstream references used for this boundary:
+
+- Keystone service users/service tokens: `https://docs.openstack.org/keystone/latest/admin/manage-services.html`;
+- `oslo.messaging` transport URLs: `https://docs.openstack.org/oslo.messaging/latest/reference/transport.html`;
+- Kolla-Ansible password classes: `https://docs.openstack.org/kolla-ansible/latest/admin/password-rotation.html`.
+
 ## Remote Precheck Evidence
 
 Read-only checks were run against the approved test Ansible host before any DB/RabbitMQ mutation.
