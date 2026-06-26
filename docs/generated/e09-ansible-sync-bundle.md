@@ -3,7 +3,7 @@
 - Stage: E09 Ansible sync bundle
 - Scope: local-only export; remote sync remains separately approved
 - Live execution status: `pending_external_evidence`
-- Source commit: `87ef6b9bc0f5`
+- Source commit: `71a8e3b6b7bc`
 - Bundle schema: `e09-ansible-sync-bundle/v1`
 - runtime secret value: absent; DB/MQ URLs remain external runtime secret inputs
 
