@@ -766,9 +766,9 @@ packages the `cloud_ui` role, preflight playbook, placeholder example vars and a
 checksums. It contains no runtime secret value, inventory, SSH material, DB/MQ URL, token, private key
 or host-specific credential.
 
-The bundle is not live deployment evidence and does not run live mutating Kolla actions. Remote sync
-remains separately approved, and the copied bundle should use `ANSIBLE_ROLES_PATH=roles` or an
-equivalent Ansible roles path configuration.
+The bundle is not live deployment evidence and does not run live mutating Kolla actions. Remote sync,
+DB/MQ auth remediation, live reconfigure and rollback remain `pending_external_evidence`, and the
+copied bundle should use `ANSIBLE_ROLES_PATH=roles` or an equivalent Ansible roles path configuration.
 
 Evidence: `docs/generated/e09-ansible-sync-bundle.md`.
 ```
