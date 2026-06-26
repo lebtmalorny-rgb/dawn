@@ -151,6 +151,25 @@ def test_preflight_rejects_production_inventory_content(tmp_path: Path) -> None:
     assert "production" in " ".join(prefixed_result.errors)
 
 
+def test_preflight_allows_kolla_producer_group_names(tmp_path: Path) -> None:
+    module = load_module()
+    inventory = tmp_path / "test-inventory.ini"
+    inventory.write_text(
+        "cloud_ui_test_stand=true\n[designate-producer:children]\ncontrol\n",
+        encoding="utf-8",
+    )
+
+    result = module.validate_inputs(
+        inventory_path=inventory,
+        output_path=ROOT / "docs/generated/e09-deployment-smoke-evidence.md",
+        backend_image="registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+        frontend_image="registry.test/cloud-ui-frontend@sha256:" + "b" * 64,
+        rollback_window_open=True,
+    )
+
+    assert result.ok is True
+
+
 def test_preflight_rejects_missing_marker_and_non_digest_images(tmp_path: Path) -> None:
     module = load_module()
     inventory = tmp_path / "test-inventory.ini"
@@ -549,7 +568,9 @@ def test_rendered_evidence_states_acceptance_rows_and_partial_scope() -> None:
 
 
 def test_generated_evidence_traceability_and_risk_register_are_updated() -> None:
-    evidence = (ROOT / "docs/generated/e09-deployment-smoke-evidence.md").read_text(encoding="utf-8")
+    evidence = (ROOT / "docs/generated/e09-deployment-smoke-evidence.md").read_text(
+        encoding="utf-8"
+    )
     traceability = (ROOT / "docs/11_DKB_TRACEABILITY.md").read_text(encoding="utf-8")
     risk_register = (ROOT / "docs/generated/risk-register.md").read_text(encoding="utf-8")
     normalized = evidence.lower()

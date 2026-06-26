@@ -16,7 +16,7 @@ DIGEST_RE = re.compile(
     r"^[A-Za-z0-9._-]+(?::[0-9]+)?(?:/[A-Za-z0-9._-]+)+@sha256:[a-fA-F0-9]{64}$"
 )
 PRODUCTION_RE = re.compile(
-    r"(?i)(?:^|[^a-z0-9])(?:production|prd[a-z0-9]*|prod(?!uct)[a-z0-9]*)"
+    r"(?i)(?:^|[^a-z0-9])(?:production|prd[a-z0-9]*|prod(?!uct|ucer)[a-z0-9]*)"
     r"(?:$|[^a-z0-9])"
 )
 TEST_MARKER_RE = re.compile(
@@ -216,7 +216,9 @@ def validate_inputs(
         errors.append("rollback window must be explicitly open")
 
     if not _output_path_is_allowed(output_path):
-        errors.append("output path must be under docs/generated without traversal or symlink escape")
+        errors.append(
+            "output path must be under docs/generated without traversal or symlink escape"
+        )
 
     return ValidationResult(ok=not errors, errors=tuple(errors))
 

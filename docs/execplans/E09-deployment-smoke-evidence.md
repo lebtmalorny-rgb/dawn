@@ -121,6 +121,18 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
     `cloud-ui-backend` and `cloud-ui-frontend` in the local registry. SSH to `192.168.10.14` failed
     with public-key authentication denied, so no live container count, hardening inspection,
     HAProxy/TLS smoke, API/UI smoke or rollback evidence was collected.
+  - 2026-06-26 after user approval: added `cloud_ui_test_stand=true` to `/etc/kolla/all-in-one` on
+    `192.168.10.15` and created a test-host backup before editing. Copied the test inventory to
+    `/private/tmp` only for runner validation; it was not committed.
+  - 2026-06-26: E09.8 preflight runner passed with the approved marker, backend/frontend digest refs
+    and open rollback window.
+  - 2026-06-26: read-only live inspection through the Ansible host found four healthy Cloud UI
+    containers on the all-in-one host, not twelve containers on three nodes. Docker inspect showed
+    `user=cloudui`, but `readonly=false`, `capdrop=null` and `securityopt=null`.
+  - 2026-06-26: frontend port smoke returned HTTP 200; backend readiness returned HTTP 503. No
+    `cloud_ui_db_migrate` or `cloud-ui db-upgrade` container was found. Remote Cloud UI custom
+    role/config was not found on the Ansible host, so `kolla-ansible reconfigure --tags cloud-ui`
+    was not run as acceptance evidence.
 
 ## Неожиданные открытия
 
@@ -146,6 +158,16 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   container inspection remain pending.
 - 2026-06-26: SSH authentication to `192.168.10.14` failed with the current key, preventing live
   container count, hardening inspection and API/UI smoke collection from that host.
+- 2026-06-26: The production-inventory guard had a false positive on the standard Kolla group name
+  `designate-producer`. Regression coverage was added and the guard was narrowed to keep rejecting
+  `production`, `prd*` and `prod*` environment markers while allowing Kolla `producer` groups.
+- 2026-06-26: The test stand has Cloud UI containers already running on the all-in-one host, but the
+  repository custom role/config was not found on the Ansible host. This means current live evidence
+  can describe observed state, but cannot prove the E09 Kolla role deploy/reconfigure path.
+- 2026-06-26: Container hardening evidence fails the E09 target on the observed all-in-one containers:
+  read-only root filesystem is disabled and capability/security options are unset.
+- 2026-06-26: API readiness returned HTTP 503 while frontend returned HTTP 200; the UI smoke is only
+  partial until backend readiness is healthy.
 - 2026-06-25: Final whole-branch review found an important redaction gap: non-JSON
   `Authorization:` headers were redacted only for Bearer values. Commit
   `8cac2a4 deploy: redact all E09 authorization headers` now redacts any `Authorization:` or

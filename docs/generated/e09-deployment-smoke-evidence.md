@@ -1,61 +1,51 @@
 # E09.8 Deployment smoke/evidence
 
 - Stage: E09.8 Deployment smoke/evidence
-- Status: partial repository evidence and read-only test-stand discovery are present; live deployment
-  rows remain `pending_external_evidence`.
+- Live execution status: `partial_lab_evidence_blocked`
 - Scope: `partial` `test-stand`
-- Live execution status: `pending_external_evidence`
+- Inventory: `/etc/kolla/all-in-one` on `192.168.10.15`; validated from a temporary copy outside the repository
+- Backend image: `192.168.10.15:5000/kolla/cloud-ui-backend@sha256:8ff5287ad21048f9f249e4e28f9bd7c3a31b2d345b265a48a7ee03f46d46a822`
+- Frontend image: `192.168.10.15:5000/kolla/cloud-ui-frontend@sha256:182debc7d8c13091b29dc37cd422bf5c6a5bdf7d8b2bbff1636b578388c671cb`
 
 ## Evidence rows
 
 | Check | Status | Sanitized summary |
 |---|---|---|
-| preflight | blocked_missing_marker | Read-only discovery on 2026-06-26 confirmed the Ansible test host and `/etc/kolla/all-in-one`, but the inventory does not contain the required `cloud_ui_test_stand` marker. No live command was run. |
-| two images | partial_lab_evidence | Read-only Podman discovery on `192.168.10.15` found `192.168.10.15:5000/kolla/cloud-ui-backend@sha256:8ff5287ad21048f9f249e4e28f9bd7c3a31b2d345b265a48a7ee03f46d46a822` and `192.168.10.15:5000/kolla/cloud-ui-frontend@sha256:182debc7d8c13091b29dc37cd422bf5c6a5bdf7d8b2bbff1636b578388c671cb`; signing/provenance remains pending. |
-| container count | pending_external_evidence | Expected three nodes x four permanent containers = 12; no live container inventory is accepted yet. SSH auth to `192.168.10.14` failed for the current key. |
-| one-shot migration | pending_external_evidence | Expected one-shot `cloud_ui_db_migrate` before rollout; live migration execution and failure/retry evidence remain pending. |
-| DB/RabbitMQ | pending_external_evidence | Expected least-privilege DB/RabbitMQ access checks without secret output; production SecMan rotation proof remains pending. |
-| HAProxy/TLS | pending_external_evidence | Expected same-origin UI/API health over TLS >= 1.2; corporate PKI/mTLS approval and negative certificate tests remain pending. |
-| container hardening | pending_external_evidence | Expected non-root user, dropped caps, controlled mounts and SELinux labels; user/caps/mounts/SELinux proof remains pending. |
-| API/UI smoke | pending_external_evidence | Expected frontend and `/api/v1/health/ready` health checks from the approved test stand only. |
-| rollback | pending_external_evidence | rollback pending before full E09 acceptance; rollback execution evidence is not attached yet. |
+| scope | partial | test-stand evidence only; production approval absent |
+| preflight | passed | User-approved test marker was added to `/etc/kolla/all-in-one` on `192.168.10.15` with a backup on the test host; runner accepted the marker, digest-pinned images and open rollback window. |
+| two_images | partial_lab_evidence | Backend and frontend digest refs were found in the local test registry on `192.168.10.15`; registry signing/provenance and deployed pull-by-digest proof remain pending. |
+| container count | partial_lab_evidence_blocked | Read-only Ansible inspection found four healthy Cloud UI containers on one all-in-one host: frontend, api, worker and events. E09 requires twelve permanent containers across three test nodes, so acceptance remains blocked. |
+| migration | pending_external_evidence | No `cloud_ui_db_migrate` or `cloud-ui db-upgrade` container was found in read-only container history. One-shot migration execution and failure/retry evidence remain pending. |
+| DB/RabbitMQ | pending_external_evidence | E09.3 DB/RabbitMQ all-in-one provisioning evidence remains separate; E09.8 did not collect live application DB/MQ access checks from the deployed containers. |
+| HAProxy/TLS | pending_external_evidence | No same-origin HAProxy/TLS route smoke was collected in this run. |
+| container hardening | failed_lab_check | Containers run as `cloudui`, but read-only root filesystem is `false` and cap/security options are unset in Docker inspect output. SELinux label evidence was not collected. |
+| API/UI smoke | partial_lab_evidence_blocked | Frontend test port returned HTTP 200; backend `/api/v1/health/ready` returned HTTP 503. API readiness blocks smoke acceptance. |
+| rollback | pending | rollback pending before full E09 acceptance |
+| live reconfigure | not_run | Remote Cloud UI custom role/config was not found on the Ansible host, so `kolla-ansible reconfigure --tags cloud-ui` was not run as acceptance evidence. |
 
-## Read-only discovery on 2026-06-26
+## Live discovery on 2026-06-26
 
-The following discovery was read-only and did not run `kolla-ansible reconfigure`, migration,
-rollback, container stop/start or inventory writes.
+The following commands were run only against the approved test stand. No production host, inventory,
+credential, private key, cookie, token or full command log is stored in this evidence.
 
 | Item | Result |
 |---|---|
-| SSH host identity | ED25519 keys for `192.168.10.15` and `192.168.10.14` matched local known_hosts entries. |
-| Ansible host | `ansible.example.local` |
-| Test inventory path | `/etc/kolla/all-in-one` present on `192.168.10.15` |
-| Test marker | missing: `cloud_ui_test_stand` is not present in the inventory |
-| Kolla-Ansible | `20.4.1.dev5` |
-| Container runtime on Ansible host | `/usr/bin/podman` |
-| Cloud UI image digests on Ansible host | backend and frontend digests found in local registry refs listed above |
-| All-in-one host SSH | `192.168.10.14` rejected the current key; no container inspection or smoke output was collected |
-
-## Pending external gates
-
-- Production approval remains pending and cannot be inferred from this partial evidence.
-- Corporate PKI/mTLS approval and negative certificate evidence remain pending.
-- Registry signing, provenance and approved scanner policy evidence remain pending.
-- ДКБ-69 waiver remains pending because the Python backend still requires an interpreter.
-- Network-owner ACL proof for management/API zones remains pending.
-- Rollback execution on the approved test stand remains pending.
-- The approved inventory still needs an explicit `cloud_ui_test_stand` marker before any live command
-  summary can be accepted.
-- SSH access to the all-in-one/container host must be restored or operator-provided sanitized
-  container inspection must be attached.
-- A rollback window still must be explicitly open before live reconfigure/rollback evidence can be
-  accepted.
+| Inventory marker | Added `cloud_ui_test_stand=true` to `/etc/kolla/all-in-one` on `192.168.10.15`; backup was created on that host before the edit. |
+| Preflight runner | Passed with digest-pinned backend/frontend images and open rollback window. |
+| Remote Cloud UI role/config | Not found under `/etc/kolla`, `/usr/share/kolla-ansible` or the Kolla venv; only the inventory backup matched the Cloud UI file search. |
+| Container topology | Four Cloud UI containers observed on `openstack-aio`, not twelve across three nodes. |
+| Container health | `cloud_ui_frontend`, `cloud_ui_api`, `cloud_ui_worker` and `cloud_ui_events` were up and Docker-reported healthy. |
+| Container hardening | `user=cloudui`; `readonly=false`; `capadd=null`; `capdrop=null`; `securityopt=null`; `restart=unless-stopped`. |
+| API/UI smoke | frontend HTTP 200; API readiness HTTP 503. |
+| Migration job | No `cloud_ui_db_migrate` or `cloud-ui db-upgrade` container found in read-only container history. |
+| Rollback | Not executed. |
 
 ## DKB scope
 
-- ДКБ-22.02/24: TLS and health rows are pending live test-stand evidence.
-- ДКБ-42-44/77/80: network/ACL rows remain pending external proof.
-- ДКБ-55/56: evidence must not contain secrets; full rotation remains external.
-- ДКБ-65: SELinux/caps/mount inspection remains pending live output.
-- ДКБ-69/70: image digests can be recorded; ДКБ-69 waiver remains required.
-- ДКБ-82: operational lifecycle evidence remains partial until rollback is executed.
+- ДКБ-22.02/24: TLS and health rows are test-stand evidence only.
+- ДКБ-42-44/77/80: network, ACL and container evidence remain external until linked.
+- ДКБ-55/56: secret-like output is redacted from this evidence.
+- ДКБ-65: user/caps/mount inspection was collected and failed the target hardening checks; SELinux
+  label evidence remains pending.
+- ДКБ-69/70: image digest evidence is recorded; ДКБ-69 still needs a waiver.
+- ДКБ-82: rollback pending status prevents full deployment acceptance.
