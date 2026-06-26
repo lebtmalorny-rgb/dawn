@@ -88,14 +88,62 @@ def test_preflight_playbook_is_local_and_imports_only_validation() -> None:
     assert "cloud_ui_database_url | length > 0" in text
     assert "cloud_ui_rabbitmq_url | length > 0" in text
 
-    import_tasks = [
-        task
-        for task in tasks
-        if "ansible.builtin.import_role" in task or "import_role" in task
-    ]
+    import_tasks = [task for task in tasks if "ansible.builtin.import_role" in task]
     assert len(import_tasks) == 1
-    import_args = import_tasks[0].get("ansible.builtin.import_role") or import_tasks[0]["import_role"]
+    import_args = import_tasks[0]["ansible.builtin.import_role"]
     assert import_args == {"name": "cloud_ui", "tasks_from": "validate"}
+
+
+def test_preflight_playbook_tasks_are_validation_only_modules() -> None:
+    playbook = load_yaml(PLAYBOOK)
+    tasks = playbook[0]["tasks"]
+    assert isinstance(tasks, list)
+
+    allowed_task_keys = {
+        "name",
+        "no_log",
+        "ansible.builtin.assert",
+        "ansible.builtin.import_role",
+    }
+    allowed_action_keys = {"ansible.builtin.assert", "ansible.builtin.import_role"}
+
+    import_tasks = []
+    for task in tasks:
+        assert isinstance(task, dict)
+        assert set(task) <= allowed_task_keys
+        action_keys = [key for key in task if key in allowed_action_keys]
+        assert len(action_keys) == 1
+        if action_keys[0] == "ansible.builtin.import_role":
+            import_tasks.append(task)
+
+    assert len(import_tasks) == 1
+    assert import_tasks[0]["ansible.builtin.import_role"] == {
+        "name": "cloud_ui",
+        "tasks_from": "validate",
+    }
+
+
+def test_preflight_runtime_secret_assertion_is_no_log() -> None:
+    playbook = load_yaml(PLAYBOOK)
+    tasks = playbook[0]["tasks"]
+    assert isinstance(tasks, list)
+
+    secret_assertions = {
+        "cloud_ui_database_url | length > 0",
+        "cloud_ui_rabbitmq_url | length > 0",
+    }
+    secret_assert_tasks = []
+    for task in tasks:
+        assert isinstance(task, dict)
+        assert_args = task.get("ansible.builtin.assert")
+        if not isinstance(assert_args, dict):
+            continue
+        assertions = assert_args.get("that", [])
+        if isinstance(assertions, list) and secret_assertions.issubset(assertions):
+            secret_assert_tasks.append(task)
+
+    assert len(secret_assert_tasks) == 1
+    assert secret_assert_tasks[0].get("no_log") is True
 
 
 def test_preflight_bundle_does_not_execute_live_or_mutating_commands() -> None:
@@ -127,6 +175,28 @@ def test_preflight_bundle_does_not_execute_live_or_mutating_commands() -> None:
 
 def test_example_vars_are_placeholders_and_secret_safe() -> None:
     example = read_text(EXAMPLE_VARS)
+    example_vars = load_yaml(EXAMPLE_VARS)
+    assert isinstance(example_vars, dict)
+
+    assert example_vars["cloud_ui_test_stand"] is True
+    assert example_vars["cloud_ui_rollback_window_open"] is False
+    assert example_vars["cloud_ui_enabled"] is True
+    assert re.match(
+        r"^sha256:[0-9a-f]{64}$",
+        example_vars["cloud_ui_backend_image_digest"],
+    )
+    assert re.match(
+        r"^sha256:[0-9a-f]{64}$",
+        example_vars["cloud_ui_frontend_image_digest"],
+    )
+    assert (
+        example_vars["cloud_ui_database_url"]
+        == "{{ lookup('ansible.builtin.env', 'CLOUD_UI_DATABASE_URL') }}"
+    )
+    assert (
+        example_vars["cloud_ui_rabbitmq_url"]
+        == "{{ lookup('ansible.builtin.env', 'CLOUD_UI_RABBITMQ_URL') }}"
+    )
 
     for expected in [
         "cloud_ui_test_stand: true",
@@ -160,8 +230,10 @@ def test_docs_record_preflight_scope_and_pending_live_evidence() -> None:
     for text in (evidence, readme, traceability):
         assert "E09 live reconfigure preflight bundle" in text
         assert "preflight only" in text.lower()
-        assert "pending_external_evidence" in text
         assert "runtime secret value" in text
+
+    for text in (evidence, traceability):
+        assert "pending_external_evidence" in text
 
     assert "R-069" in risk_register
     assert "preflight bundle mistaken for deployment acceptance" in risk_register
