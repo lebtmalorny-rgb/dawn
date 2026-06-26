@@ -9,6 +9,7 @@ __pycache__/
 .ruff_cache/
 .venv/
 .serena/
+.superpowers/
 .worktrees/
 node_modules/
 dist/
