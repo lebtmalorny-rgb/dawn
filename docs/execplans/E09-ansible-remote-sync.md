@@ -2,12 +2,12 @@
 
 ## Цель и наблюдаемый результат
 
-Оператор получает repository-side доказательство для E09 Ansible remote sync: локально собранный bundle
-можно проверить helper-ом для approved test Ansible host `192.168.10.15` и пути
-`/etc/kolla/cloud-ui-sync-bundle` без запуска удаленных команд. Наблюдаемый результат текущей задачи:
-committed evidence file `docs/generated/e09-ansible-remote-sync.md`, обновленная трассировка ДКБ и risk
-register, а также dry-run helper output с exit 0. До этой задачи pytest-контракт падал, потому что
-committed evidence отсутствовал.
+Оператор получает проверяемое remote-sync-only доказательство для E09: локально собранный bundle
+скопирован на approved test Ansible host `192.168.10.15` в
+`/etc/kolla/cloud-ui-sync-bundle`, затем helper выполнил pull-back validation и checksum comparison.
+Наблюдаемый результат: committed evidence file `docs/generated/e09-ansible-remote-sync.md` с backup
+path, remote file count and pending live-evidence boundaries; обновленная трассировка ДКБ и risk
+register; read-only remote marker `remote_bundle_present`. Это не live Kolla deployment acceptance.
 
 ## Контекст и текущее состояние
 
@@ -18,21 +18,25 @@ committed docs на отсутствие overclaim. Экспортер `deploy/k
 разрешает evidence path только под `docs/generated`. Remote sync helper
 `deploy/kolla/scripts/sync-ansible-remote-bundle.py` имеет approved host `192.168.10.15`, approved path
 `/etc/kolla/cloud-ui-sync-bundle` и role path note
-`ANSIBLE_ROLES_PATH=/etc/kolla/cloud-ui-sync-bundle/roles`.
+`ANSIBLE_ROLES_PATH=/etc/kolla/cloud-ui-sync-bundle/roles`. На 2026-06-26 remote bundle present proof
+exists, but DB/MQ auth remediation, live reconfigure and deployment smoke remain separate gates.
 
 ## Scope
 
 - Сформировать локальный bundle в `/tmp/dawn-e09-ansible-remote-sync-bundle`.
-- Выполнить только dry-run remote sync helper без `--execute`.
-- Создать `docs/generated/e09-ansible-remote-sync.md`.
+- Выполнить dry-run helper check.
+- Выполнить approved remote sync helper `--execute` для
+  `192.168.10.15:/etc/kolla/cloud-ui-sync-bundle`.
+- Проверить remote path read-only marker and helper pull-back checksum validation.
+- Создать и обновить `docs/generated/e09-ansible-remote-sync.md`.
 - Создать этот ExecPlan в `docs/execplans/E09-ansible-remote-sync.md`.
 - Обновить `docs/11_DKB_TRACEABILITY.md` и `docs/generated/risk-register.md`.
 - Проверить pytest contract, ruff для test/helper, secret scan и whitespace diff.
 
 ## Non-goals
 
-- Не контактировать с `192.168.10.15`.
-- Не запускать SSH, rsync transfer или remote verification pullback.
+- Не запускать `kolla-ansible deploy`, `reconfigure`, `upgrade`, `destroy`, `pull`, `prechecks` or
+  `check`.
 - Не запускать Kolla command, migration, deployment smoke или rollback.
 - Не ремонтировать DB/MQ auth.
 - Не доказывать 12 running containers, HAProxy/TLS, SELinux hardening, registry signing or production
@@ -43,9 +47,10 @@ committed docs на отсутствие overclaim. Экспортер `deploy/k
 
 - Браузерные и backend архитектурные инварианты не меняются.
 - Secret material не попадает в Git, logs или evidence.
-- Действия ограничены local docs/evidence, без remote mutation.
+- Remote mutation is limited to path-scoped bundle replacement under
+  `/etc/kolla/cloud-ui-sync-bundle` on the approved test Ansible host.
 - Current slice остается `remote-sync-only`; все live rows остаются `pending_external_evidence`.
-- В финальном commit должны попасть только четыре Task 3 файла.
+- Runtime Kolla inventory, DB/MQ, Keystone, OpenStack services, containers and HAProxy are not changed.
 
 ## Связь с ДКБ
 
@@ -67,9 +72,10 @@ committed docs на отсутствие overclaim. Экспортер `deploy/k
 2. Bundle/export dry-run: create `/tmp/dawn-e09-ansible-remote-sync-bundle` with temporary generated
    evidence and run sync helper without `--execute`.
 3. Docs/evidence: create evidence, ExecPlan, DKB traceability section and R-071 row.
-4. Verification and cleanup: run required commands, remove temporary generated side effects and review
+4. Approved remote copy: run helper `--execute`, write refreshed evidence and verify
+   `remote_bundle_present`.
+5. Verification and cleanup: run required commands, remove temporary/generated side effects and review
    final diff.
-5. Commit Task 3 docs only.
 
 ## Progress
 
@@ -96,9 +102,10 @@ committed docs на отсутствие overclaim. Экспортер `deploy/k
 
 ## Журнал решений
 
-- 2026-06-26: Keep final evidence as remote-sync-only and set `remote_verified=false`,
-  `remote_file_count=0`, `backup_path=not-created-yet`. Alternative rejected: using dry-run command
-  timestamp backup path as if a remote backup existed. Reason: no remote copy occurred.
+- 2026-06-26: Initial repository evidence stayed remote-sync-only with `remote_verified=false`,
+  `remote_file_count=0`, `backup_path=not-created-yet` until a separately approved remote copy was
+  executed. After approval, evidence was refreshed with the helper-recorded backup path and remote
+  checksum verification.
 - 2026-06-26: Add a separate R-071 risk instead of broadening R-070. Reason: R-070 covers local-only
   export; R-071 covers the new risk that remote-sync-only delivery may be mistaken for live deployment
   evidence.
