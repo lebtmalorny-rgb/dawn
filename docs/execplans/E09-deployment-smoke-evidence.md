@@ -112,6 +112,15 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   OpenSSH reported a host-key mismatch, `podman` was present but Cloud UI/Kolla containers/images were
   not found by name, `kolla-ansible`/`kolla-build` were not on PATH, and no approved inventory path or
   backend/frontend image digests were available.
+  - 2026-06-26 continuation from branch `e09-live-evidence-continuation`: read-only host-key scan
+    matched local known_hosts ED25519 keys for `192.168.10.15` and `192.168.10.14`. Read-only SSH to
+    `192.168.10.15` confirmed host `ansible.example.local`, `/etc/kolla/all-in-one` present,
+    `kolla-ansible 20.4.1.dev5` present and `/usr/bin/podman` present. The inventory is still missing
+    the required `cloud_ui_test_stand` marker, so no mutating live command was run.
+  - 2026-06-26: read-only Podman image discovery on `192.168.10.15` found digest refs for
+    `cloud-ui-backend` and `cloud-ui-frontend` in the local registry. SSH to `192.168.10.14` failed
+    with public-key authentication denied, so no live container count, hardening inspection,
+    HAProxy/TLS smoke, API/UI smoke or rollback evidence was collected.
 
 ## Неожиданные открытия
 
@@ -129,6 +138,14 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   run. Additional read-only probes found `/usr/bin/podman`, but no Cloud UI/Kolla containers/images by
   name, no `kolla-ansible`/`kolla-build` on PATH and no approved inventory/digest inputs to feed into
   the evidence runner.
+- 2026-06-26: The host-key blocker did not reproduce for ED25519 keys: `ssh-keyscan` output for
+  `192.168.10.15` and `192.168.10.14` matched local known_hosts. The next blocker is the missing
+  `cloud_ui_test_stand` marker in `/etc/kolla/all-in-one`.
+- 2026-06-26: Two Cloud UI image digest refs exist on the Ansible host local registry, but this is
+  only partial lab evidence. Registry signing, provenance, deployed pull-by-digest proof and
+  container inspection remain pending.
+- 2026-06-26: SSH authentication to `192.168.10.14` failed with the current key, preventing live
+  container count, hardening inspection and API/UI smoke collection from that host.
 - 2026-06-25: Final whole-branch review found an important redaction gap: non-JSON
   `Authorization:` headers were redacted only for Bearer values. Commit
   `8cac2a4 deploy: redact all E09 authorization headers` now redacts any `Authorization:` or
