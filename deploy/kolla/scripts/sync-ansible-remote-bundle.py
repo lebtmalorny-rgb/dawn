@@ -37,6 +37,14 @@ FORBIDDEN_BUNDLE_FILENAMES = {
     "clouds.yaml",
     "openrc",
 }
+REQUIRED_BUNDLE_PATHS = {
+    "manifest.json",
+    "roles/cloud_ui/defaults/main.yml",
+    "roles/cloud_ui/tasks/main.yml",
+    "roles/cloud_ui/templates/cloud-ui-backend.env.j2",
+    "playbooks/cloud-ui-preflight.yml",
+    "examples/cloud-ui-vars.yml.example",
+}
 
 
 @dataclass(frozen=True)
@@ -229,6 +237,8 @@ def validate_local_bundle(bundle_dir: Path) -> ValidationResult:
     errors.extend(scan_errors)
     expected_paths = set(seen_paths)
     expected_paths.add("manifest.json")
+    for relative_path in sorted(REQUIRED_BUNDLE_PATHS - expected_paths):
+        errors.append(f"{relative_path}: required bundle artifact missing")
     for relative_path in sorted(actual_paths - expected_paths):
         if _is_forbidden_bundle_filename(relative_path):
             errors.append(f"{relative_path}: forbidden credential bundle filename")
@@ -506,11 +516,36 @@ def execute_sync_request(request: SyncRequest) -> None:
         subprocess.run(("ssh", request.target, command), check=True)  # noqa: S603,S607
 
 
+def pull_remote_bundle_for_verification(request: SyncRequest, verify_dir: Path) -> None:
+    subprocess.run(  # noqa: S603
+        (
+            "rsync",
+            "-a",
+            f"{request.target}:{request.remote_path}/",
+            str(verify_dir) + "/",
+        ),
+        check=True,
+    )
+
+
+def _summary_path_count(summary: dict[str, Any] | None) -> int:
+    if not isinstance(summary, dict):
+        return 0
+    paths = summary.get("paths")
+    if isinstance(paths, list):
+        return len(paths)
+    files = summary.get("files")
+    if isinstance(files, list):
+        return len(files)
+    return 0
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate and optionally sync the E09 Ansible bundle to the approved test host."
     )
-    parser.add_argument("bundle_dir", type=Path)
+    parser.add_argument("bundle_dir", nargs="?", type=Path)
+    parser.add_argument("--bundle-dir", dest="bundle_dir_option", type=Path)
     parser.add_argument("--remote-host", default=APPROVED_REMOTE_HOST)
     parser.add_argument("--remote-user", default="root")
     parser.add_argument("--remote-path", default=Path(APPROVED_REMOTE_PATH), type=Path)
@@ -521,7 +556,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Run ssh/rsync and write evidence. Without this flag the command is a dry run.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.bundle_dir is not None and args.bundle_dir_option is not None:
+        parser.error("pass either positional bundle_dir or --bundle-dir, not both")
+    args.bundle_dir = args.bundle_dir if args.bundle_dir is not None else args.bundle_dir_option
+    delattr(args, "bundle_dir_option")
+    if args.bundle_dir is None:
+        parser.error("bundle directory is required; pass --bundle-dir or positional bundle_dir")
+    return args
 
 
 def _print_errors(errors: tuple[str, ...]) -> None:
@@ -570,20 +612,32 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     local_summary = validation.summary
-    remote_file_count = 0
     source_commit = "unknown"
     if isinstance(local_summary, dict):
-        paths = local_summary.get("paths", [])
-        if isinstance(paths, list):
-            remote_file_count = len(paths)
         source_commit = str(local_summary.get("source_commit", "unknown"))
+    with tempfile.TemporaryDirectory(prefix="cloud-ui-sync-verify-") as temporary_dir:
+        verify_dir = Path(temporary_dir)
+        try:
+            pull_remote_bundle_for_verification(request, verify_dir)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            print(f"error: remote verification pullback failed: {exc}", file=sys.stderr)
+            return 3
+        remote_validation = validate_local_bundle(verify_dir)
+        if not remote_validation.ok:
+            _print_errors(tuple(f"remote verification: {error}" for error in remote_validation.errors))
+            return 3
+        comparison = compare_remote_summary(local_summary, remote_validation.summary)
+        if not comparison.ok:
+            _print_errors(comparison.errors)
+            return 3
+
     evidence = render_evidence(
         local_summary=local_summary,
         remote_host=args.remote_host,
         remote_path=request.remote_path,
         backup_path=request.backup_path,
-        remote_verified=True,
-        remote_file_count=remote_file_count,
+        remote_verified=comparison.ok,
+        remote_file_count=_summary_path_count(remote_validation.summary),
         source_commit=source_commit,
     )
     try:
