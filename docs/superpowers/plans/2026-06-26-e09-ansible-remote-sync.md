@@ -70,10 +70,13 @@ def load_module(path: Path, module_name: str) -> Any:
     return module
 
 
-def make_bundle(tmp_path: Path) -> Path:
+def make_bundle(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     exporter = load_module(EXPORTER, "export_ansible_bundle_for_remote_sync_test")
+    generated_docs = tmp_path / "generated"
+    generated_docs.mkdir()
+    monkeypatch.setattr(exporter, "GENERATED_DOCS", generated_docs.resolve())
     bundle_dir = tmp_path / "bundle"
-    evidence_path = tmp_path / "local-evidence.md"
+    evidence_path = generated_docs / "local-evidence.md"
     result = exporter.export_bundle(
         output_dir=bundle_dir,
         evidence_path=evidence_path,
@@ -116,9 +119,12 @@ def test_sync_script_exists() -> None:
     assert SCRIPT.exists()
 
 
-def test_validates_local_bundle_manifest(tmp_path: Path) -> None:
+def test_validates_local_bundle_manifest(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     module = load_module(SCRIPT, "sync_ansible_remote_bundle")
-    bundle_dir = make_bundle(tmp_path)
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
 
     result = module.validate_local_bundle(bundle_dir)
 
@@ -133,9 +139,12 @@ def test_validates_local_bundle_manifest(tmp_path: Path) -> None:
         assert item["bytes"] == path.stat().st_size
 
 
-def test_rejects_tampered_bundle_file(tmp_path: Path) -> None:
+def test_rejects_tampered_bundle_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     module = load_module(SCRIPT, "sync_ansible_remote_bundle")
-    bundle_dir = make_bundle(tmp_path)
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
     target = bundle_dir / "roles/cloud_ui/tasks/main.yml"
     target.write_text(target.read_text(encoding="utf-8") + "\n# tamper\n", encoding="utf-8")
 
@@ -145,9 +154,12 @@ def test_rejects_tampered_bundle_file(tmp_path: Path) -> None:
     assert "sha256 mismatch" in " ".join(result.errors)
 
 
-def test_rejects_unapproved_remote_host_and_path(tmp_path: Path) -> None:
+def test_rejects_unapproved_remote_host_and_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     module = load_module(SCRIPT, "sync_ansible_remote_bundle")
-    bundle_dir = make_bundle(tmp_path)
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
 
     bad_host = module.validate_sync_request(
         bundle_dir=bundle_dir,
@@ -166,9 +178,12 @@ def test_rejects_unapproved_remote_host_and_path(tmp_path: Path) -> None:
     assert "approved remote path" in " ".join(bad_path.errors)
 
 
-def test_builds_safe_remote_commands(tmp_path: Path) -> None:
+def test_builds_safe_remote_commands(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     module = load_module(SCRIPT, "sync_ansible_remote_bundle")
-    bundle_dir = make_bundle(tmp_path)
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
 
     request = module.build_sync_request(
         bundle_dir=bundle_dir,
@@ -188,9 +203,12 @@ def test_builds_safe_remote_commands(tmp_path: Path) -> None:
     assert all("reconfigure" not in command for command in request.remote_commands)
 
 
-def test_renders_sanitized_evidence(tmp_path: Path) -> None:
+def test_renders_sanitized_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     module = load_module(SCRIPT, "sync_ansible_remote_bundle")
-    bundle_dir = make_bundle(tmp_path)
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
     local_result = module.validate_local_bundle(bundle_dir)
     assert local_result.ok, local_result.errors
 
@@ -216,9 +234,12 @@ def test_renders_sanitized_evidence(tmp_path: Path) -> None:
     assert all(line == line.rstrip() for line in evidence.splitlines())
 
 
-def test_compares_remote_summary_to_local_bundle(tmp_path: Path) -> None:
+def test_compares_remote_summary_to_local_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     module = load_module(SCRIPT, "sync_ansible_remote_bundle")
-    bundle_dir = make_bundle(tmp_path)
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
     local_result = module.validate_local_bundle(bundle_dir)
     assert local_result.ok, local_result.errors
 
@@ -297,7 +318,6 @@ import argparse
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
