@@ -510,6 +510,27 @@ Evidence paths:
 - `deploy/kolla/ansible/examples/cloud-ui-vars.yml.example`
 - `docs/generated/e09-live-reconfigure-bundle.md`
 
+## E09 Ansible sync bundle
+
+Обновление требований 2026-06-26: E09 Ansible sync bundle is local-only and prepares a reproducible
+operator artifact for a later, separately approved test-host sync. Remote sync, live reconfigure,
+DB/MQ auth remediation, 12-container inspection, HAProxy/TLS, SELinux and rollback remain
+`pending_external_evidence`.
+
+For ДКБ-55/56, the exporter rejects runtime secret value material and does not include inventory,
+DB/MQ URLs, SSH data, tokens, private keys, `.env`, `clouds.yaml` or openrc. Secret delivery and
+rotation remain external evidence.
+
+For ДКБ-65/69/70/76/77/80/82, this slice creates a checksum manifest and operator documentation only.
+It does not prove live container hardening, registry pull-by-digest, management-zone ACLs, live
+deployment, rollback or ДКБ-69 waiver closure.
+
+Evidence paths:
+
+- `tests/test_e09_ansible_sync_bundle.py`
+- `deploy/kolla/scripts/export-ansible-bundle.py`
+- `docs/generated/e09-ansible-sync-bundle.md`
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |

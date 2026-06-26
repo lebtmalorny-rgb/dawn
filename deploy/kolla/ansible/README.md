@@ -64,3 +64,16 @@ configuration so the `cloud_ui` role resolves correctly.
 
 Evidence and remaining live follow-up are recorded in
 `docs/generated/e09-live-reconfigure-bundle.md`.
+
+## E09 Ansible sync bundle
+
+The E09 Ansible sync bundle is a local-only export for the approved test-stand preparation path. It
+packages the `cloud_ui` role, preflight playbook, placeholder example vars and a manifest with file
+checksums. It contains no runtime secret value, inventory, SSH material, DB/MQ URL, token, private key
+or host-specific credential.
+
+The bundle is not live deployment evidence and does not run live mutating Kolla actions. Remote sync,
+DB/MQ auth remediation, live reconfigure and rollback remain `pending_external_evidence`, and the
+copied bundle should use `ANSIBLE_ROLES_PATH=roles` or an equivalent Ansible roles path configuration.
+
+Evidence: `docs/generated/e09-ansible-sync-bundle.md`.
