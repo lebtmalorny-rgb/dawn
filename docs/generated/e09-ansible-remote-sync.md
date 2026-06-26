@@ -1,28 +1,16 @@
 # E09 Ansible remote sync
 
 - Stage: E09 Ansible remote sync
-- Scope: remote-sync-only helper for the approved test Ansible host; no live deployment claim
+- Scope: remote-sync-only helper for the approved test host; no live deployment claim
 - Approved host: `192.168.10.15`
 - Approved remote path: `/etc/kolla/cloud-ui-sync-bundle`
 - Role path note: `ANSIBLE_ROLES_PATH=/etc/kolla/cloud-ui-sync-bundle/roles`
-- Backup path: `not-created-yet`
-- Remote status: `remote_verified=false`
-- Remote count: `remote_file_count=0`
+- Backup path: `/etc/kolla/cloud-ui-sync-bundle.backup-20260626T132956Z`
+- Remote sync command status: `yes`
 - Local manifest file count: 13
-- Source commit: `0ebe6e213c53`
+- Remote path file count: 14
+- Source commit: `10a72ee91e05`
 - runtime secret value: not included in bundle or evidence
-
-## Dry-run result
-
-The local helper was run without `--execute` against the approved target values. It exited 0 and printed
-the dry-run command shape only; no SSH, rsync transfer, Kolla action, migration or remote verification
-was performed.
-
-- Target: `root@192.168.10.15`
-- Remote path: `/etc/kolla/cloud-ui-sync-bundle`
-- Staging path shape: `/etc/kolla/.cloud-ui-sync-bundle.<timestamp>.staging`
-- Backup path shape: `/etc/kolla/cloud-ui-sync-bundle.backup-<timestamp>`
-- Role resolution for a later approved operator run: `ANSIBLE_ROLES_PATH=/etc/kolla/cloud-ui-sync-bundle/roles`
 
 ## Bundle contents
 
@@ -51,4 +39,4 @@ was performed.
 - HAProxy/TLS remains `pending_external_evidence`.
 - SELinux hardening remains `pending_external_evidence`.
 - rollback remains `pending_external_evidence`.
-- production deployment is out of scope for this remote-sync-only evidence.
+- production deployment is out of scope for this remote-sync-only helper.

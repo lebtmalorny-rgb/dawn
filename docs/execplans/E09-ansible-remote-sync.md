@@ -77,7 +77,9 @@ committed docs на отсутствие overclaim. Экспортер `deploy/k
 - [x] 2026-06-26: Helper and exporter behavior reviewed; dry-run helper command is scoped to approved
   host/path and does not execute remote commands without `--execute`.
 - [x] 2026-06-26: Docs/evidence content drafted for remote-sync-only scope.
-- [ ] Approved remote copy to `192.168.10.15:/etc/kolla/cloud-ui-sync-bundle` remains pending Task 4.
+- [x] 2026-06-26: Approved remote copy to
+  `192.168.10.15:/etc/kolla/cloud-ui-sync-bundle` completed with helper `--execute`; pull-back
+  checksum verification passed and read-only marker returned `remote_bundle_present`.
 - [ ] Final external review and live deployment evidence acceptance remain pending.
 
 ## Неожиданные открытия
@@ -86,6 +88,9 @@ committed docs на отсутствие overclaim. Экспортер `deploy/k
   `docs/generated/e09-ansible-remote-sync.md` was absent. Evidence: first local pytest run.
 - The exporter enforces generated evidence under `docs/generated`, so temporary local export evidence must
   use `docs/generated/e09-ansible-remote-sync-local.md` and be removed before commit.
+- The approved remote sync created/refreshed `/etc/kolla/cloud-ui-sync-bundle` on `192.168.10.15` and
+  recorded backup path `/etc/kolla/cloud-ui-sync-bundle.backup-20260626T132956Z`. This is still
+  artifact delivery evidence only; no Kolla command was run.
 
 ## Журнал решений
 
@@ -95,6 +100,9 @@ committed docs на отсутствие overclaim. Экспортер `deploy/k
 - 2026-06-26: Add a separate R-071 risk instead of broadening R-070. Reason: R-070 covers local-only
   export; R-071 covers the new risk that remote-sync-only delivery may be mistaken for live deployment
   evidence.
+- 2026-06-26: Run the approved copy through `sync-ansible-remote-bundle.py --execute` rather than ad
+  hoc `rsync`. Reason: the helper performs staging, path-scoped backup, remote pull-back validation and
+  manifest checksum comparison before writing evidence.
 
 ## Детальный план реализации
 
