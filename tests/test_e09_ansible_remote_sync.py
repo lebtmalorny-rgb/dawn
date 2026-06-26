@@ -84,6 +84,15 @@ def assert_error_mentions(result: Any, *needles: str) -> None:
     assert any(needle.lower() in error_text for needle in needles), error_text
 
 
+def assert_same_line_contains(text: str, *needles: str) -> None:
+    normalized_needles = [needle.lower() for needle in needles]
+    for line in text.splitlines():
+        normalized_line = line.replace("`", "").lower()
+        if all(needle in normalized_line for needle in normalized_needles):
+            return
+    raise AssertionError(f"missing same-line markers: {needles}")
+
+
 def test_sync_script_exists() -> None:
     assert SCRIPT.exists()
 
@@ -123,7 +132,21 @@ def test_rejects_tampered_bundle_file(
     assert "sha256 mismatch" in " ".join(result.errors)
 
 
-def test_rejects_unmanifested_forbidden_bundle_file(
+def test_rejects_unmanifested_extra_bundle_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module(SCRIPT, "sync_ansible_remote_bundle")
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
+    (bundle_dir / "notes.txt").write_text("operator scratch note\n", encoding="utf-8")
+
+    result = module.validate_local_bundle(bundle_dir)
+
+    assert result.ok is False
+    assert_error_mentions(result, "unmanifested", "extra bundle file")
+
+
+def test_rejects_forbidden_credential_bundle_filename(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -134,7 +157,7 @@ def test_rejects_unmanifested_forbidden_bundle_file(
     result = module.validate_local_bundle(bundle_dir)
 
     assert result.ok is False
-    assert_error_mentions(result, "unmanifested", "forbidden", "extra bundle file")
+    assert_error_mentions(result, "forbidden", "credential")
 
 
 def test_rejects_manifest_byte_count_mismatch(
@@ -320,17 +343,29 @@ def test_committed_docs_record_remote_sync_scope_and_risk() -> None:
         "production approved",
     ):
         assert overclaim not in evidence
-    for pending_marker in (
-        "live reconfigure remains pending_external_evidence",
-        "DB/MQ auth remediation remains pending_external_evidence",
-        "migration remains pending_external_evidence",
-        "12-container inspection remains pending_external_evidence",
-        "HAProxy/TLS remains pending_external_evidence",
-        "SELinux hardening remains pending_external_evidence",
-        "rollback remains pending_external_evidence",
-        "production deployment remains out of scope",
-    ):
-        assert pending_marker in evidence
+    assert_same_line_contains(evidence, "live reconfigure", "remains", "pending_external_evidence")
+    assert_same_line_contains(
+        evidence,
+        "DB/MQ auth remediation",
+        "remains",
+        "pending_external_evidence",
+    )
+    assert_same_line_contains(evidence, "migration", "remains", "pending_external_evidence")
+    assert_same_line_contains(
+        evidence,
+        "12-container inspection",
+        "remains",
+        "pending_external_evidence",
+    )
+    assert_same_line_contains(evidence, "HAProxy/TLS", "remains", "pending_external_evidence")
+    assert_same_line_contains(
+        evidence,
+        "SELinux hardening",
+        "remains",
+        "pending_external_evidence",
+    )
+    assert_same_line_contains(evidence, "rollback", "remains", "pending_external_evidence")
+    assert_same_line_contains(evidence, "production deployment", "out of scope")
 
     risk_ids = [
         line.split("|")[1].strip()
