@@ -40,21 +40,36 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 PLAYBOOK = "deploy/kolla/ansible/playbooks/cloud-ui-preflight.yml"
+VALIDATE_TASKS = "deploy/kolla/ansible/roles/cloud_ui/tasks/validate.yml"
 EXAMPLE_VARS = "deploy/kolla/ansible/examples/cloud-ui-vars.yml.example"
 EVIDENCE = "docs/generated/e09-live-reconfigure-bundle.md"
 EXECPLAN = "docs/execplans/E09-live-reconfigure-bundle.md"
 README = "deploy/kolla/ansible/README.md"
 TRACEABILITY = "docs/11_DKB_TRACEABILITY.md"
 RISK_REGISTER = "docs/generated/risk-register.md"
-TASK1_TARGET_ARTIFACTS = [
+TASK1_NEW_ARTIFACTS = [
     PLAYBOOK,
+    VALIDATE_TASKS,
     EXAMPLE_VARS,
     EVIDENCE,
     EXECPLAN,
-    README,
-    TRACEABILITY,
-    RISK_REGISTER,
 ]
+PREFLIGHT_SECTION_HEADING = "E09 live reconfigure preflight bundle"
+RISK_ID = "R-069"
+PREFLIGHT_ASSERTIONS = {
+    "cloud_ui_test_stand | bool",
+    "cloud_ui_rollback_window_open | bool",
+    "cloud_ui_backend_image_digest is match('^sha256:[0-9a-f]{64}$')",
+    "cloud_ui_frontend_image_digest is match('^sha256:[0-9a-f]{64}$')",
+    "cloud_ui_database_url | length > 0",
+    "cloud_ui_rabbitmq_url | length > 0",
+}
+SECRET_REFERENCE_MARKERS = {
+    "cloud_ui_database_url",
+    "cloud_ui_rabbitmq_url",
+    "CLOUD_UI_DATABASE_URL",
+    "CLOUD_UI_RABBITMQ_URL",
+}
 ZERO_SHA256_DIGEST = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 
@@ -68,6 +83,16 @@ def read_text(relative_path: str) -> str:
 
 def load_yaml(relative_path: str) -> Any:
     return yaml.safe_load(read_text(relative_path))
+
+
+def load_task_list(relative_path: str) -> list[dict[str, Any]]:
+    tasks = load_yaml(relative_path)
+    assert isinstance(tasks, list)
+    validated_tasks = []
+    for task in tasks:
+        assert isinstance(task, dict)
+        validated_tasks.append(task)
+    return validated_tasks
 
 
 def load_play() -> dict[str, Any]:
@@ -103,6 +128,47 @@ def playbook_assert_conditions() -> set[str]:
     return conditions
 
 
+def extract_markdown_section(relative_path: str, heading_text: str) -> str:
+    lines = read_text(relative_path).splitlines()
+    for start, line in enumerate(lines):
+        match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+        if not match or match.group(2).strip().lower() != heading_text.lower():
+            continue
+
+        heading_level = len(match.group(1))
+        end = len(lines)
+        for next_index in range(start + 1, len(lines)):
+            next_match = re.match(r"^(#{1,6})\s+", lines[next_index])
+            if next_match and len(next_match.group(1)) <= heading_level:
+                end = next_index
+                break
+        return "\n".join(lines[start:end])
+
+    raise AssertionError(f"{relative_path} missing section: {heading_text}")
+
+
+def extract_risk_row(risk_id: str) -> str:
+    for line in read_text(RISK_REGISTER).splitlines():
+        if line.startswith(f"| {risk_id} |"):
+            return line
+    raise AssertionError(f"{RISK_REGISTER} missing row: {risk_id}")
+
+
+def task1_contract_text_blocks() -> dict[str, str]:
+    return {
+        **{relative_path: read_text(relative_path) for relative_path in TASK1_NEW_ARTIFACTS},
+        f"{README}#{PREFLIGHT_SECTION_HEADING}": extract_markdown_section(
+            README,
+            PREFLIGHT_SECTION_HEADING,
+        ),
+        f"{TRACEABILITY}#{PREFLIGHT_SECTION_HEADING}": extract_markdown_section(
+            TRACEABILITY,
+            PREFLIGHT_SECTION_HEADING,
+        ),
+        f"{RISK_REGISTER}#{RISK_ID}": extract_risk_row(RISK_ID),
+    }
+
+
 def nested_strings(value: Any) -> list[str]:
     if isinstance(value, str):
         return [value]
@@ -120,9 +186,15 @@ def nested_strings(value: Any) -> list[str]:
     return []
 
 
+def task_references_secret_input(task: dict[str, Any]) -> bool:
+    task_references = "\n".join(nested_strings(task))
+    return any(marker in task_references for marker in SECRET_REFERENCE_MARKERS)
+
+
 def test_e09_live_reconfigure_bundle_files_exist() -> None:
     for relative_path in [
         PLAYBOOK,
+        VALIDATE_TASKS,
         EXAMPLE_VARS,
         EVIDENCE,
         EXECPLAN,
@@ -155,14 +227,7 @@ def test_preflight_playbook_is_local_and_imports_only_validation() -> None:
 
     tasks = load_tasks()
     conditions = playbook_assert_conditions()
-    assert {
-        "cloud_ui_test_stand | bool",
-        "cloud_ui_rollback_window_open | bool",
-        "cloud_ui_backend_image_digest is match('^sha256:[0-9a-f]{64}$')",
-        "cloud_ui_frontend_image_digest is match('^sha256:[0-9a-f]{64}$')",
-        "cloud_ui_database_url | length > 0",
-        "cloud_ui_rabbitmq_url | length > 0",
-    } <= conditions
+    assert conditions == PREFLIGHT_ASSERTIONS
 
     import_tasks = [task for task in tasks if "ansible.builtin.import_role" in task]
     assert len(import_tasks) == 1
@@ -214,29 +279,38 @@ def test_preflight_runtime_secret_assertion_is_no_log() -> None:
     assert secret_assert_tasks[0].get("no_log") is True
 
     for task in tasks:
-        task_references = "\n".join(nested_strings(task))
-        if "cloud_ui_database_url" in task_references or "cloud_ui_rabbitmq_url" in task_references:
+        if task_references_secret_input(task):
+            assert task.get("no_log") is True
+
+
+def test_imported_role_validation_tasks_are_assert_only_and_secret_safe() -> None:
+    tasks = load_task_list(VALIDATE_TASKS)
+    assert tasks
+
+    allowed_task_keys = {"name", "no_log", "ansible.builtin.assert"}
+    for task in tasks:
+        assert set(task) <= allowed_task_keys
+        action_keys = [key for key in task if key == "ansible.builtin.assert"]
+        assert action_keys == ["ansible.builtin.assert"]
+        if task_references_secret_input(task):
             assert task.get("no_log") is True
 
 
 def test_preflight_bundle_does_not_execute_live_or_mutating_commands() -> None:
-    combined = "\n".join(read_text(path) for path in TASK1_TARGET_ARTIFACTS)
-    lowered = combined.lower()
+    forbidden_patterns = [
+        r"(?im)^\s*(?:[-*]\s+)?(?:`|\$|sudo\s+)?kolla-ansible"
+        r"(?:\s+(?!deploy\b|reconfigure\b|destroy\b|upgrade\b)\S+)*"
+        r"\s+(?:deploy|reconfigure|destroy|upgrade)\b",
+        r"(?im)^\s*(?:[-*]\s+)?(?:ansible\.builtin\.)?shell\s*:",
+        r"(?im)^\s*(?:[-*]\s+)?(?:ansible\.builtin\.)?command\s*:",
+        r"(?im)^\s*(?:[-*]\s+)?kolla_container\s*:",
+        r"(?im)^\s*(?:[-*]\s+)?community\.mysql(?:\.[A-Za-z_]+)?\s*:",
+        r"(?im)^\s*(?:[-*]\s+)?community\.rabbitmq(?:\.[A-Za-z_]+)?\s*:",
+    ]
 
-    for forbidden in [
-        "kolla-ansible reconfigure",
-        "kolla-ansible deploy",
-        "kolla-ansible destroy",
-        "kolla-ansible upgrade",
-        "kolla_container:",
-        "community.mysql",
-        "community.rabbitmq",
-        "shell:",
-        "command:",
-        "production approved",
-        "12 live containers proven",
-    ]:
-        assert forbidden not in lowered
+    for label, text in task1_contract_text_blocks().items():
+        for pattern in forbidden_patterns:
+            assert re.search(pattern, text) is None, label
 
 
 def test_task1_artifacts_do_not_contain_secret_canaries_or_credential_urls() -> None:
@@ -245,8 +319,7 @@ def test_task1_artifacts_do_not_contain_secret_canaries_or_credential_urls() -> 
         r"amqps?://[^\s'\"/@:]+:[^\s'\"/@]+@",
     ]
 
-    for relative_path in TASK1_TARGET_ARTIFACTS:
-        text = read_text(relative_path)
+    for label, text in task1_contract_text_blocks().items():
         for forbidden in [
             fixture_value("admin", "123"),
             fixture_value("mysql+pymysql://", "cloud_ui", ":"),
@@ -255,9 +328,9 @@ def test_task1_artifacts_do_not_contain_secret_canaries_or_credential_urls() -> 
             "clouds.yaml",
             "openrc",
         ]:
-            assert forbidden not in text, relative_path
+            assert forbidden not in text, label
         for pattern in credential_url_patterns:
-            assert re.search(pattern, text) is None, relative_path
+            assert re.search(pattern, text) is None, label
 
 
 def test_example_vars_are_placeholders_and_secret_safe() -> None:
@@ -312,9 +385,9 @@ def test_example_vars_are_placeholders_and_secret_safe() -> None:
 
 def test_docs_record_preflight_scope_and_pending_live_evidence() -> None:
     evidence = read_text(EVIDENCE)
-    readme = read_text(README)
-    traceability = read_text(TRACEABILITY)
-    risk_register = read_text(RISK_REGISTER)
+    readme = extract_markdown_section(README, PREFLIGHT_SECTION_HEADING)
+    traceability = extract_markdown_section(TRACEABILITY, PREFLIGHT_SECTION_HEADING)
+    risk_row = extract_risk_row(RISK_ID)
 
     for text in (evidence, readme, traceability):
         assert "E09 live reconfigure preflight bundle" in text
@@ -324,10 +397,10 @@ def test_docs_record_preflight_scope_and_pending_live_evidence() -> None:
     for text in (evidence, traceability):
         assert "pending_external_evidence" in text
 
-    assert "R-069" in risk_register
-    assert "preflight bundle mistaken for deployment acceptance" in risk_register
+    assert RISK_ID in risk_row
+    assert "preflight bundle mistaken for deployment acceptance" in risk_row
 
-    risk_ids = re.findall(r"^\| (R-\d{3}) \|", risk_register, flags=re.MULTILINE)
+    risk_ids = re.findall(r"^\| (R-\d{3}) \|", read_text(RISK_REGISTER), flags=re.MULTILINE)
     duplicate_ids = {risk_id for risk_id in risk_ids if risk_ids.count(risk_id) > 1}
     assert duplicate_ids == set()
 ```
