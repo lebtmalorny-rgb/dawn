@@ -306,6 +306,15 @@ Expected: commit contains only the new test file.
 **Files:**
 - Create: `deploy/kolla/scripts/sync-ansible-remote-bundle.py`
 
+> Controller amendment after Task 1 reviews: use the committed
+> `tests/test_e09_ansible_remote_sync.py` as the executable contract. The helper must reject
+> unmanifested benign extra files, forbidden credential filenames such as `clouds.yaml`, manifest byte
+> mismatches and manifest path traversal. `build_sync_request(...)` must produce the exact staging
+> `rsync` args and exact backup-before-replace command sequence asserted by the test. Evidence text
+> must keep live reconfigure, DB/MQ auth remediation, migration, 12-container inspection,
+> HAProxy/TLS, SELinux hardening and rollback as same-line `remains pending_external_evidence`
+> statements, and production deployment must remain out of scope.
+
 - [ ] **Step 1: Implement helper**
 
 Create `deploy/kolla/scripts/sync-ansible-remote-bundle.py`:
