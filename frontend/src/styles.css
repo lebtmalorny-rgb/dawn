@@ -520,9 +520,9 @@ body {
   color: #f0f5f8;
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: auto auto minmax(16rem, 1fr) auto auto auto auto;
+  grid-template-columns: auto auto minmax(12rem, 1fr) auto minmax(8rem, auto) minmax(6rem, auto) auto;
   min-height: 3.25rem;
-  padding: 0 1rem;
+  padding: 0.5rem 1rem;
 }
 
 .cloud-ui-icon-button,
@@ -534,8 +534,16 @@ body {
   font: inherit;
 }
 
+.cloud-ui-icon-button:disabled,
+.cloud-ui-actions-button:disabled {
+  color: #b8c7d1;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .cloud-ui-product-title {
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .cloud-ui-global-search input {
@@ -550,6 +558,7 @@ body {
 .cloud-ui-shell-user {
   color: #dce6ed;
   font-size: 0.875rem;
+  overflow-wrap: anywhere;
 }
 
 .cloud-ui-shell-body {
@@ -587,14 +596,17 @@ body {
 }
 
 .cloud-ui-object-tree ul {
+  display: grid;
+  gap: 0.25rem;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.cloud-ui-object-tree a {
+.cloud-ui-object-tree-item {
   color: #151515;
-  display: block;
+  display: grid;
+  gap: 0.25rem;
   padding: 0.25rem 0.375rem;
   text-decoration: none;
 }
@@ -602,6 +614,29 @@ body {
 .cloud-ui-object-tree a[aria-current="page"] {
   background: #253746;
   color: #ffffff;
+}
+
+.cloud-ui-object-tree-item-disabled {
+  background: #f0f0f0;
+  border: 1px solid #d2d2d2;
+  color: #6a6e73;
+  cursor: not-allowed;
+}
+
+.cloud-ui-object-tree-status {
+  border: 1px solid #8a8d90;
+  display: inline-flex;
+  font-size: 0.75rem;
+  justify-self: start;
+  padding: 0.0625rem 0.25rem;
+}
+
+.cloud-ui-object-tree-reason {
+  color: #6a6e73;
+  display: block;
+  font-size: 0.75rem;
+  padding: 0 0.375rem;
+  overflow-wrap: anywhere;
 }
 
 .cloud-ui-workbench {
@@ -615,6 +650,7 @@ body {
   display: flex;
   gap: 0.75rem;
   padding: 0.75rem 1rem 0.375rem;
+  min-width: 0;
 }
 
 .cloud-ui-object-header h1 {
@@ -627,10 +663,15 @@ body {
   margin: 0.125rem 0 0;
 }
 
+.cloud-ui-actions-button {
+  margin-left: auto;
+}
+
 .cloud-ui-object-tabs,
 .cloud-ui-bottom-tabs {
   border-bottom: 1px solid #d2d2d2;
   display: flex;
+  flex-wrap: wrap;
   gap: 1.5rem;
   padding: 0 1rem;
 }
@@ -645,7 +686,7 @@ body {
   padding: 0.625rem 0;
 }
 
-.cloud-ui-object-tabs button[aria-selected="true"],
+.cloud-ui-object-tabs button[aria-current="page"],
 .cloud-ui-bottom-tab-active {
   border-bottom: 3px solid #0066cc;
 }
@@ -665,4 +706,47 @@ body {
   color: #6a6e73;
   padding: 1rem;
   text-align: center;
+}
+
+@media (max-width: 900px) {
+  .cloud-ui-top-chrome {
+    grid-template-columns: auto minmax(8rem, 1fr) auto;
+  }
+
+  .cloud-ui-global-search {
+    grid-column: 1 / -1;
+    order: 1;
+  }
+
+  .cloud-ui-shell-meta,
+  .cloud-ui-shell-user {
+    font-size: 0.8125rem;
+  }
+
+  .cloud-ui-shell-body {
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-ui-object-navigator {
+    border-bottom: 1px solid #d2d2d2;
+    border-right: 0;
+    overflow-x: clip;
+  }
+
+  .cloud-ui-object-tree {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  }
+
+  .cloud-ui-workbench {
+    min-width: 0;
+  }
+
+  .cloud-ui-object-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .cloud-ui-actions-button {
+    margin-left: 0;
+  }
 }

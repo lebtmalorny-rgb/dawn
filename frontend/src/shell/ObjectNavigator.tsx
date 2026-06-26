@@ -1,5 +1,10 @@
 import { CLOUD_MODULE_GROUPS } from "../navigation/cloudModules";
 
+const STATUS_LABELS = {
+  disabled: "Недоступно",
+  planned: "Запланировано",
+} as const;
+
 type ObjectNavigatorProps = {
   activeView: string;
 };
@@ -18,17 +23,43 @@ export function ObjectNavigator({ activeView }: ObjectNavigatorProps) {
           <section key={group.key} aria-label={group.title}>
             <h3>{group.title}</h3>
             <ul>
-              {group.items.map((item) => (
-                <li key={item.key}>
-                  <a
-                    href={`?view=${encodeURIComponent(item.view)}`}
-                    aria-current={activeView === item.view ? "page" : undefined}
-                    data-status={item.status}
-                  >
-                    {item.title}
-                  </a>
-                </li>
-              ))}
+              {group.items.map((item) => {
+                const reasonId = `cloud-ui-module-reason-${item.key}`;
+
+                if (item.status !== "implemented") {
+                  return (
+                    <li key={item.key}>
+                      <span
+                        className="cloud-ui-object-tree-item cloud-ui-object-tree-item-disabled"
+                        aria-disabled="true"
+                        aria-describedby={reasonId}
+                        data-status={item.status}
+                      >
+                        <span>{item.title}</span>
+                        <span className="cloud-ui-object-tree-status">
+                          {STATUS_LABELS[item.status]}
+                        </span>
+                      </span>
+                      <span id={reasonId} className="cloud-ui-object-tree-reason">
+                        {item.reason}
+                      </span>
+                    </li>
+                  );
+                }
+
+                return (
+                  <li key={item.key}>
+                    <a
+                      className="cloud-ui-object-tree-item"
+                      href={`?view=${encodeURIComponent(item.view)}`}
+                      aria-current={activeView === item.view ? "page" : undefined}
+                      data-status={item.status}
+                    >
+                      {item.title}
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         ))}

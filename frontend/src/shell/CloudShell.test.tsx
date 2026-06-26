@@ -27,22 +27,35 @@ describe("CloudShell", () => {
     );
 
     expect(screen.getByRole("banner")).toHaveTextContent("Cloud UI");
+    expect(
+      screen.getByRole("button", { name: "Меню продукта запланировано для следующего этапа" }),
+    ).toBeDisabled();
     expect(screen.getByRole("searchbox", { name: "Глобальный поиск" })).toHaveAttribute(
       "placeholder",
       shellContext.searchPlaceholder,
     );
+    expect(
+      screen.getByRole("button", { name: "Обновление данных запланировано для следующего этапа" }),
+    ).toBeDisabled();
     expect(screen.getByRole("navigation", { name: "Объекты облака" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "compute-03" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Summary" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.getByRole("button", { name: "Действия объекта запланированы для следующего этапа" }),
+    ).toBeDisabled();
     expect(screen.getByRole("region", { name: "Нижняя рабочая панель" })).toHaveTextContent(
       "Recent Tasks",
     );
     expect(screen.getByRole("region", { name: "Рабочая область" })).toHaveTextContent(
       "Instances table",
     );
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });
 
-  test("bottom panel exposes operations, audit and approvals tabs", () => {
+  test("bottom panel exposes static operations, audit and approvals controls", () => {
     render(
       <CloudShell
         context={shellContext}
@@ -56,9 +69,40 @@ describe("CloudShell", () => {
     );
 
     const bottomPanel = screen.getByRole("region", { name: "Нижняя рабочая панель" });
-    expect(within(bottomPanel).getByRole("tab", { name: "Recent Tasks" })).toBeInTheDocument();
-    expect(within(bottomPanel).getByRole("tab", { name: "Alarms" })).toBeInTheDocument();
-    expect(within(bottomPanel).getByRole("tab", { name: "Audit Tail" })).toBeInTheDocument();
-    expect(within(bottomPanel).getByRole("tab", { name: "Approvals" })).toBeInTheDocument();
+    expect(within(bottomPanel).getByRole("button", { name: "Recent Tasks" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(within(bottomPanel).getByRole("button", { name: "Alarms" })).toBeInTheDocument();
+    expect(within(bottomPanel).getByRole("button", { name: "Audit Tail" })).toBeInTheDocument();
+    expect(within(bottomPanel).getByRole("button", { name: "Approvals" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+  });
+
+  test("planned modules are visible but not links or enabled controls", () => {
+    render(
+      <CloudShell
+        context={shellContext}
+        activeView="instances"
+        objectTitle="compute-03"
+        objectType="Hypervisor"
+        tabs={["Summary"]}
+      >
+        <span>Instances table</span>
+      </CloudShell>,
+    );
+
+    expect(screen.getByRole("link", { name: "ВМ" })).toHaveAttribute("href", "?view=instances");
+    expect(screen.queryByRole("link", { name: /Watcher/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Watcher/ })).not.toBeInTheDocument();
+    const watcherItem = screen.getByText("Watcher").closest("li");
+    expect(watcherItem).not.toBeNull();
+    expect(within(watcherItem as HTMLElement).getByText("Watcher").closest("[aria-disabled='true']"))
+      .toHaveAttribute("data-status", "planned");
+    expect(within(watcherItem as HTMLElement).getByText("Запланировано")).toBeInTheDocument();
+    expect(
+      screen.getByText("First-class module planned; direct action apply remains approval-gated"),
+    ).toBeInTheDocument();
   });
 });

@@ -7,7 +7,13 @@ type TopChromeProps = {
 export function TopChrome({ context }: TopChromeProps) {
   return (
     <header className="cloud-ui-top-chrome" role="banner">
-      <button className="cloud-ui-icon-button" type="button" aria-label="Меню продукта">
+      <button
+        className="cloud-ui-icon-button"
+        type="button"
+        aria-label="Меню продукта запланировано для следующего этапа"
+        title="Меню продукта запланировано для следующего этапа"
+        disabled
+      >
         ☰
       </button>
       <div className="cloud-ui-product-title">{context.productTitle}</div>
@@ -19,7 +25,13 @@ export function TopChrome({ context }: TopChromeProps) {
           placeholder={context.searchPlaceholder}
         />
       </label>
-      <button className="cloud-ui-icon-button" type="button" aria-label="Обновить">
+      <button
+        className="cloud-ui-icon-button"
+        type="button"
+        aria-label="Обновление данных запланировано для следующего этапа"
+        title="Обновление данных запланировано для следующего этапа"
+        disabled
+      >
         ↻
       </button>
       <div className="cloud-ui-shell-meta">{context.scopeLabel}</div>

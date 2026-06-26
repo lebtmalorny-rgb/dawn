@@ -38,13 +38,19 @@ export function CloudShell({
                 {objectType} · {context.freshnessLabel}
               </p>
             </div>
-            <button type="button" className="cloud-ui-actions-button">
+            <button
+              type="button"
+              className="cloud-ui-actions-button"
+              aria-label="Действия объекта запланированы для следующего этапа"
+              title="Действия объекта запланированы для следующего этапа"
+              disabled
+            >
               ⋮ Actions
             </button>
           </div>
           <nav className="cloud-ui-object-tabs" aria-label="Разделы объекта">
             {tabs.map((tab, index) => (
-              <button key={tab} type="button" role="tab" aria-selected={index === 0}>
+              <button key={tab} type="button" aria-current={index === 0 ? "page" : undefined}>
                 {tab}
               </button>
             ))}
