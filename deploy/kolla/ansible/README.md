@@ -45,3 +45,22 @@ provisioning. It stores only object names and Vault secret references. It must n
 passwords, RabbitMQ passwords, Vault tokens, openrc files or `clouds.yaml`.
 
 Live E09.3 evidence is recorded in `docs/generated/e09-db-rabbitmq-provisioning.md`.
+
+## E09 live reconfigure preflight bundle
+
+The E09 live reconfigure preflight bundle is preflight only. It validates the approved test marker,
+rollback window, image digest inputs and runtime DB/MQ secret inputs, then imports `cloud_ui` role
+validation with `tasks_from: validate`.
+
+It does not run live mutating Kolla actions, start containers, render runtime config files, run
+migrations, mutate DB/MQ/Vault or claim E09 acceptance. The bundle checks that runtime secret inputs
+are present without storing any runtime secret value in the repository.
+
+Operators should create a non-committed vars file from
+`examples/cloud-ui-vars.yml.example` and inject runtime secret values through the approved secret
+mechanism. When invoking the preflight playbook from this repository, set
+`ANSIBLE_ROLES_PATH=deploy/kolla/ansible/roles` or use an equivalent Ansible roles path
+configuration so the `cloud_ui` role resolves correctly.
+
+Evidence and remaining live follow-up are recorded in
+`docs/generated/e09-live-reconfigure-bundle.md`.

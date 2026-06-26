@@ -574,3 +574,26 @@ Evidence: `tests/test_e09_deployment_smoke_evidence.py`,
 - Закрывать ДКБ-69 удалением compiler, игнорируя наличие необходимого Python interpreter/shell.
 - Закрывать ДКБ-72 настройкой UI без проверки storage paths Nova/Cinder/Ceph.
 - Закрывать ДКБ-77 одной документацией без firewall/policy/disabled endpoints.
+
+## E09 live reconfigure preflight bundle
+
+Обновление требований 2026-06-26: E09 live reconfigure preflight bundle is preflight only. It
+validates repository-side inputs for an approved test-stand preparation path while live
+deploy/reconfigure evidence remains
+`pending_external_evidence`. The slice does not create a production action or E09 acceptance claim.
+
+For ДКБ-55/56, the bundle validates runtime DB/MQ inputs supplied from the approved secret mechanism
+without committing any runtime secret value. Rotation, owner approval and SecMan evidence remain open
+until the approved external run provides sanitized proof.
+
+For ДКБ-65/69/70/76/77/80/82, this slice creates no live container, registry, network, SELinux or
+rollback proof. It adds operator documentation and a preflight validation bundle only; live Kolla
+run evidence, registry digest proof, management-zone/API proof, host hardening inspection and rollback
+execution evidence remain pending.
+
+Evidence paths:
+
+- `tests/test_e09_live_reconfigure_bundle.py`
+- `deploy/kolla/ansible/playbooks/cloud-ui-preflight.yml`
+- `deploy/kolla/ansible/examples/cloud-ui-vars.yml.example`
+- `docs/generated/e09-live-reconfigure-bundle.md`
