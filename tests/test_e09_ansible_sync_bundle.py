@@ -158,6 +158,10 @@ def test_exporter_creates_allowlisted_bundle_and_manifest(
 
     assert produced_files == EXPECTED_BUNDLE_FILES
     assert evidence_path.exists()
+    generated_evidence = evidence_path.read_text(encoding="utf-8")
+    assert "runtime secret value" in generated_evidence
+    assert "Runtime secret value" not in generated_evidence
+    assert all(line == line.rstrip() for line in generated_evidence.splitlines())
 
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == "e09-ansible-sync-bundle/v1"

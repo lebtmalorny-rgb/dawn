@@ -321,7 +321,7 @@ def render_evidence(manifest: dict[str, object]) -> str:
             "- Live execution status: `pending_external_evidence`",
             f"- Source commit: `{manifest['source_commit']}`",
             f"- Bundle schema: `{manifest['schema_version']}`",
-            "- Runtime secret value: absent; DB/MQ URLs remain external runtime secret inputs",
+            "- runtime secret value: absent; DB/MQ URLs remain external runtime secret inputs",
             "",
             "## Bundle contents",
             "",
@@ -340,7 +340,7 @@ def render_evidence(manifest: dict[str, object]) -> str:
             "## Remaining blockers",
             "",
             "- remote sync remains separately approved;",
-            "- DB/MQ auth remediation remains `pending_external_evidence`; ",
+            "- DB/MQ auth remediation remains `pending_external_evidence`;",
             "- live reconfigure, 12-container inspection, HAProxy/TLS, SELinux and rollback remain pending.",
             "",
         ]
