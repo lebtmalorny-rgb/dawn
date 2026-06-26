@@ -13,6 +13,21 @@
 
 В варианте с тремя control/UI-узлами ожидается 12 постоянно работающих контейнеров: по три frontend, API, worker и event consumer. Миграция БД выполняется отдельным одноразовым контейнером. Существующие MariaDB и RabbitMQ используются через отдельные БД, учетные записи, vhost, exchange и очереди. Mistral остается движком длительных пользовательских workflow. etcd не используется как бизнес-хранилище или хранилище сессий.
 
+## Текущий статус
+
+На 2026-06-26 активный handoff находится внутри E09.8 `Deployment smoke/evidence`.
+Repository-side evidence для E09.1-E09.8 реализовано и проверено, включая Kolla image build
+contract, Ansible role contracts, DB/RabbitMQ all-in-one lab provisioning, migration job contract,
+process topology, HAProxy/TLS route contract, lifecycle/rollback contract и fail-closed evidence
+runner.
+
+Полная приемка E09 еще не заявлена. Остаются внешние live gates: подтвержденные image digests из
+test registry, approved test inventory с marker `cloud_ui_test_stand`, 12 live containers на трех
+test nodes, one-shot migration execution, HAProxy/TLS smoke, DB/RabbitMQ least-privilege checks,
+container hardening/SELinux inspection и executed rollback evidence. Текущий источник handoff:
+`docs/execplans/E09-deployment-smoke-evidence.md` и
+`docs/generated/e09-deployment-smoke-evidence.md`.
+
 ## Как работать с комплектом
 
 Начните с `CODEX_START.md`, затем передайте Codex только один файл этапа из `tasks/`. Для сложного этапа Codex должен создать и вести ExecPlan по правилам `PLANS.md`.

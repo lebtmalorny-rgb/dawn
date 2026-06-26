@@ -11,6 +11,7 @@
 | [PLANS.md](PLANS.md) | Правила создания и ведения живого ExecPlan. |
 | [CODEX_START.md](CODEX_START.md) | Готовые запросы для реализации, review и security review. |
 | [tasks/README.md](tasks/README.md) | Граф этапов, handoff между сессиями и уровни результата. |
+| [docs/generated/current-state.md](docs/generated/current-state.md) | Текущий handoff workspace/E09 и исторический baseline среды. |
 
 ## Архитектура и требования
 
@@ -59,6 +60,29 @@
 | E10 | [tasks/E10_SCALE_HA.md](tasks/E10_SCALE_HA.md) | Нагрузка, HA, failover, rolling update и consistency evidence. |
 | E11 | [tasks/E11_ACCEPTANCE.md](tasks/E11_ACCEPTANCE.md) | Приемочные сценарии, runbooks и воспроизводимая демонстрация. |
 | E12 | [tasks/E12_PRODUCTION_GAPS.md](tasks/E12_PRODUCTION_GAPS.md) | Evidence audit, внешние controls, waivers и решение о pilot. |
+
+## Актуальный handoff E09
+
+| Файл | Назначение |
+|---|---|
+| [docs/execplans/E09-deployment-smoke-evidence.md](docs/execplans/E09-deployment-smoke-evidence.md) | Последний активный ExecPlan: E09.8 repository runner готов, live smoke/evidence pending. |
+| [docs/generated/e09-deployment-smoke-evidence.md](docs/generated/e09-deployment-smoke-evidence.md) | Сводка E09.8 evidence rows и pending external gates. |
+| [deploy/kolla/scripts/collect-e09-evidence.py](deploy/kolla/scripts/collect-e09-evidence.py) | Fail-closed runner для sanitized test-stand deployment evidence. |
+| [tests/test_e09_deployment_smoke_evidence.py](tests/test_e09_deployment_smoke_evidence.py) | Contract/security tests для E09.8 runner и redaction. |
+| [docs/generated/risk-register.md](docs/generated/risk-register.md) | Риски R-056-R-068 по E09 и запрет ложных deployment claims. |
+
+## Артефакты E09
+
+| Slice | ExecPlan | Evidence |
+|---|---|---|
+| E09.1 image build | [docs/execplans/E09-kolla-image-build.md](docs/execplans/E09-kolla-image-build.md) | [docs/generated/e09-kolla-image-build.md](docs/generated/e09-kolla-image-build.md) |
+| E09.2 role skeleton | [docs/execplans/E09-kolla-ansible-role.md](docs/execplans/E09-kolla-ansible-role.md) | [docs/generated/e09-kolla-ansible-role.md](docs/generated/e09-kolla-ansible-role.md) |
+| E09.3 DB/RabbitMQ provisioning | [docs/execplans/E09-db-rabbitmq-provisioning.md](docs/execplans/E09-db-rabbitmq-provisioning.md) | [docs/generated/e09-db-rabbitmq-provisioning.md](docs/generated/e09-db-rabbitmq-provisioning.md) |
+| E09.4 migration job | [docs/execplans/E09-migration-job.md](docs/execplans/E09-migration-job.md) | [docs/generated/e09-migration-job.md](docs/generated/e09-migration-job.md) |
+| E09.5 process containers | [docs/execplans/E09-process-containers.md](docs/execplans/E09-process-containers.md) | [docs/generated/e09-process-containers.md](docs/generated/e09-process-containers.md) |
+| E09.6 HAProxy/TLS/network | [docs/execplans/E09-haproxy-tls-network.md](docs/execplans/E09-haproxy-tls-network.md) | [docs/generated/e09-haproxy-tls-network.md](docs/generated/e09-haproxy-tls-network.md) |
+| E09.7 reconfigure/rollback | [docs/execplans/E09-reconfigure-rollback.md](docs/execplans/E09-reconfigure-rollback.md) | [docs/generated/e09-reconfigure-rollback.md](docs/generated/e09-reconfigure-rollback.md) |
+| E09.8 deployment smoke/evidence | [docs/execplans/E09-deployment-smoke-evidence.md](docs/execplans/E09-deployment-smoke-evidence.md) | [docs/generated/e09-deployment-smoke-evidence.md](docs/generated/e09-deployment-smoke-evidence.md) |
 
 ## Локальные инструкции Codex
 

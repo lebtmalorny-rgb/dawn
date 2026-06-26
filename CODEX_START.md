@@ -18,6 +18,19 @@
 
 > Прочитай `AGENTS.md`, `PLANS.md`, завершенный ExecPlan предыдущего этапа и `tasks/E01_BOOTSTRAP.md`. Проверь входные критерии. Создай или актуализируй ExecPlan и выполни только текущий этап по единицам работы. После каждой единицы запускай релевантные тесты. Не переходи к следующему этапу. Обнови документацию и трассировку ДКБ, затем выполни self-review.
 
+## Запрос для продолжения E09.8
+
+Используйте этот запрос, если нужно продолжить с текущего handoff, а не начинать E10:
+
+> Прочитай `AGENTS.md`, `PLANS.md`, `tasks/E09_KOLLA_DEPLOY.md`,
+> `docs/execplans/E09-deployment-smoke-evidence.md` и
+> `docs/generated/e09-deployment-smoke-evidence.md`. Перепроверь рабочее дерево и релевантные
+> E09 tests. Не начинай E10. Продолжай только E09.8 live smoke/evidence: используй approved test
+> inventory с marker `cloud_ui_test_stand`, backend/frontend images только по `@sha256`, открытый
+> rollback window и подтвержденную SSH host identity. Не коммить inventory, credentials, private keys,
+> cookies, токены или production URLs. Обновляй только sanitized evidence и явно оставляй
+> `pending_external_evidence`, если live proof не получен.
+
 ## Запрос на review
 
 После реализации используйте отдельный проход:

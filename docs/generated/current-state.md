@@ -1,23 +1,65 @@
 # Current state baseline
 
-- Date: 2026-06-20
+- Date: 2026-06-26
 - Workspace: `/Users/dmitry/Desktop/dawn`
-- Stage: E01 bootstrap implemented
-- Evidence status: local and lab evidence, sanitized
+- Stage: E09.8 deployment smoke/evidence handoff
+- Evidence status: repository evidence implemented; live test-stand gates are pending external sanitized evidence
 
 ## Repository state
 
 Fact: current workspace is a Git repository.
 
-Current branch and pushed state:
+Current branch and pushed state observed on 2026-06-26:
 
 | Item | Observed value |
 |---|---|
 | repository root | `/Users/dmitry/Desktop/dawn` |
-| branch | `feature/e01-bootstrap` |
+| branch | `main` |
 | remote | `https://github.com/lebtmalorny-rgb/dawn.git` |
-| local HEAD | current `feature/e01-bootstrap` branch tip |
-| origin branch | `origin/feature/e01-bootstrap` exists; push after this docs commit updates it |
+| local HEAD | `cb57783 docs: record E09 authorization redaction review fix` |
+| origin branch | `main...origin/main`; no local drift before this documentation refresh |
+
+## Current E09 handoff
+
+E09 is the active stage. Repository-side evidence exists for E09.1-E09.8:
+
+- E09.1 Kolla image build contract and wrapper;
+- E09.2 Kolla-Ansible role skeleton;
+- E09.3 all-in-one lab Vault/MariaDB/RabbitMQ provisioning evidence;
+- E09.4 one-shot migration job contract;
+- E09.5 three-node/twelve-container process topology contract;
+- E09.6 HAProxy/TLS/network route contract;
+- E09.7 reconfigure, rolling update and rollback lifecycle contract;
+- E09.8 fail-closed deployment evidence runner and redaction tests.
+
+Full E09 acceptance is not claimed. The live deployment rows in
+`docs/generated/e09-deployment-smoke-evidence.md` remain `pending_external_evidence` until the
+approved test stand provides:
+
+- confirmed SSH host identity and approved inventory path with `cloud_ui_test_stand`;
+- `cloud-ui-backend` and `cloud-ui-frontend` image refs pinned by `@sha256`;
+- an open rollback window;
+- 12 live Cloud UI permanent containers on three test nodes;
+- one-shot migration execution and failure/retry evidence;
+- HAProxy/TLS health and API/UI smoke;
+- DB/RabbitMQ least-privilege checks without secret output;
+- non-root/caps/mounts/SELinux container inspection;
+- executed failed-update rollback evidence.
+
+Latest local verification for the handoff:
+
+| Command | Result |
+|---|---|
+| `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py tests/test_e09_reconfigure_rollback.py tests/test_e09_kolla_ansible_role.py tests/test_e09_haproxy_tls_network.py tests/test_e09_process_containers.py tests/test_e09_migration_job.py tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_image_build.py -q` | passed: 68 tests |
+| `./scripts/secret-scan.sh` | passed |
+
+Primary handoff documents:
+
+- `docs/execplans/E09-deployment-smoke-evidence.md`;
+- `docs/generated/e09-deployment-smoke-evidence.md`;
+- `deploy/kolla/scripts/collect-e09-evidence.py`;
+- `tests/test_e09_deployment_smoke_evidence.py`;
+- `docs/generated/risk-register.md` rows R-056-R-068.
 
 ## Files observed
 
@@ -46,9 +88,11 @@ Generated directories:
 - `docs/generated/`
 - `docs/execplans/`
 - `docs/adr/`
-- `artifacts/`
+- `artifacts/` where present
 
-## E01 bootstrap implementation state
+## Historical E01 bootstrap implementation state
+
+The following E01 section is retained as historical baseline evidence from 2026-06-20.
 
 E01 implemented the first runnable application slice:
 
@@ -85,8 +129,9 @@ Codex sandbox note:
 
 Kolla status:
 
-- E01 is a source application bootstrap, not the Kolla Build integration step;
-- Kolla-compatible image template/build integration remains a later deployment stage.
+- E01 was a source application bootstrap, not the Kolla Build integration step;
+- E09 later added repository-side Kolla Build/Kolla-Ansible contracts and evidence, but live
+  three-node deployment acceptance remains pending as described in the current E09 handoff above.
 
 ## Local host
 
