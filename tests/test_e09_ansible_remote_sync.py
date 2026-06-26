@@ -79,6 +79,11 @@ def risk_row(risk_id: str) -> str:
     raise AssertionError(f"missing {risk_id}")
 
 
+def assert_error_mentions(result: Any, *needles: str) -> None:
+    error_text = " ".join(result.errors).lower()
+    assert any(needle.lower() in error_text for needle in needles), error_text
+
+
 def test_sync_script_exists() -> None:
     assert SCRIPT.exists()
 
@@ -116,6 +121,60 @@ def test_rejects_tampered_bundle_file(
 
     assert result.ok is False
     assert "sha256 mismatch" in " ".join(result.errors)
+
+
+def test_rejects_unmanifested_forbidden_bundle_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module(SCRIPT, "sync_ansible_remote_bundle")
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
+    (bundle_dir / "clouds.yaml").write_text("clouds: {}\n", encoding="utf-8")
+
+    result = module.validate_local_bundle(bundle_dir)
+
+    assert result.ok is False
+    assert_error_mentions(result, "unmanifested", "forbidden", "extra bundle file")
+
+
+def test_rejects_manifest_byte_count_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module(SCRIPT, "sync_ansible_remote_bundle")
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
+    manifest_path = bundle_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"][0]["bytes"] = int(manifest["files"][0]["bytes"]) + 1
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    result = module.validate_local_bundle(bundle_dir)
+
+    assert result.ok is False
+    assert_error_mentions(result, "byte", "size")
+
+
+def test_rejects_manifest_path_traversal(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module(SCRIPT, "sync_ansible_remote_bundle")
+    bundle_dir = make_bundle(monkeypatch, tmp_path)
+    manifest_path = bundle_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"][0]["path"] = "../clouds.yaml"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    result = module.validate_local_bundle(bundle_dir)
+
+    assert result.ok is False
+    assert_error_mentions(result, "traversal", "escape", "unsafe", "forbidden")
 
 
 def test_rejects_unapproved_remote_host_and_path(
@@ -161,9 +220,25 @@ def test_builds_safe_remote_commands(
     assert request.remote_path == "/etc/kolla/cloud-ui-sync-bundle"
     assert request.staging_path == "/etc/kolla/.cloud-ui-sync-bundle.20260626T101112Z.staging"
     assert request.backup_path == "/etc/kolla/cloud-ui-sync-bundle.backup-20260626T101112Z"
-    assert request.rsync_args[:2] == ("rsync", "-a")
-    assert str(bundle_dir) + "/" in request.rsync_args
-    assert "kolla-ansible" not in " ".join(request.remote_commands)
+    assert request.rsync_args == (
+        "rsync",
+        "-a",
+        "--delete",
+        str(bundle_dir.resolve()) + "/",
+        "root@192.168.10.15:/etc/kolla/.cloud-ui-sync-bundle.20260626T101112Z.staging/",
+    )
+    assert request.remote_commands == (
+        "mkdir -p '/etc/kolla'",
+        "rm -rf '/etc/kolla/.cloud-ui-sync-bundle.20260626T101112Z.staging'",
+        "mkdir -p '/etc/kolla/.cloud-ui-sync-bundle.20260626T101112Z.staging'",
+        "if [ -e '/etc/kolla/cloud-ui-sync-bundle' ]; then mv "
+        "'/etc/kolla/cloud-ui-sync-bundle' "
+        "'/etc/kolla/cloud-ui-sync-bundle.backup-20260626T101112Z'; fi",
+        "mv '/etc/kolla/.cloud-ui-sync-bundle.20260626T101112Z.staging' "
+        "'/etc/kolla/cloud-ui-sync-bundle'",
+    )
+    assert all("/usr/share/kolla-ansible" not in command for command in request.remote_commands)
+    assert all("kolla-ansible" not in command for command in request.remote_commands)
     assert all("reconfigure" not in command for command in request.remote_commands)
 
 
@@ -234,6 +309,28 @@ def test_committed_docs_record_remote_sync_scope_and_risk() -> None:
     assert "DB/MQ auth remediation" in evidence
     assert "live reconfigure" in evidence
     assert "mistaken for live deployment" in row
+    for overclaim in (
+        "live reconfigure completed",
+        "DB/MQ auth remediation completed",
+        "migration completed",
+        "12 containers running",
+        "HAProxy/TLS completed",
+        "SELinux hardening completed",
+        "rollback completed",
+        "production approved",
+    ):
+        assert overclaim not in evidence
+    for pending_marker in (
+        "live reconfigure remains pending_external_evidence",
+        "DB/MQ auth remediation remains pending_external_evidence",
+        "migration remains pending_external_evidence",
+        "12-container inspection remains pending_external_evidence",
+        "HAProxy/TLS remains pending_external_evidence",
+        "SELinux hardening remains pending_external_evidence",
+        "rollback remains pending_external_evidence",
+        "production deployment remains out of scope",
+    ):
+        assert pending_marker in evidence
 
     risk_ids = [
         line.split("|")[1].strip()
