@@ -135,4 +135,34 @@ describe("CloudShell", () => {
       within(vmItem as HTMLElement).getByText("Требуется capability: instance.read"),
     ).toBeInTheDocument();
   });
+
+  test("planned modules keep planned status when future capability is missing", () => {
+    render(
+      <CloudShell
+        context={shellContext}
+        activeView="instances"
+        capabilities={["instance.read"]}
+        objectTitle="ВМ"
+        objectType="Inventory / Instances"
+        tabs={["Summary"]}
+      >
+        <span>Instances table</span>
+      </CloudShell>,
+    );
+
+    expect(screen.queryByRole("link", { name: "Сети" })).not.toBeInTheDocument();
+    const networkItem = screen.getByText("Сети").closest("li");
+    expect(networkItem).not.toBeNull();
+    expect(within(networkItem as HTMLElement).getByText("Сети").closest("[aria-disabled='true']"))
+      .toHaveAttribute("data-status", "planned");
+    expect(within(networkItem as HTMLElement).getByText("Запланировано")).toBeInTheDocument();
+    expect(
+      within(networkItem as HTMLElement).getByText(
+        "Horizon parity row, backend adapter not enabled in this slice",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(networkItem as HTMLElement).queryByText("Требуется capability: network.read"),
+    ).not.toBeInTheDocument();
+  });
 });

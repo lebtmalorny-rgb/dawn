@@ -33,14 +33,16 @@ export function ObjectNavigator({ activeView, capabilities }: ObjectNavigatorPro
                   item.status === "implemented" && !missingCapability;
 
                 if (!canOpenImplementedModule) {
-                  const disabledStatus: keyof typeof STATUS_LABELS = missingCapability
-                    ? "disabled"
-                    : item.status === "disabled"
+                  const disabledStatus: keyof typeof STATUS_LABELS =
+                    item.status === "implemented"
                       ? "disabled"
-                      : "planned";
-                  const reason = missingCapability
-                    ? `Требуется capability: ${item.requiredCapability}`
-                    : item.reason;
+                      : item.status === "disabled"
+                        ? "disabled"
+                        : "planned";
+                  const reason =
+                    item.status === "implemented" && missingCapability
+                      ? `Требуется capability: ${item.requiredCapability}`
+                      : item.reason;
 
                   return (
                     <li key={item.key}>
