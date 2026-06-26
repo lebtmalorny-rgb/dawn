@@ -60,6 +60,19 @@ if ! find "$FRONTEND_DIST_ROOT" -type f -print -quit | grep -q .; then
     exit 2
 fi
 
+if command -v shasum >/dev/null 2>&1; then
+    SHA256_COMMAND=(shasum -a 256)
+elif command -v sha256sum >/dev/null 2>&1; then
+    SHA256_COMMAND=(sha256sum)
+else
+    printf '%s\n' "Neither shasum nor sha256sum is available for frontend dist verification" >&2
+    exit 2
+fi
+
+sha256_digest() {
+    "${SHA256_COMMAND[@]}" "$@"
+}
+
 hash_directory() {
     local directory="$1"
     (
@@ -67,9 +80,9 @@ hash_directory() {
         find . -type f -print0 \
             | LC_ALL=C sort -z \
             | while IFS= read -r -d '' file_path; do
-                shasum -a 256 "$file_path"
+                sha256_digest "$file_path"
             done \
-            | shasum -a 256 \
+            | sha256_digest \
             | awk '{print $1}'
     )
 }
@@ -144,9 +157,9 @@ CONFIG_FILE="$RENDERED_CONFIG"
 COMMON_ARGS=(
     --config-file "$CONFIG_FILE"
     --docker-dir "$DOCKER_DIR"
-    --profile cloud-ui
+    --profile cloudui
     --tag "$CLOUD_UI_IMAGE_TAG"
-    --build-args "CLOUD_UI_SOURCE_PIN=$SOURCE_PIN_COMMIT"
+    --build-args "CLOUD_UI_SOURCE_PIN:$SOURCE_PIN_COMMIT"
 )
 
 case "$ACTION" in

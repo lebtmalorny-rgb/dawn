@@ -30,8 +30,8 @@ def test_kolla_build_config_declares_exactly_two_custom_images() -> None:
     assert "base = rocky" in config
     assert "base_tag = 9" in config
     assert "openstack_release = 2025.1" in config
-    assert "profile = cloud-ui" in config
-    assert "cloud-ui = cloud-ui-backend,cloud-ui-frontend" in config
+    assert "profile = cloudui" in config
+    assert "cloudui = cloud-ui-backend,cloud-ui-frontend" in config
     assert "[cloudui-user]" in config
     assert "uid = 42424" in config
     assert "gid = 42424" in config
@@ -52,6 +52,8 @@ def test_backend_template_keeps_one_backend_image_for_all_commands() -> None:
         "ADD cloud-ui-backend-archive /cloud-ui-backend-source",
         "cloud-ui-backend-source",
         "{{ macros.configure_user(name='cloudui') }}",
+        "dnf -y install python3.11 python3.11-devel python3.11-pip",
+        "python3.11 -m pip --no-cache-dir --disable-pip-version-check install /cloud-ui-backend",
         "org.opencontainers.image.title=\"cloud-ui-backend\"",
         "cloud-ui api",
         "cloud-ui worker",
@@ -68,12 +70,14 @@ def test_backend_template_keeps_one_backend_image_for_all_commands() -> None:
         "cloud-ui-api-source",
         "cloud-ui-worker-source",
         "cloud-ui-events-source",
+        "python3 -m pip --no-cache-dir install --upgrade -c /requirements/upper-constraints.txt",
     ]:
         assert forbidden not in template
 
 
 def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
     template = read_text("deploy/kolla/docker/cloud-ui-frontend/Dockerfile.j2")
+    nginx_config = read_text("frontend/nginx.conf")
 
     for expected in [
         "FROM {{ namespace }}/{{ image_prefix }}base:{{ tag }}",
@@ -90,6 +94,9 @@ def test_frontend_template_uses_prebuilt_dist_without_node_runtime() -> None:
     assert "node" not in normalized_template
     assert "npm" not in normalized_template
     assert "COPY cloud-ui-frontend-source" not in template
+    assert "error_log /var/log/kolla/cloud-ui-frontend/error.log warn;" in nginx_config
+    assert "access_log /var/log/kolla/cloud-ui-frontend/access.log;" in nginx_config
+    assert "/var/log/nginx" not in nginx_config
 
 
 def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
@@ -108,6 +115,11 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         "KOLLA_DOCKER_DIR override is not supported for E09.1",
         "git -C \"$SOURCE_ROOT\" rev-parse --is-inside-work-tree",
         "git -C \"$SOURCE_ROOT\" rev-parse --verify \"$CLOUD_UI_SOURCE_PIN^{commit}\"",
+        "command -v shasum",
+        "command -v sha256sum",
+        "Neither shasum nor sha256sum is available for frontend dist verification",
+        "sha256_digest \"$file_path\"",
+        "| sha256_digest",
         "CLOUD_UI_FRONTEND_DIST_SHA256 does not match frontend dist",
         "git -C \"$SOURCE_ROOT\" archive --format=tar \"$SOURCE_PIN_COMMIT\" backend",
         "git -C \"$SOURCE_ROOT\" archive --format=tar \"$SOURCE_PIN_COMMIT\" frontend",
@@ -124,9 +136,9 @@ def test_build_script_requires_test_registry_pin_and_rejects_latest() -> None:
         "CLOUD_UI_IMAGE_TAG must not be latest",
         "--config-file \"$CONFIG_FILE\"",
         "--docker-dir \"$DOCKER_DIR\"",
-        "--profile cloud-ui",
+        "--profile cloudui",
         "--tag \"$CLOUD_UI_IMAGE_TAG\"",
-        "--build-args \"CLOUD_UI_SOURCE_PIN=$SOURCE_PIN_COMMIT\"",
+        "--build-args \"CLOUD_UI_SOURCE_PIN:$SOURCE_PIN_COMMIT\"",
         "--registry \"$CLOUD_UI_TEST_REGISTRY\"",
         "--push",
         "cloud-ui-backend",

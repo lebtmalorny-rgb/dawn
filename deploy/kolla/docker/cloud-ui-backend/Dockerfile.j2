@@ -15,8 +15,10 @@ LABEL maintainer="{{ maintainer }}" name="{{ image_name }}" build-date="{{ build
 
 ADD cloud-ui-backend-archive /cloud-ui-backend-source
 
-RUN ln -s /cloud-ui-backend-source/* /cloud-ui-backend \
-    && {{ macros.install_pip(['/cloud-ui-backend'] | customizable("pip_packages")) }} \
+RUN dnf -y install python3.11 python3.11-devel python3.11-pip \
+    && dnf clean all && rm -rf /var/cache/dnf \
+    && ln -s /cloud-ui-backend-source/* /cloud-ui-backend \
+    && python3.11 -m pip --no-cache-dir --disable-pip-version-check install /cloud-ui-backend \
     && mkdir -p /etc/cloud-ui /var/log/kolla/cloud-ui \
     && chown -R cloudui: /etc/cloud-ui /var/log/kolla/cloud-ui
 

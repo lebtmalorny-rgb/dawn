@@ -5,7 +5,7 @@ This directory is the E09.1 repository contract for building the two portal-owne
 - `cloud-ui-backend`;
 - `cloud-ui-frontend`.
 
-It follows the Kolla custom template flow: `kolla-build.conf.example` defines a `cloud-ui` profile,
+It follows the Kolla custom template flow: `kolla-build.conf.example` defines a `cloudui` profile,
 and `deploy/kolla/docker` is passed to `kolla-build` with `--docker-dir`.
 
 E09.2 adds a repository-side Kolla-Ansible role skeleton at
@@ -69,6 +69,10 @@ Record image digests, SBOM, vulnerability scan and signature evidence in
 
 Kolla Build turns each source section into an archive named after the image source section, so the
 templates intentionally use `ADD cloud-ui-backend-archive` and `ADD cloud-ui-frontend-archive`.
+The backend image keeps the application runtime on Python 3.11 because `backend/pyproject.toml`
+requires `>=3.11,<3.12`; the Rocky 9 `openstack-base` image also carries Python 3.9 for OpenStack
+packages, so the portal package is installed with `python3.11 -m pip` instead of Kolla's Python 3.9
+OpenStack upper-constraints installer.
 
 ## Security Rules
 

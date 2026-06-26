@@ -4,13 +4,13 @@ base = rocky
 base_tag = 9
 openstack_release = 2025.1
 tag = 2025.1-rocky-9
-profile = cloud-ui
+profile = cloudui
 namespace = cloud-ui-test
 image_prefix =
 maintainer = Cloud UI Platform Team <platform@example.invalid>
 
 [profiles]
-cloud-ui = cloud-ui-backend,cloud-ui-frontend
+cloudui = cloud-ui-backend,cloud-ui-frontend
 
 [cloud-ui-backend]
 type = local

@@ -34,6 +34,11 @@ the prebuilt frontend `dist` directory against `CLOUD_UI_FRONTEND_DIST_SHA256`, 
 Kolla config that points backend and frontend source sections at those sanitized directories.
 `KOLLA_BUILD_CONFIG` and `KOLLA_DOCKER_DIR` overrides are rejected in this slice, and the wrapper
 validates the rendered source paths and resolved commit before invoking `kolla-build`.
+The Kolla profile name is `cloudui` because Kolla registers profile names as oslo.config option
+names. The image names remain `cloud-ui-backend` and `cloud-ui-frontend`.
+`cloud-ui-backend` installs the portal package with Python 3.11, matching `backend/pyproject.toml`,
+instead of using the Python 3.9 interpreter and OpenStack upper constraints from Rocky 9
+`openstack-base`.
 
 ## Commands
 
