@@ -26,6 +26,8 @@ export type HorizonParityRow = {
   cloudUiModule: string;
   requiredCapability: string;
   openStackAuthority: string;
+  apiContract: string;
+  statusReason: string;
   auditEvent: string;
   dkbNotes: string;
   status: HorizonParityStatus;

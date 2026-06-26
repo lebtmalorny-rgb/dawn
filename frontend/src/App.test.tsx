@@ -592,10 +592,28 @@ test("horizon parity registry keeps source workflows explicit", () => {
   expect(HORIZON_PARITY_ROWS).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
-        horizonArea: "Project / Compute / Instances",
+        horizonArea: "Project / Compute / Instances / List and detail",
         cloudUiModule: "Inventory / Instances",
         requiredCapability: "instance.read",
         status: "implemented",
+      }),
+      expect.objectContaining({
+        horizonArea: "Project / Compute / Instances / Launch instance",
+        cloudUiModule: "Operations / Workflow catalog",
+        requiredCapability: "instance.launch",
+        status: "planned",
+      }),
+      expect.objectContaining({
+        horizonArea: "Project / Compute / Instances / Power or lifecycle actions",
+        cloudUiModule: "Operations / Workflow catalog",
+        requiredCapability: "instance.lifecycle.manage",
+        status: "planned",
+      }),
+      expect.objectContaining({
+        horizonArea: "Project / Compute / Instances / Console access",
+        cloudUiModule: "Inventory / Instances",
+        requiredCapability: "instance.console.read",
+        status: "planned",
       }),
       expect.objectContaining({
         horizonArea: "Project / Network / Routers",
@@ -613,7 +631,11 @@ test("horizon parity registry keeps source workflows explicit", () => {
   );
   expect(
     HORIZON_PARITY_ROWS.every(
-      (row) => row.auditEvent.length > 0 && row.dkbNotes.length > 0,
+      (row) =>
+        row.apiContract.length > 0 &&
+        row.statusReason.length > 0 &&
+        row.auditEvent.length > 0 &&
+        row.dkbNotes.length > 0,
     ),
   ).toBe(true);
 });
