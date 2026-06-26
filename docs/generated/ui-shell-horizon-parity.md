@@ -32,4 +32,3 @@
 - `cd frontend && npm test`
 - `./scripts/secret-scan.sh`
 - `git diff --check`
-
