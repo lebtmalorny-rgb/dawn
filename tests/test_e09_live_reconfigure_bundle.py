@@ -265,7 +265,8 @@ def test_imported_role_validation_tasks_are_assert_only_and_secret_safe() -> Non
 
 def test_preflight_bundle_does_not_execute_live_or_mutating_commands() -> None:
     forbidden_patterns = [
-        r"(?im)^\s*(?:[-*]\s+)?(?:`|\$|sudo\s+)?kolla-ansible"
+        r"(?im)^\s*(?:(?:[-*]|\d+\.)\s+)?(?:`|\$\s*)?(?:sudo\s+)?"
+        r"(?:\S*/)?kolla-ansible"
         r"(?:\s+(?!deploy\b|reconfigure\b|destroy\b|upgrade\b)\S+)*"
         r"\s+(?:deploy|reconfigure|destroy|upgrade)\b",
         r"(?im)^\s*(?:[-*]\s+)?(?:ansible\.builtin\.)?shell\s*:",

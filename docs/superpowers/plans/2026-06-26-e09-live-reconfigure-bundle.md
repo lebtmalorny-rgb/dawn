@@ -498,7 +498,7 @@ Run:
 UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-live-bundle-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_live_reconfigure_bundle.py -q
 ```
 
-Expected: only documentation/evidence assertions still fail.
+Expected: Task 3 documentation/evidence, section and risk-row assertions still fail.
 
 ## Task 3: Evidence And Traceability
 
