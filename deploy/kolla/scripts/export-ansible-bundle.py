@@ -35,6 +35,9 @@ SECRET_ASSIGNMENT_RE = re.compile(
     r"application_credential(?:_secret)?)(?:_[A-Za-z0-9_-]+)?\s*[:=]\s*"
     r"(?:\"[^\"]+\"|'[^']+'|[^\n#]+)"
 )
+FORBIDDEN_CREDENTIAL_FILE_RE = re.compile(
+    r"(?i)(?:clouds\.yaml|\bopenrc\b|(?<![A-Za-z0-9_-])\.env(?![A-Za-z0-9_.-]))"
+)
 MUTATING_KOLLA_RE = re.compile(
     r"(?is)\bkolla-ansible\b(?:(?!\n).)*\b(?:deploy|reconfigure|destroy|upgrade)\b"
 )
@@ -125,6 +128,8 @@ def _scan_text(relative_path: Path, text: str) -> tuple[str, ...]:
         or SECRET_ASSIGNMENT_RE.search(text)
     ):
         errors.append(f"{relative_path}: secret-like value found")
+    if FORBIDDEN_CREDENTIAL_FILE_RE.search(text):
+        errors.append(f"{relative_path}: forbidden credential file reference found")
     if MUTATING_KOLLA_RE.search(text):
         errors.append(f"{relative_path}: live mutating Kolla command pattern found")
     elif _is_task_or_playbook_source(relative_path) and TASK_SHELL_OR_COMMAND_RE.search(text):

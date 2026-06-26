@@ -332,6 +332,49 @@ def test_exporter_rejects_secret_like_source_content(
             injected.unlink()
 
 
+def test_exporter_rejects_forbidden_credential_file_references(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    generated_docs = generated_docs_tmp(monkeypatch, tmp_path, module)
+    output_dir = tmp_path / "bundle"
+    evidence_path = generated_docs / "e09-ansible-sync-bundle.md"
+    injected = (
+        ROOT
+        / "deploy/kolla/ansible/roles/cloud_ui/tasks/"
+        / "e09-ansible-sync-bundle-forbidden-credential-file-reference.yml"
+    )
+    assert_path_available(injected)
+    created = False
+
+    try:
+        injected.write_text(
+            "\n".join(
+                [
+                    fixture_value("- debug: msg=", "clouds", ".yaml"),
+                    fixture_value("- debug: msg=", "open", "rc"),
+                    fixture_value("- debug: msg=", ".e", "nv"),
+                ]
+            ),
+            encoding="utf-8",
+        )
+        created = True
+
+        result = module.export_bundle(
+            output_dir=output_dir,
+            evidence_path=evidence_path,
+            source_commit="test-commit",
+        )
+
+        assert result.ok is False
+        assert "forbidden credential file reference" in " ".join(result.errors)
+        assert_no_export_side_effects(output_dir, evidence_path)
+    finally:
+        if created:
+            injected.unlink()
+
+
 def test_exporter_rejects_live_mutating_kolla_source_content(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
