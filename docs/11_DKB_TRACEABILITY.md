@@ -352,6 +352,13 @@ Evidence: `tests/test_e09_kolla_ansible_role.py`, `deploy/kolla/ansible/README.m
 `deploy/kolla/ansible/roles/cloud_ui/*`, `docs/generated/e09-kolla-ansible-role.md`,
 `docs/generated/risk-register.md` and ExecPlan `docs/execplans/E09-kolla-ansible-role.md`.
 
+E09 runtime-secret injection update: the `cloud_ui` role now declares empty
+`cloud_ui_database_url`/`cloud_ui_rabbitmq_url` inputs, documents their Vault/SecMan lab paths in
+`cloud_ui_secret_references`, validates that these URLs are supplied when `cloud_ui_enabled=true`,
+and renders `CLOUD_UI_DATABASE_URL`/`CLOUD_UI_RABBITMQ_URL` with `no_log: true`. This narrows the
+live readiness 503 root cause to runtime secret delivery/principal drift without committing any
+runtime secret value. It does not close full ДКБ-55/56 rotation/owner evidence.
+
 ## Обновление требований 2026-06-25: E09.3 DB/RabbitMQ provisioning
 
 E09.3 добавляет repository-side contract and sanitized all-in-one lab evidence для one-time Cloud UI

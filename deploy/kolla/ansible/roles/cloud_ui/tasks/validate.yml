@@ -45,6 +45,14 @@
       - cloud_ui_management_network_acl_required | bool
     fail_msg: "Cloud UI HAProxy route must keep the E09.6 same-origin TLS/network contract."
 
+- name: Validate Cloud UI runtime secret inputs
+  ansible.builtin.assert:
+    that:
+      - not cloud_ui_enabled | bool or cloud_ui_database_url | length > 0
+      - not cloud_ui_enabled | bool or cloud_ui_rabbitmq_url | length > 0
+    fail_msg: "Cloud UI DB/MQ runtime URLs must be supplied by the approved secret mechanism when enabled."
+  no_log: true
+
 - name: Validate Cloud UI lifecycle contract
   ansible.builtin.assert:
     that:

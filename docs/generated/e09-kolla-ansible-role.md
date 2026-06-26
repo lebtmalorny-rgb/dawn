@@ -29,12 +29,17 @@ This evidence covers repository-side role skeleton artifacts only:
 - role defaults for service names, groups, images, image tags/digests, ports, volumes and hardening
   dimensions;
 - validation tasks that reject `latest` image tags and missing image names;
-- non-secret config templates for backend environment and frontend nginx runtime config;
+- secret-backed runtime URL inputs `cloud_ui_database_url` and `cloud_ui_rabbitmq_url`, with
+  `cloud_ui_secret_references` documenting the expected Vault/SecMan lab paths;
+- config templates for backend environment and frontend nginx runtime config; the backend template
+  writes `CLOUD_UI_DATABASE_URL` and `CLOUD_UI_RABBITMQ_URL` from runtime variables and uses
+  `no_log: true`;
 - handler names for later restart integration;
 - `cloud_ui_container_definitions` fact data for later Kolla-Ansible container tasks.
 
-No Kolla-Ansible inventory, remote host, registry credential, runtime secret, DB/MQ credential,
-certificate or live deployment output was added.
+No Kolla-Ansible inventory, remote host, registry credential, runtime secret value, DB/MQ credential
+value, certificate or live deployment output was added. The role fails closed when `cloud_ui_enabled`
+is true and the DB/MQ runtime URLs are not supplied by the approved secret mechanism.
 
 ## External Evidence Status
 
@@ -65,7 +70,9 @@ certificate or live deployment output was added.
   Kolla-Ansible integration. Network ACLs, management-zone placement, unused-interface blocking,
   HAProxy/TLS and runtime inspection remain external E09 evidence.
 - ДКБ-55/56: this slice stores no secret values. Vault/SecMan delivery, Kolla service credentials,
-  MariaDB/RabbitMQ credentials and rotation evidence remain later deployment work.
+  MariaDB/RabbitMQ credentials and rotation evidence remain later deployment work. The role now
+  records `cloud_ui_secret_references` and renders `CLOUD_UI_DATABASE_URL`/`CLOUD_UI_RABBITMQ_URL`
+  only from runtime variables with `no_log: true`; no runtime secret value is committed.
 - ДКБ-82: rollback is repository-only by Git revert in this slice. Live rollback proof remains later
   E09 evidence.
 

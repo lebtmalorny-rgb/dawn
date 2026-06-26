@@ -177,6 +177,60 @@ def test_role_templates_contain_only_non_secret_config() -> None:
         assert forbidden not in combined_templates
 
 
+def test_backend_runtime_env_has_secret_injection_contract() -> None:
+    defaults = load_yaml("deploy/kolla/ansible/roles/cloud_ui/defaults/main.yml")
+    backend_template = read_text(
+        "deploy/kolla/ansible/roles/cloud_ui/templates/cloud-ui-backend.env.j2"
+    )
+    config_tasks = load_yaml_list("deploy/kolla/ansible/roles/cloud_ui/tasks/config.yml")
+    validate_tasks = load_yaml_list(
+        "deploy/kolla/ansible/roles/cloud_ui/tasks/validate.yml"
+    )
+
+    assert defaults["cloud_ui_database_url"] == ""
+    assert defaults["cloud_ui_rabbitmq_url"] == ""
+    assert defaults["cloud_ui_secret_references"] == {
+        "database_url": "kv/cloud-ui/local/mariadb/runtime",
+        "rabbitmq_url": "kv/cloud-ui/local/rabbitmq/runtime",
+    }
+
+    assert "CLOUD_UI_DATABASE_URL={{ cloud_ui_database_url }}" in backend_template
+    assert "CLOUD_UI_RABBITMQ_URL={{ cloud_ui_rabbitmq_url }}" in backend_template
+
+    backend_template_tasks = [
+        task
+        for task in config_tasks
+        if task.get("ansible.builtin.template", {}).get("dest", "").endswith(
+            "cloud-ui-backend.env"
+        )
+    ]
+    assert len(backend_template_tasks) == 1
+    assert backend_template_tasks[0]["no_log"] is True
+
+    validate_thats = []
+    for task in validate_tasks:
+        assert_block = task.get("ansible.builtin.assert") or task.get("assert")
+        if isinstance(assert_block, dict):
+            validate_thats.extend([str(item) for item in assert_block.get("that", [])])
+
+    assert (
+        "not cloud_ui_enabled | bool or cloud_ui_database_url | length > 0"
+        in validate_thats
+    )
+    assert (
+        "not cloud_ui_enabled | bool or cloud_ui_rabbitmq_url | length > 0"
+        in validate_thats
+    )
+
+    role_readme = read_text("deploy/kolla/ansible/README.md")
+    evidence = read_text("docs/generated/e09-kolla-ansible-role.md")
+    for text in (role_readme, evidence):
+        assert "CLOUD_UI_DATABASE_URL" in text
+        assert "CLOUD_UI_RABBITMQ_URL" in text
+        assert "cloud_ui_secret_references" in text
+        assert "no runtime secret value" in text.lower()
+
+
 def test_role_scope_excludes_later_e09_work() -> None:
     assert ROLE_ROOT.exists(), ROLE_ROOT
     combined_role = "\n".join(role_texts().values()).lower()

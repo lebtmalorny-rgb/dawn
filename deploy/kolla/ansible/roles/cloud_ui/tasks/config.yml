@@ -9,11 +9,12 @@
     - cloud-ui-frontend
     - cloud-ui-haproxy
 
-- name: Render Cloud UI backend non-secret environment
+- name: Render Cloud UI backend runtime environment
   ansible.builtin.template:
     src: cloud-ui-backend.env.j2
     dest: "{{ cloud_ui_config_root }}/cloud-ui-backend/cloud-ui-backend.env"
     mode: "0640"
+  no_log: true
   notify:
     - Restart Cloud UI containers
 

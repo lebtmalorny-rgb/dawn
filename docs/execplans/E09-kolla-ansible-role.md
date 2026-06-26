@@ -137,6 +137,19 @@ Included in E09.2:
   - `git diff --check` -> passed.
   - Self-review grep for `password|token|private key|BEGIN|latest|production approved|12 live containers proven`
     found only explanatory text, negative assertions or existing traceability references.
+- [x] 2026-06-26: Runtime DB/MQ secret-injection remediation after live E09.8 readiness diagnostics.
+  - Added RED coverage requiring `cloud_ui_database_url`, `cloud_ui_rabbitmq_url`,
+    `cloud_ui_secret_references`, `CLOUD_UI_DATABASE_URL`, `CLOUD_UI_RABBITMQ_URL`, `no_log: true`
+    backend env rendering and fail-closed validation when `cloud_ui_enabled=true`.
+  - Minimal role update now accepts runtime DB/MQ URLs from the approved secret mechanism and records
+    Vault/SecMan lab paths without committing any runtime secret value.
+  - Verification:
+    `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-runtime-secret-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_*.py -q`
+    -> 71 passed;
+    `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-runtime-secret-venv uv run --python 3.11 --project backend --extra dev ruff check tests/test_e09_kolla_ansible_role.py`
+    -> passed;
+    `./scripts/secret-scan.sh` -> passed;
+    `git diff --check` -> passed.
 
 ## Неожиданные открытия
 
@@ -146,6 +159,9 @@ Included in E09.2:
   package engine range. This is a warning only in the current environment and did not block bootstrap.
 - `uv run` generated local `backend/uv.lock` and `backend/src/cloud_ui.egg-info/` during the test
   environment rebuild; both were removed before committing.
+- 2026-06-26 live E09.8 diagnostics showed Cloud UI API reached MariaDB/RabbitMQ by TCP but failed
+  application auth. The role template did not yet render DB/MQ runtime URLs, so this remediation adds
+  the missing secret-injection contract before any further live reconfigure attempt.
 
 ## Журнал решений
 
