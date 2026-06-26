@@ -10,6 +10,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
+import { CLOUD_MODULE_GROUPS } from "./navigation/cloudModules";
+import { HORIZON_PARITY_ROWS } from "./navigation/horizonParity";
 
 const readyPayload = {
   status: "ok",
@@ -558,6 +560,62 @@ test("renders safe auth error when session payload is malformed", async () => {
   render(<App />);
 
   expect(await screen.findByText("Сессия недоступна")).toBeInTheDocument();
+});
+
+test("cloud module registry exposes the agreed shell groups", () => {
+  expect(CLOUD_MODULE_GROUPS.map((group) => group.key)).toEqual([
+    "inventory",
+    "operations",
+    "administration",
+    "audit_dkb",
+  ]);
+  expect(
+    CLOUD_MODULE_GROUPS.flatMap((group) => group.items).map(
+      (item) => item.key,
+    ),
+  ).toEqual(
+    expect.arrayContaining([
+      "instances",
+      "hypervisors",
+      "networks",
+      "volumes",
+      "mistral_operations",
+      "watcher",
+      "masakari",
+      "horizon_parity",
+      "dkb_evidence",
+    ]),
+  );
+});
+
+test("horizon parity registry keeps source workflows explicit", () => {
+  expect(HORIZON_PARITY_ROWS).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        horizonArea: "Project / Compute / Instances",
+        cloudUiModule: "Inventory / Instances",
+        requiredCapability: "instance.read",
+        status: "implemented",
+      }),
+      expect.objectContaining({
+        horizonArea: "Project / Network / Routers",
+        cloudUiModule: "Inventory / Networks",
+        requiredCapability: "network.read",
+        status: "planned",
+      }),
+      expect.objectContaining({
+        horizonArea: "Admin / Identity / Users",
+        cloudUiModule: "Administration / Identity",
+        requiredCapability: "role.manage",
+        status: "planned",
+      }),
+    ]),
+  );
+  expect(
+    HORIZON_PARITY_ROWS.every(
+      (row) => row.auditEvent.length > 0 && row.dkbNotes.length > 0,
+    ),
+  ).toBe(true);
 });
 
 test("renders inventory navigation only when capabilities allow it", async () => {

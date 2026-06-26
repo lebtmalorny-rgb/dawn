@@ -1,0 +1,58 @@
+import type { HorizonParityRow } from "./types";
+
+export const HORIZON_PARITY_ROWS: HorizonParityRow[] = [
+  {
+    horizonArea: "Project / Compute / Instances",
+    cloudUiModule: "Inventory / Instances",
+    requiredCapability: "instance.read",
+    openStackAuthority: "Nova policy",
+    auditEvent: "inventory.instance.read",
+    dkbNotes: "Browser reads portal API only; backend enforces capability and OpenStack policy.",
+    status: "implemented",
+  },
+  {
+    horizonArea: "Project / Compute / Images",
+    cloudUiModule: "Inventory / Images",
+    requiredCapability: "image.read",
+    openStackAuthority: "Glance policy",
+    auditEvent: "inventory.image.read",
+    dkbNotes: "Planned module; image actions require OpenAPI, audit and negative authorization tests.",
+    status: "planned",
+  },
+  {
+    horizonArea: "Project / Network / Routers",
+    cloudUiModule: "Inventory / Networks",
+    requiredCapability: "network.read",
+    openStackAuthority: "Neutron policy",
+    auditEvent: "inventory.network.read",
+    dkbNotes: "Planned module; no direct Neutron calls from browser.",
+    status: "planned",
+  },
+  {
+    horizonArea: "Project / Volumes / Volumes",
+    cloudUiModule: "Inventory / Volumes",
+    requiredCapability: "volume.read",
+    openStackAuthority: "Cinder policy",
+    auditEvent: "inventory.volume.read",
+    dkbNotes: "Planned module; no Cinder credential in browser.",
+    status: "planned",
+  },
+  {
+    horizonArea: "Admin / Identity / Users",
+    cloudUiModule: "Administration / Identity",
+    requiredCapability: "role.manage",
+    openStackAuthority: "Keystone policy and corporate IAM",
+    auditEvent: "identity.user.read",
+    dkbNotes: "Requires SoD/IAM evidence; portal capability cannot expand Keystone authority.",
+    status: "planned",
+  },
+  {
+    horizonArea: "Admin / Compute / Host Aggregates",
+    cloudUiModule: "Inventory / Host Aggregates",
+    requiredCapability: "hypervisor.read",
+    openStackAuthority: "Nova policy",
+    auditEvent: "inventory.aggregate.read",
+    dkbNotes: "Planned module; mutations require operation workflow and audit.",
+    status: "planned",
+  },
+];
