@@ -718,9 +718,18 @@ test("authenticated inventory view renders inside CloudShell", async () => {
 
 test("shell does not write tokens or identity secrets to browser storage", async () => {
   window.history.pushState({}, "", "/?view=instances");
-  const storageSet = vi.spyOn(Storage.prototype, "setItem");
-  vi.stubGlobal("localStorage", { getItem: vi.fn(() => null) });
-  vi.stubGlobal("sessionStorage", { getItem: vi.fn(() => null) });
+  const storageFrame = document.createElement("iframe");
+  document.body.appendChild(storageFrame);
+  const testLocalStorage = storageFrame.contentWindow?.localStorage;
+  const testSessionStorage = storageFrame.contentWindow?.sessionStorage;
+  expect(testLocalStorage?.clear).toEqual(expect.any(Function));
+  expect(testSessionStorage?.clear).toEqual(expect.any(Function));
+  testLocalStorage?.clear();
+  testSessionStorage?.clear();
+  const localStorageSet = vi.spyOn(testLocalStorage as Storage, "setItem");
+  const sessionStorageSet = vi.spyOn(testSessionStorage as Storage, "setItem");
+  vi.stubGlobal("localStorage", testLocalStorage);
+  vi.stubGlobal("sessionStorage", testSessionStorage);
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url === "/api/v1/session") {
@@ -769,7 +778,11 @@ test("shell does not write tokens or identity secrets to browser storage", async
   expect(
     await screen.findByRole("table", { name: "Таблица ВМ" }),
   ).toBeInTheDocument();
-  expect(storageSet).not.toHaveBeenCalledWith(
+  expect(localStorageSet).not.toHaveBeenCalledWith(
+    expect.stringMatching(/token|password|credential|secret/i),
+    expect.any(String),
+  );
+  expect(sessionStorageSet).not.toHaveBeenCalledWith(
     expect.stringMatching(/token|password|credential|secret/i),
     expect.any(String),
   );
