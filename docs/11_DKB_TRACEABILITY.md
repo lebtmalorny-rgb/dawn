@@ -531,6 +531,28 @@ Evidence paths:
 - `deploy/kolla/scripts/export-ansible-bundle.py`
 - `docs/generated/e09-ansible-sync-bundle.md`
 
+## E09 Ansible remote sync
+
+Обновление требований 2026-06-26: E09 Ansible remote sync records remote-sync-only evidence for the
+approved test Ansible host `192.168.10.15`. The bundle target is
+`/etc/kolla/cloud-ui-sync-bundle`, and a later approved operator run must resolve the role with
+`ANSIBLE_ROLES_PATH=/etc/kolla/cloud-ui-sync-bundle/roles`.
+
+For ДКБ-55/56, this slice copies no runtime secret value and stores no secret material in repository
+evidence. Secret delivery, rotation and DB/MQ auth remediation remain `pending_external_evidence`
+until separately approved test-stand actions produce sanitized proof.
+
+For ДКБ-65/69/70/76/77/80/82, this slice covers copied operator artifacts and checksum verification
+only. It does not prove live reconfigure, migration, twelve containers, HAProxy/TLS, SELinux,
+rollback, registry signing or ДКБ-69 waiver closure; those rows remain
+`pending_external_evidence`.
+
+Evidence paths:
+
+- `tests/test_e09_ansible_remote_sync.py`
+- `deploy/kolla/scripts/sync-ansible-remote-bundle.py`
+- `docs/generated/e09-ansible-remote-sync.md`
+
 ## Полная матрица
 
 | Код | Требование | Исходная оценка | Контур ответственности | Этап | Gate | Рекомендуемая реализация/проверка | Остаточный риск/условие | Доказательство |
