@@ -1,7 +1,7 @@
 # Актуальный реестр рисков
 
-- Stage: E09.1 Kolla image build
-- Last updated: 2026-06-24
+- Stage: UI shell and Horizon parity first slice
+- Last updated: 2026-06-26
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
 ## Снятые или суженные решениями риски
@@ -110,6 +110,12 @@
 | R-068 | E09.8 smoke evidence mistaken for production deployment approval | E09.8 collects sanitized test-stand evidence and may include live `kolla-ansible` command summaries, but it is scoped to the approved test inventory only. | Keep production approval, corporate PKI/mTLS, registry signing, DKB-69 waiver, network-owner ACL proof and rollback execution status explicit in generated evidence before any acceptance claim. | E09 |
 | R-069 | E09 live preflight bundle mistaken for deployment acceptance | The preflight bundle validates inputs and role validation locally, but does not install the custom role on the Ansible host, run live mutating Kolla actions, execute migration, inspect twelve live containers, validate HAProxy/TLS or test rollback. | Keep E09.8 live evidence rows pending until user-approved test-stand actions produce sanitized evidence. | E09 |
 | R-070 | E09 Ansible sync bundle mistaken for live deployment or secret remediation | The local-only export bundle proves repository artifact packaging, checksums and absence of runtime secret value material, but it does not copy the role to the Ansible host, repair DB/MQ auth, run live mutating Kolla actions, inspect containers or test rollback. | Keep remote sync, DB/MQ auth remediation, live reconfigure, 12-container inspection, HAProxy/TLS, SELinux and rollback evidence as `pending_external_evidence` until separately approved test-stand actions produce sanitized proof. | E09 |
+
+## UI shell and Horizon parity risks
+
+| ID | Риск | Текущее положение | Митигация | Stage |
+|---|---|---|---|---|
+| R-072 | UI shell and Horizon parity registry mistaken for implemented Horizon replacement | The first UI slice creates a vSphere-informed shell and static Horizon parity registry, but it does not implement every Horizon workflow, production federation, real Watcher/Masakari workflows, export approvals or DKB compliance evidence. | Keep parity rows, disabled-state reasons, backend/API tests and DKB evidence gates explicit before claiming Horizon replacement or production compliance. | UI/E04/E08 |
 
 ## Immediate priority order
 
