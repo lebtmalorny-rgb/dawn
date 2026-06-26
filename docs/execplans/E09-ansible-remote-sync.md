@@ -80,7 +80,9 @@ committed docs на отсутствие overclaim. Экспортер `deploy/k
 - [x] 2026-06-26: Approved remote copy to
   `192.168.10.15:/etc/kolla/cloud-ui-sync-bundle` completed with helper `--execute`; pull-back
   checksum verification passed and read-only marker returned `remote_bundle_present`.
-- [ ] Final external review and live deployment evidence acceptance remain pending.
+- [x] 2026-06-26: Final local verification passed: targeted pytest `40 passed`, Ruff clean, secret scan
+  clean and `git diff --check` clean.
+- [ ] Live deployment evidence acceptance remains pending.
 
 ## Неожиданные открытия
 
@@ -114,6 +116,10 @@ committed docs на отсутствие overclaim. Экспортер `deploy/k
   `docs/11_DKB_TRACEABILITY.md`.
 - Append R-071 after R-070 in `docs/generated/risk-register.md`.
 - Remove temporary `docs/generated/e09-ansible-remote-sync-local.md` before commit.
+- Execute the approved remote copy with
+  `deploy/kolla/scripts/sync-ansible-remote-bundle.py --bundle-dir /tmp/dawn-e09-ansible-remote-sync-bundle --remote-host 192.168.10.15 --remote-user root --remote-path /etc/kolla/cloud-ui-sync-bundle --evidence docs/generated/e09-ansible-remote-sync.md --execute`.
+- Verify the remote path read-only with
+  `ssh ... 'test -f /etc/kolla/cloud-ui-sync-bundle/manifest.json && test -d /etc/kolla/cloud-ui-sync-bundle/roles/cloud_ui && test -f /etc/kolla/cloud-ui-sync-bundle/playbooks/cloud-ui-preflight.yml && printf remote_bundle_present'`.
 
 ## Миграции и совместимость
 
@@ -124,14 +130,14 @@ bundle directory because the exporter requires an empty output directory.
 
 ## Проверка
 
-Run from `/Users/dmitry/Desktop/dawn/.worktrees/e09-ansible-remote-sync`:
+Final run from `/Users/dmitry/Desktop/dawn/.worktrees/e09-ansible-remote-sync`:
 
-- `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-remote-sync-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_ansible_remote_sync.py -q`
-- `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-remote-sync-venv uv run --python 3.11 --project backend --extra dev ruff check tests/test_e09_ansible_remote_sync.py deploy/kolla/scripts/sync-ansible-remote-bundle.py`
-- `./scripts/secret-scan.sh`
-- `git diff --check`
+- `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-remote-sync-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_ansible_remote_sync.py tests/test_e09_ansible_sync_bundle.py tests/test_e09_deployment_smoke_evidence.py -q` -> `40 passed`.
+- `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-remote-sync-venv uv run --python 3.11 --project backend --extra dev ruff check tests/test_e09_ansible_remote_sync.py deploy/kolla/scripts/sync-ansible-remote-bundle.py` -> `All checks passed!`.
+- `./scripts/secret-scan.sh` -> exit `0`.
+- `git diff --check` -> exit `0`.
 
-Expected result: all commands exit 0. No `kolla` live command is required or allowed for this plan.
+No `kolla` live command was run.
 
 ## Доказательства
 
@@ -141,15 +147,22 @@ Expected result: all commands exit 0. No `kolla` live command is required or all
 - `tests/test_e09_ansible_remote_sync.py`
 - `deploy/kolla/scripts/sync-ansible-remote-bundle.py`
 - Dry-run helper output showing command shape only and no `--execute`.
+- `docs/generated/e09-ansible-remote-sync.md` refreshed after helper `--execute` with backup path
+  `/etc/kolla/cloud-ui-sync-bundle.backup-20260626T132956Z` and remote path file count `14`.
+- Read-only remote marker `remote_bundle_present`.
 
 ## Откат и восстановление
 
-Safe rollback is `git revert <commit>` for the documentation commit. If only local generated side
-effects need cleanup, remove `/tmp/dawn-e09-ansible-remote-sync-bundle` and
-`docs/generated/e09-ansible-remote-sync-local.md`. No remote state exists from this task.
+Repository rollback is `git revert` of this branch's commits. Remote rollback for the approved
+test-stand copy is path-scoped: on `192.168.10.15`, restore
+`/etc/kolla/cloud-ui-sync-bundle.backup-20260626T132956Z` to
+`/etc/kolla/cloud-ui-sync-bundle`, or remove `/etc/kolla/cloud-ui-sync-bundle` if the backup is not
+needed. Do not modify other Kolla paths. If only local generated side effects need cleanup, remove
+`/tmp/dawn-e09-ansible-remote-sync-bundle` and `docs/generated/e09-ansible-remote-sync-local.md`.
 
 ## Итог и остаточные риски
 
-Task 3 creates local docs/evidence for an approved remote-sync request shape only. It does not prove
-remote copy, DB/MQ auth remediation, migration, live reconfigure, 12-container inspection, HAProxy/TLS,
-SELinux hardening, registry signing, DKB-69 waiver closure, rollback or production deployment.
+This slice copied and verified the Cloud UI Ansible sync bundle on the approved test Ansible host.
+It does not prove DB/MQ auth remediation, migration, live reconfigure, 12-container inspection,
+HAProxy/TLS, SELinux hardening, registry signing, DKB-69 waiver closure, rollback execution or
+production deployment.
