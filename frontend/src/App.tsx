@@ -48,6 +48,8 @@ import {
   requestAuditExport,
   submitOperation,
 } from "./api";
+import type { ShellContext } from "./navigation/types";
+import { CloudShell } from "./shell/CloudShell";
 import "./styles.css";
 
 const READINESS_UNAVAILABLE_MESSAGE = "Готовность API недоступна";
@@ -223,6 +225,74 @@ const INVENTORY_FILTER_KEYS = [
   "service_state",
   "maintenance_status",
 ] as const;
+
+function buildShellContext(
+  authState: AuthState,
+  capabilities: Capabilities | null,
+  readiness: LoadState,
+): ShellContext {
+  const identityLabel =
+    authState.type === "authenticated"
+      ? authState.subject.display_name
+      : "anonymous";
+  const scopeLabel =
+    capabilities === null
+      ? "Scope: unknown"
+      : `Scope: ${capabilities.scope.type}${
+          capabilities.scope.id ? ` / ${capabilities.scope.id}` : ""
+        }`;
+  const policyRevision =
+    capabilities === null
+      ? "Policy rev unknown"
+      : `Policy rev ${capabilities.policy_revision}`;
+  const freshnessLabel =
+    readiness.type === "ready"
+      ? `API readiness: ${readiness.readiness.status}`
+      : "API readiness unknown";
+
+  return {
+    productTitle: "Cloud UI",
+    searchPlaceholder:
+      "Search in all clouds, projects, hosts, VMs, operations",
+    scopeLabel,
+    identityLabel,
+    policyRevision,
+    freshnessLabel,
+  };
+}
+
+function objectTitleForView(view: PortalView | InventoryView | null): string {
+  if (view === "hypervisors") return "Гипервизоры";
+  if (view === "groups") return "Группы";
+  if (view === "operations") return "Операции";
+  if (view === "audit") return "Аудит";
+  return "ВМ";
+}
+
+function objectTypeForView(view: PortalView | InventoryView | null): string {
+  if (view === "hypervisors") return "Inventory / Hypervisors";
+  if (view === "groups") return "Resource groups";
+  if (view === "operations") return "Mistral operation center";
+  if (view === "audit") return "Audit and evidence";
+  return "Inventory / Instances";
+}
+
+function objectTabsForView(view: PortalView | InventoryView | null): string[] {
+  if (view === "audit") return ["Summary", "Audit Tail", "Exports"];
+  if (view === "operations") {
+    return ["Summary", "Catalog", "Executions", "Approvals", "Audit"];
+  }
+  if (view === "groups") return ["Summary", "Members", "Rules", "Audit"];
+  return [
+    "Summary",
+    "Monitor",
+    "Configure",
+    "Permissions",
+    "VMs",
+    "Operations",
+    "Audit",
+  ];
+}
 
 export function App() {
   const [state, setState] = useState<LoadState>({ type: "loading" });
@@ -831,6 +901,56 @@ export function App() {
     }
   }
 
+  const authenticatedWorkArea =
+    authState.type !== "authenticated" || authState.capabilities === null
+      ? null
+      : activePortalView === "groups" ? (
+          <GroupsWorkArea
+            capabilities={authState.capabilities}
+            detailState={groupDetailState}
+            locationSearch={locationSearch}
+            onGroupInventoryOpen={handleGroupInventoryOpen}
+            onGroupSelect={handleGroupSelect}
+            state={groupState}
+          />
+        ) : activePortalView === "operations" ? (
+          <OperationsWorkArea
+            capabilities={authState.capabilities}
+            csrf={authState.csrf}
+            detailState={operationDetailState}
+            onOperationSubmitted={handleOperationSubmitted}
+            selectedOperationId={selectedOperationId}
+            state={workflowDefinitionsState}
+          />
+        ) : activePortalView === "audit" ? (
+          <AuditWorkArea
+            capabilities={authState.capabilities}
+            csrf={authState.csrf}
+            exportState={auditExportState}
+            onAuditExport={handleAuditExport}
+            onAuditNextPage={handleAuditNextPage}
+            state={auditState}
+          />
+        ) : (
+          <InventoryWorkArea
+            activeView={activeInventoryView}
+            capabilities={authState.capabilities}
+            locationSearch={locationSearch}
+            modulesState={inventoryModulesState}
+            onInventoryLinkSelect={handleInventoryLinkSelect}
+            onInventoryNextPage={handleInventoryNextPage}
+            onInventoryViewSelect={handleInventoryViewSelect}
+            state={inventoryState}
+          />
+        );
+  const shellContext = buildShellContext(authState, currentCapabilities, state);
+  const shellView =
+    activePortalView === "inventory" ? activeInventoryView : activePortalView;
+  const shellActiveView = shellView ?? "instances";
+  const shellObjectTitle = objectTitleForView(shellView);
+  const shellObjectType = objectTypeForView(shellView);
+  const shellTabs = objectTabsForView(shellView);
+
   return (
     <Page>
       <PageSection className="cloud-ui-page">
@@ -1020,55 +1140,17 @@ export function App() {
           </div>
 
           {authState.type === "authenticated" &&
-            activePortalView === "groups" && (
-              <GroupsWorkArea
-                capabilities={authState.capabilities}
-                detailState={groupDetailState}
-                locationSearch={locationSearch}
-                onGroupInventoryOpen={handleGroupInventoryOpen}
-                onGroupSelect={handleGroupSelect}
-                state={groupState}
-              />
-            )}
-
-          {authState.type === "authenticated" &&
-            activePortalView === "operations" && (
-              <OperationsWorkArea
-                capabilities={authState.capabilities}
-                csrf={authState.csrf}
-                detailState={operationDetailState}
-                onOperationSubmitted={handleOperationSubmitted}
-                selectedOperationId={selectedOperationId}
-                state={workflowDefinitionsState}
-              />
-            )}
-
-          {authState.type === "authenticated" &&
-            activePortalView === "audit" && (
-              <AuditWorkArea
-                capabilities={authState.capabilities}
-                csrf={authState.csrf}
-                exportState={auditExportState}
-                onAuditExport={handleAuditExport}
-                onAuditNextPage={handleAuditNextPage}
-                state={auditState}
-              />
-            )}
-
-          {authState.type === "authenticated" &&
-            activePortalView !== "groups" &&
-            activePortalView !== "operations" &&
-            activePortalView !== "audit" && (
-              <InventoryWorkArea
-                activeView={activeInventoryView}
-                capabilities={authState.capabilities}
-                locationSearch={locationSearch}
-                modulesState={inventoryModulesState}
-                onInventoryLinkSelect={handleInventoryLinkSelect}
-                onInventoryNextPage={handleInventoryNextPage}
-                onInventoryViewSelect={handleInventoryViewSelect}
-                state={inventoryState}
-              />
+            authState.capabilities !== null &&
+            authenticatedWorkArea !== null && (
+              <CloudShell
+                context={shellContext}
+                activeView={shellActiveView}
+                objectTitle={shellObjectTitle}
+                objectType={shellObjectType}
+                tabs={shellTabs}
+              >
+                {authenticatedWorkArea}
+              </CloudShell>
             )}
         </div>
       </PageSection>

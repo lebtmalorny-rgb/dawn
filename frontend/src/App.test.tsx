@@ -533,8 +533,11 @@ test("logs in through BFF and hides forbidden role management action", async () 
   await user.type(screen.getByLabelText("Код доступа"), "operator-code");
   await user.click(screen.getByRole("button", { name: "Войти" }));
 
-  expect(await screen.findByText("Оператор облака")).toBeInTheDocument();
-  expect(screen.getByText("Операции")).toBeInTheDocument();
+  expect(await screen.findAllByText("Оператор облака")).not.toHaveLength(0);
+  const portalNav = screen.getByRole("navigation", { name: "Разделы портала" });
+  expect(
+    within(portalNav).getByRole("link", { name: "Операции" }),
+  ).toBeInTheDocument();
   expect(screen.queryByText("Управление ролями")).not.toBeInTheDocument();
   expect(storageSet).not.toHaveBeenCalled();
 });
@@ -640,6 +643,78 @@ test("horizon parity registry keeps source workflows explicit", () => {
   ).toBe(true);
 });
 
+test("authenticated inventory view renders inside CloudShell", async () => {
+  window.history.pushState({}, "", "/?view=instances");
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(
+        capabilitiesPayload([
+          "instance.read",
+          "hypervisor.read",
+          "group.read",
+          "operation.read",
+          "audit.read",
+        ]),
+      );
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/instances?limit=50&sort=name.asc") {
+      expect(init).toEqual(
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      return jsonResponse(
+        inventoryPage([
+          instanceItem({
+            name: "vm-prod-api-01",
+            project_id: "project-a",
+            user_id: "user-a",
+            power_state: "RUNNING",
+            vm_state: "active",
+            host_name: "compute-03",
+            hypervisor_id: "hyp-03",
+            availability_zone: "az1",
+            flavor_id: "m1.small",
+            image_id: "image-1",
+            addresses: {},
+          }),
+        ]),
+      );
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(await screen.findByRole("banner")).toHaveTextContent("Cloud UI");
+  expect(
+    screen.getByRole("navigation", { name: "Объекты облака" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "ВМ" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "Нижняя рабочая панель" }),
+  ).toHaveTextContent("Recent Tasks");
+  expect(
+    await screen.findByRole("table", { name: "Таблица ВМ" }),
+  ).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/v1/instances?limit=50&sort=name.asc",
+    expect.objectContaining({ signal: expect.any(AbortSignal) }),
+  );
+  expect(
+    fetchMock.mock.calls.some(([input]) => String(input).includes("openstack")),
+  ).toBe(false);
+});
+
 test("renders inventory navigation only when capabilities allow it", async () => {
   vi.stubGlobal(
     "fetch",
@@ -663,8 +738,13 @@ test("renders inventory navigation only when capabilities allow it", async () =>
 
   render(<App />);
 
-  expect(await screen.findByText("ВМ")).toBeInTheDocument();
-  expect(screen.queryByText("Гипервизоры")).not.toBeInTheDocument();
+  const inventoryNav = await screen.findByRole("navigation", {
+    name: "Разделы инвентаря",
+  });
+  expect(within(inventoryNav).getByRole("link", { name: "ВМ" })).toBeInTheDocument();
+  expect(
+    within(inventoryNav).queryByRole("link", { name: "Гипервизоры" }),
+  ).not.toBeInTheDocument();
 });
 
 test("renders groups navigation for group read capability", async () => {
@@ -688,11 +768,14 @@ test("renders groups navigation for group read capability", async () => {
 
   render(<App />);
 
+  const portalNav = await screen.findByRole("navigation", {
+    name: "Разделы портала",
+  });
   expect(
-    await screen.findByRole("link", { name: "Группы" }),
+    within(portalNav).getByRole("link", { name: "Группы" }),
   ).toBeInTheDocument();
   expect(await screen.findByText("Prod VMs")).toBeInTheDocument();
-  expect(screen.queryByRole("link", { name: "ВМ" })).not.toBeInTheDocument();
+  expect(within(portalNav).queryByRole("link", { name: "ВМ" })).not.toBeInTheDocument();
 });
 
 test("renders operations catalog for operation read capability", async () => {
@@ -773,7 +856,12 @@ test("audit view fetches a server-side page and follows next cursor", async () =
 
   render(<App />);
 
-  expect(await screen.findByRole("link", { name: "Аудит" })).toBeInTheDocument();
+  const portalNav = await screen.findByRole("navigation", {
+    name: "Разделы портала",
+  });
+  expect(
+    within(portalNav).getByRole("link", { name: "Аудит" }),
+  ).toBeInTheDocument();
   const auditTable = await screen.findByRole("table", {
     name: "Таблица аудита",
   });
@@ -816,7 +904,8 @@ test("audit navigation is hidden without audit read capability", async () => {
   render(<App />);
 
   expect(await screen.findByText("Host maintenance precheck")).toBeInTheDocument();
-  expect(screen.queryByRole("link", { name: "Аудит" })).not.toBeInTheDocument();
+  const portalNav = screen.getByRole("navigation", { name: "Разделы портала" });
+  expect(within(portalNav).queryByRole("link", { name: "Аудит" })).not.toBeInTheDocument();
 });
 
 test("audit export is separated from audit read and uses csrf", async () => {
@@ -1690,7 +1779,10 @@ test("aborts superseded inventory requests when changing inventory view", async 
 
   render(<App />);
 
-  await user.click(await screen.findByRole("link", { name: "Гипервизоры" }));
+  const inventoryNav = await screen.findByRole("navigation", {
+    name: "Разделы инвентаря",
+  });
+  await user.click(within(inventoryNav).getByRole("link", { name: "Гипервизоры" }));
 
   expect(await screen.findByText("compute-after-abort")).toBeInTheDocument();
   expect(inventorySignals[0]).not.toBeNull();
