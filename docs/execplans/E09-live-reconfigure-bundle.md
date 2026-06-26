@@ -14,7 +14,7 @@ This plan creates static Ansible/operator artifacts and tests. It does not run l
 - [x] RED tests.
 - [x] Bundle artifacts.
 - [x] Evidence and traceability.
-- [ ] Verification and review.
+- [x] Verification and review.
 
 ## Verification
 
