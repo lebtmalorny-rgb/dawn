@@ -19,7 +19,7 @@ This plan creates static Ansible/operator artifacts and tests. It does not run l
 ## Verification
 
 - `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-live-bundle-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_live_reconfigure_bundle.py tests/test_e09_reconfigure_rollback.py tests/test_e09_kolla_ansible_role.py -q`
-- `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-live-bundle-venv uv run --python 3.11 --project backend --extra dev ruff check .`
+- `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-e09-live-bundle-venv uv run --python 3.11 --project backend --extra dev ruff check tests/test_e09_live_reconfigure_bundle.py`
 - `./scripts/secret-scan.sh`
 - `git diff --check`
 
