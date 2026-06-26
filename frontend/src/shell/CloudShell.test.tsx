@@ -34,15 +34,17 @@ describe("CloudShell", () => {
       "placeholder",
       shellContext.searchPlaceholder,
     );
+    expect(screen.getByRole("searchbox", { name: "Глобальный поиск" })).toBeDisabled();
+    expect(screen.getByText("Поиск запланирован")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Обновление данных запланировано для следующего этапа" }),
     ).toBeDisabled();
     expect(screen.getByRole("navigation", { name: "Объекты облака" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "compute-03" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Summary" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    const objectSections = screen.getByRole("navigation", { name: "Разделы объекта" });
+    expect(within(objectSections).queryAllByRole("button")).toHaveLength(0);
+    expect(within(objectSections).queryAllByRole("link")).toHaveLength(0);
+    expect(within(objectSections).getByText("Summary")).toHaveAttribute("aria-current", "page");
     expect(
       screen.getByRole("button", { name: "Действия объекта запланированы для следующего этапа" }),
     ).toBeDisabled();
@@ -55,7 +57,7 @@ describe("CloudShell", () => {
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });
 
-  test("bottom panel exposes static operations, audit and approvals controls", () => {
+  test("bottom panel exposes static operations, audit and approvals status labels", () => {
     render(
       <CloudShell
         context={shellContext}
@@ -69,13 +71,13 @@ describe("CloudShell", () => {
     );
 
     const bottomPanel = screen.getByRole("region", { name: "Нижняя рабочая панель" });
-    expect(within(bottomPanel).getByRole("button", { name: "Recent Tasks" })).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
-    expect(within(bottomPanel).getByRole("button", { name: "Alarms" })).toBeInTheDocument();
-    expect(within(bottomPanel).getByRole("button", { name: "Audit Tail" })).toBeInTheDocument();
-    expect(within(bottomPanel).getByRole("button", { name: "Approvals" })).toBeInTheDocument();
+    expect(within(bottomPanel).queryAllByRole("button")).toHaveLength(0);
+    expect(within(bottomPanel).queryByRole("tablist")).not.toBeInTheDocument();
+    expect(within(bottomPanel).queryAllByRole("tab")).toHaveLength(0);
+    expect(within(bottomPanel).getByText("Recent Tasks")).toHaveAttribute("aria-current", "true");
+    expect(within(bottomPanel).getByText("Alarms")).toBeInTheDocument();
+    expect(within(bottomPanel).getByText("Audit Tail")).toBeInTheDocument();
+    expect(within(bottomPanel).getByText("Approvals")).toBeInTheDocument();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });

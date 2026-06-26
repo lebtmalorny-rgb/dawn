@@ -5,14 +5,13 @@ export function BottomWorkPanel() {
     <section className="cloud-ui-bottom-panel" aria-label="Нижняя рабочая панель">
       <div className="cloud-ui-bottom-tabs" aria-label="Рабочие события">
         {BOTTOM_PANEL_TABS.map((tab, index) => (
-          <button
+          <span
             key={tab}
-            type="button"
             aria-current={index === 0 ? "true" : undefined}
             className={index === 0 ? "cloud-ui-bottom-tab-active" : undefined}
           >
             {tab}
-          </button>
+          </span>
         ))}
       </div>
       <div className="cloud-ui-bottom-empty">

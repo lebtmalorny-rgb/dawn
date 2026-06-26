@@ -21,10 +21,15 @@ export function TopChrome({ context }: TopChromeProps) {
         <span className="cloud-ui-sr-only">Глобальный поиск</span>
         <input
           aria-label="Глобальный поиск"
+          aria-describedby="cloud-ui-global-search-planned"
+          disabled
           type="search"
           placeholder={context.searchPlaceholder}
         />
       </label>
+      <span id="cloud-ui-global-search-planned" className="cloud-ui-planned-marker">
+        Поиск запланирован
+      </span>
       <button
         className="cloud-ui-icon-button"
         type="button"

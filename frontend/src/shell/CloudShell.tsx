@@ -50,9 +50,9 @@ export function CloudShell({
           </div>
           <nav className="cloud-ui-object-tabs" aria-label="Разделы объекта">
             {tabs.map((tab, index) => (
-              <button key={tab} type="button" aria-current={index === 0 ? "page" : undefined}>
+              <span key={tab} aria-current={index === 0 ? "page" : undefined}>
                 {tab}
-              </button>
+              </span>
             ))}
           </nav>
           <div className="cloud-ui-workbench-content">{children}</div>
