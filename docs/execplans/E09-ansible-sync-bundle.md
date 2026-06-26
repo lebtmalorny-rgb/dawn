@@ -16,7 +16,7 @@ claim E09 deployment acceptance.
 - [x] RED contract tests.
 - [x] Exporter implementation.
 - [x] Evidence and traceability.
-- [ ] Verification and review.
+- [x] Verification and review.
 
 ## Verification
 
