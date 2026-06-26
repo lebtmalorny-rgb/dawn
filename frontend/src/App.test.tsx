@@ -12,6 +12,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { App } from "./App";
 import { CLOUD_MODULE_GROUPS } from "./navigation/cloudModules";
 import { HORIZON_PARITY_ROWS } from "./navigation/horizonParity";
+import { BottomWorkPanel } from "./shell/BottomWorkPanel";
 
 const readyPayload = {
   status: "ok",
@@ -713,6 +714,85 @@ test("authenticated inventory view renders inside CloudShell", async () => {
   expect(
     fetchMock.mock.calls.some(([input]) => String(input).includes("openstack")),
   ).toBe(false);
+});
+
+test("shell does not write tokens or identity secrets to browser storage", async () => {
+  window.history.pushState({}, "", "/?view=instances");
+  const storageSet = vi.spyOn(Storage.prototype, "setItem");
+  vi.stubGlobal("localStorage", { getItem: vi.fn(() => null) });
+  vi.stubGlobal("sessionStorage", { getItem: vi.fn(() => null) });
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(
+        capabilitiesPayload(["instance.read", "hypervisor.read", "operation.read"]),
+      );
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/instances?limit=50&sort=name.asc") {
+      expect(init).toEqual(
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      return jsonResponse(
+        inventoryPage([
+          instanceItem({
+            name: "vm-prod-api-01",
+            project_id: "project-a",
+            user_id: "user-a",
+            power_state: "RUNNING",
+            vm_state: "active",
+            host_name: "compute-03",
+            hypervisor_id: "hyp-03",
+            availability_zone: "az1",
+            flavor_id: "m1.small",
+            image_id: "image-1",
+            addresses: {},
+          }),
+        ]),
+      );
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(await screen.findByRole("banner")).toHaveTextContent("Cloud UI");
+  expect(
+    await screen.findByRole("table", { name: "Таблица ВМ" }),
+  ).toBeInTheDocument();
+  expect(storageSet).not.toHaveBeenCalledWith(
+    expect.stringMatching(/token|password|credential|secret/i),
+    expect.any(String),
+  );
+  expect(window.localStorage.getItem("keystone_token")).toBeNull();
+  expect(window.sessionStorage.getItem("keystone_token")).toBeNull();
+  expect(
+    fetchMock.mock.calls.some(([input]) => String(input).includes("openstack")),
+  ).toBe(false);
+});
+
+test("bottom panel states that audit tail and approvals are planned when backend data is absent", () => {
+  render(
+    <BottomWorkPanel auditTailState="planned" approvalsState="planned" />,
+  );
+
+  const bottomPanel = screen.getByRole("region", {
+    name: "Нижняя рабочая панель",
+  });
+  expect(bottomPanel).toHaveTextContent("Audit Tail planned");
+  expect(bottomPanel).toHaveTextContent("Approvals planned");
+  expect(within(bottomPanel).queryAllByRole("button")).toHaveLength(0);
+  expect(within(bottomPanel).queryByRole("tablist")).not.toBeInTheDocument();
+  expect(within(bottomPanel).queryAllByRole("tab")).toHaveLength(0);
 });
 
 test("authenticated user without accessible portal sections does not mount CloudShell", async () => {
