@@ -7,9 +7,10 @@ const STATUS_LABELS = {
 
 type ObjectNavigatorProps = {
   activeView: string;
+  capabilities: string[];
 };
 
-export function ObjectNavigator({ activeView }: ObjectNavigatorProps) {
+export function ObjectNavigator({ activeView, capabilities }: ObjectNavigatorProps) {
   return (
     <nav className="cloud-ui-object-navigator" aria-label="Объекты облака">
       <div className="cloud-ui-object-mode-strip" aria-label="Режимы навигации">
@@ -25,23 +26,37 @@ export function ObjectNavigator({ activeView }: ObjectNavigatorProps) {
             <ul>
               {group.items.map((item) => {
                 const reasonId = `cloud-ui-module-reason-${item.key}`;
+                const missingCapability =
+                  item.requiredCapability !== null &&
+                  !capabilities.includes(item.requiredCapability);
+                const canOpenImplementedModule =
+                  item.status === "implemented" && !missingCapability;
 
-                if (item.status !== "implemented") {
+                if (!canOpenImplementedModule) {
+                  const disabledStatus: keyof typeof STATUS_LABELS = missingCapability
+                    ? "disabled"
+                    : item.status === "disabled"
+                      ? "disabled"
+                      : "planned";
+                  const reason = missingCapability
+                    ? `Требуется capability: ${item.requiredCapability}`
+                    : item.reason;
+
                   return (
                     <li key={item.key}>
                       <span
                         className="cloud-ui-object-tree-item cloud-ui-object-tree-item-disabled"
                         aria-disabled="true"
                         aria-describedby={reasonId}
-                        data-status={item.status}
+                        data-status={disabledStatus}
                       >
                         <span>{item.title}</span>
                         <span className="cloud-ui-object-tree-status">
-                          {STATUS_LABELS[item.status]}
+                          {STATUS_LABELS[disabledStatus]}
                         </span>
                       </span>
                       <span id={reasonId} className="cloud-ui-object-tree-reason">
-                        {item.reason}
+                        {reason}
                       </span>
                     </li>
                   );

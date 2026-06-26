@@ -8,6 +8,7 @@ import { TopChrome } from "./TopChrome";
 type CloudShellProps = {
   context: ShellContext;
   activeView: string;
+  capabilities: string[];
   objectTitle: string;
   objectType: string;
   tabs: string[];
@@ -17,6 +18,7 @@ type CloudShellProps = {
 export function CloudShell({
   context,
   activeView,
+  capabilities,
   objectTitle,
   objectType,
   tabs,
@@ -26,7 +28,7 @@ export function CloudShell({
     <div className="cloud-ui-shell-v2">
       <TopChrome context={context} />
       <div className="cloud-ui-shell-body">
-        <ObjectNavigator activeView={activeView} />
+        <ObjectNavigator activeView={activeView} capabilities={capabilities} />
         <main className="cloud-ui-workbench" id="main-content">
           <div className="cloud-ui-object-header">
             <div className="cloud-ui-object-icon" aria-hidden="true">

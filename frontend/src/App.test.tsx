@@ -715,6 +715,39 @@ test("authenticated inventory view renders inside CloudShell", async () => {
   ).toBe(false);
 });
 
+test("authenticated user without accessible portal sections does not mount CloudShell", async () => {
+  window.history.pushState({}, "", "/?view=instances");
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(capabilitiesPayload([]));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(
+    await screen.findByText("Нет доступных разделов портала"),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("navigation", { name: "Объекты облака" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "ВМ" })).not.toBeInTheDocument();
+  expect(
+    fetchMock.mock.calls.some(([input]) =>
+      String(input).startsWith("/api/v1/instances"),
+    ),
+  ).toBe(false);
+});
+
 test("renders inventory navigation only when capabilities allow it", async () => {
   vi.stubGlobal(
     "fetch",
@@ -776,6 +809,17 @@ test("renders groups navigation for group read capability", async () => {
   ).toBeInTheDocument();
   expect(await screen.findByText("Prod VMs")).toBeInTheDocument();
   expect(within(portalNav).queryByRole("link", { name: "ВМ" })).not.toBeInTheDocument();
+  const objectNav = screen.getByRole("navigation", { name: "Объекты облака" });
+  expect(within(objectNav).queryByRole("link", { name: "ВМ" })).not.toBeInTheDocument();
+  expect(
+    within(objectNav).queryByRole("link", { name: "Гипервизоры" }),
+  ).not.toBeInTheDocument();
+  const vmItem = within(objectNav).getByText("ВМ").closest("li");
+  expect(vmItem).not.toBeNull();
+  expect(within(vmItem as HTMLElement).getByText("Недоступно")).toBeInTheDocument();
+  expect(
+    within(vmItem as HTMLElement).getByText("Требуется capability: instance.read"),
+  ).toBeInTheDocument();
 });
 
 test("renders operations catalog for operation read capability", async () => {
@@ -807,6 +851,11 @@ test("renders operations catalog for operation read capability", async () => {
   expect(screen.getByText("workflow.execute.maintenance-host")).toBeInTheDocument();
   expect(screen.getByLabelText("Хост")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Запустить precheck" })).toBeDisabled();
+  const objectNav = screen.getByRole("navigation", { name: "Объекты облака" });
+  expect(within(objectNav).queryByRole("link", { name: "ВМ" })).not.toBeInTheDocument();
+  expect(
+    within(objectNav).queryByRole("link", { name: "Гипервизоры" }),
+  ).not.toBeInTheDocument();
 });
 
 test("audit view fetches a server-side page and follows next cursor", async () => {

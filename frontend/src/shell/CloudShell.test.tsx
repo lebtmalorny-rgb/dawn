@@ -18,6 +18,7 @@ describe("CloudShell", () => {
       <CloudShell
         context={shellContext}
         activeView="instances"
+        capabilities={["instance.read", "hypervisor.read", "operation.read", "audit.read"]}
         objectTitle="compute-03"
         objectType="Hypervisor"
         tabs={["Summary", "Monitor", "Configure", "Permissions", "VMs", "Operations", "Audit"]}
@@ -62,6 +63,7 @@ describe("CloudShell", () => {
       <CloudShell
         context={shellContext}
         activeView="audit"
+        capabilities={["instance.read", "hypervisor.read", "operation.read", "audit.read"]}
         objectTitle="Audit"
         objectType="Evidence"
         tabs={["Summary", "Audit"]}
@@ -87,6 +89,7 @@ describe("CloudShell", () => {
       <CloudShell
         context={shellContext}
         activeView="instances"
+        capabilities={["instance.read", "hypervisor.read", "operation.read", "audit.read"]}
         objectTitle="compute-03"
         objectType="Hypervisor"
         tabs={["Summary"]}
@@ -105,6 +108,31 @@ describe("CloudShell", () => {
     expect(within(watcherItem as HTMLElement).getByText("Запланировано")).toBeInTheDocument();
     expect(
       screen.getByText("First-class module planned; direct action apply remains approval-gated"),
+    ).toBeInTheDocument();
+  });
+
+  test("implemented modules without required capability are visible but disabled", () => {
+    render(
+      <CloudShell
+        context={shellContext}
+        activeView="groups"
+        capabilities={["group.read"]}
+        objectTitle="Группы"
+        objectType="Resource groups"
+        tabs={["Summary"]}
+      >
+        <span>Groups table</span>
+      </CloudShell>,
+    );
+
+    expect(screen.queryByRole("link", { name: "ВМ" })).not.toBeInTheDocument();
+    const vmItem = screen.getByText("ВМ").closest("li");
+    expect(vmItem).not.toBeNull();
+    expect(within(vmItem as HTMLElement).getByText("ВМ").closest("[aria-disabled='true']"))
+      .toHaveAttribute("data-status", "disabled");
+    expect(within(vmItem as HTMLElement).getByText("Недоступно")).toBeInTheDocument();
+    expect(
+      within(vmItem as HTMLElement).getByText("Требуется capability: instance.read"),
     ).toBeInTheDocument();
   });
 });

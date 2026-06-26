@@ -904,6 +904,8 @@ export function App() {
   const authenticatedWorkArea =
     authState.type !== "authenticated" || authState.capabilities === null
       ? null
+      : activePortalView === null
+        ? null
       : activePortalView === "groups" ? (
           <GroupsWorkArea
             capabilities={authState.capabilities}
@@ -1016,77 +1018,85 @@ export function App() {
                           <Spinner aria-label="Загрузка прав" size="md" />
                         </Bullseye>
                       ) : (
-                        hasSessionNavigation(authState.capabilities) && (
-                          <nav
-                            aria-label="Разделы портала"
-                            className="cloud-ui-nav"
-                          >
-                            {authState.capabilities.capabilities.includes(
-                              "group.read",
-                            ) && (
-                              <a
-                                aria-current={
-                                  activePortalView === "groups"
-                                    ? "page"
-                                    : undefined
-                                }
-                                className="cloud-ui-nav-item"
-                                href={groupViewHref(locationSearch)}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  handleGroupViewSelect();
-                                }}
-                              >
-                                Группы
-                              </a>
-                            )}
-                            {authState.capabilities.capabilities.includes(
-                              "operation.read",
-                            ) && (
-                              <a
-                                aria-current={
-                                  activePortalView === "operations"
-                                    ? "page"
-                                    : undefined
-                                }
-                                className="cloud-ui-nav-item"
-                                href={operationsViewHref(locationSearch)}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  handleOperationsViewSelect();
-                                }}
-                              >
-                                Операции
-                              </a>
-                            )}
-                            {authState.capabilities.capabilities.includes(
-                              "audit.read",
-                            ) && (
-                              <a
-                                aria-current={
-                                  activePortalView === "audit"
-                                    ? "page"
-                                    : undefined
-                                }
-                                className="cloud-ui-nav-item"
-                                href={auditViewHref(locationSearch)}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  handleAuditViewSelect();
-                                }}
-                              >
-                                Аудит
-                              </a>
-                            )}
-                            {authState.capabilities.capabilities.includes(
-                              "role.manage",
-                            ) && (
-                              <span className="cloud-ui-nav-item">
-                                Управление ролями
-                              </span>
-                            )}
-                          </nav>
-                        )
+                        <>
+                          {activePortalView === null && (
+                            <Alert
+                              variant="warning"
+                              title="Нет доступных разделов портала"
+                            />
+                          )}
+                          {hasSessionNavigation(authState.capabilities) && (
+                            <nav
+                              aria-label="Разделы портала"
+                              className="cloud-ui-nav"
+                            >
+                              {authState.capabilities.capabilities.includes(
+                                "group.read",
+                              ) && (
+                                <a
+                                  aria-current={
+                                    activePortalView === "groups"
+                                      ? "page"
+                                      : undefined
+                                  }
+                                  className="cloud-ui-nav-item"
+                                  href={groupViewHref(locationSearch)}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    handleGroupViewSelect();
+                                  }}
+                                >
+                                  Группы
+                                </a>
+                              )}
+                              {authState.capabilities.capabilities.includes(
+                                "operation.read",
+                              ) && (
+                                <a
+                                  aria-current={
+                                    activePortalView === "operations"
+                                      ? "page"
+                                      : undefined
+                                  }
+                                  className="cloud-ui-nav-item"
+                                  href={operationsViewHref(locationSearch)}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    handleOperationsViewSelect();
+                                  }}
+                                >
+                                  Операции
+                                </a>
+                              )}
+                              {authState.capabilities.capabilities.includes(
+                                "audit.read",
+                              ) && (
+                                <a
+                                  aria-current={
+                                    activePortalView === "audit"
+                                      ? "page"
+                                      : undefined
+                                  }
+                                  className="cloud-ui-nav-item"
+                                  href={auditViewHref(locationSearch)}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    handleAuditViewSelect();
+                                  }}
+                                >
+                                  Аудит
+                                </a>
+                              )}
+                              {authState.capabilities.capabilities.includes(
+                                "role.manage",
+                              ) && (
+                                <span className="cloud-ui-nav-item">
+                                  Управление ролями
+                                </span>
+                              )}
+                            </nav>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
@@ -1145,6 +1155,7 @@ export function App() {
               <CloudShell
                 context={shellContext}
                 activeView={shellActiveView}
+                capabilities={authState.capabilities.capabilities}
                 objectTitle={shellObjectTitle}
                 objectType={shellObjectType}
                 tabs={shellTabs}
