@@ -33,6 +33,9 @@ cloud-ui = "cloud_ui.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"cloud_ui.migrations" = ["script.py.mako"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

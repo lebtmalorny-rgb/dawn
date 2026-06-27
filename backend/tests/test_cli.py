@@ -55,7 +55,7 @@ def test_db_upgrade_sets_database_url_and_upgrades_head(monkeypatch: Any) -> Non
         database_url = FakeUrl()
 
     class FakeConfig:
-        def __init__(self, path: str) -> None:
+        def __init__(self, path: str | None = None) -> None:
             self.path = path
             self.options: dict[str, str] = {}
 
@@ -75,7 +75,8 @@ def test_db_upgrade_sets_database_url_and_upgrades_head(monkeypatch: Any) -> Non
     run_db_upgrade()
 
     cfg = captured["cfg"]
-    assert cfg.path == "alembic.ini"
+    assert cfg.path is None
+    assert cfg.options["script_location"].endswith("cloud_ui/migrations")
     assert cfg.options["sqlalchemy.url"] == "mysql+pymysql://user:pass@db:3306/cloud_ui"
     assert captured["revision"] == "head"
 

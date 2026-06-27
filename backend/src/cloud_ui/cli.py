@@ -1,6 +1,7 @@
 import argparse
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
 import uvicorn
 from alembic import command
@@ -21,6 +22,8 @@ from cloud_ui.operations.mistral import InMemoryMistralAdapter
 from cloud_ui.operations.repository import OperationRepository
 from cloud_ui.operations.worker import OperationWorker
 from cloud_ui.worker import run_loop
+
+MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,7 +55,8 @@ def run_api() -> None:
 
 def run_db_upgrade(*, check: bool = False) -> int:
     settings = get_settings()
-    cfg = Config("alembic.ini")
+    cfg = Config()
+    cfg.set_main_option("script_location", str(MIGRATIONS_DIR))
     cfg.set_main_option("sqlalchemy.url", settings.database_url.unicode_string())
     if check:
         command.current(cfg)
