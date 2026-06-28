@@ -19,12 +19,14 @@ RISK_REGISTER = ROOT / "docs/generated/risk-register.md"
 EXPECTED_BUNDLE_FILES = {
     "examples/cloud-ui-vars.yml.example",
     "manifest.json",
+    "playbooks/cloud-ui-aio-reconfigure.yml",
     "playbooks/cloud-ui-preflight.yml",
     "roles/cloud_ui/defaults/main.yml",
     "roles/cloud_ui/handlers/main.yml",
     "roles/cloud_ui/tasks/config.yml",
     "roles/cloud_ui/tasks/containers.yml",
     "roles/cloud_ui/tasks/lifecycle.yml",
+    "roles/cloud_ui/tasks/live-aio.yml",
     "roles/cloud_ui/tasks/main.yml",
     "roles/cloud_ui/tasks/migration.yml",
     "roles/cloud_ui/tasks/validate.yml",
@@ -410,6 +412,49 @@ def test_exporter_rejects_live_mutating_kolla_source_content(
     finally:
         if created:
             injected.unlink()
+
+
+def test_exporter_allows_docker_container_command_argument() -> None:
+    module = load_module()
+    text = "\n".join(
+        [
+            "- name: Run API container",
+            "  community.docker.docker_container:",
+            "    name: cloud_ui_api",
+            "    image: registry.test/cloud-ui-backend@sha256:" + "a" * 64,
+            "    command: cloud-ui api",
+            "    read_only: true",
+        ]
+    )
+
+    errors = module._scan_text(
+        Path("deploy/kolla/ansible/roles/cloud_ui/tasks/live-aio.yml"),
+        text,
+    )
+
+    assert errors == ()
+
+
+def test_exporter_fallback_scan_allows_docker_container_command_argument(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    monkeypatch.setattr(module, "yaml", None)
+    text = "\n".join(
+        [
+            "- name: Run API container",
+            "  community.docker.docker_container:",
+            "    name: cloud_ui_api",
+            "    command: cloud-ui api",
+        ]
+    )
+
+    errors = module._scan_text(
+        Path("deploy/kolla/ansible/roles/cloud_ui/tasks/live-aio.yml"),
+        text,
+    )
+
+    assert errors == ()
 
 
 def test_committed_docs_record_local_only_scope_and_risk() -> None:

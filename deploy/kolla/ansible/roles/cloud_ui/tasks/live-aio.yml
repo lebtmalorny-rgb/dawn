@@ -1,0 +1,135 @@
+---
+- name: Validate Cloud UI all-in-one live reconfigure gates
+  ansible.builtin.assert:
+    that:
+      - cloud_ui_test_stand | bool
+      - cloud_ui_rollback_window_open | bool
+      - cloud_ui_enabled | bool
+      - cloud_ui_backend_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - cloud_ui_frontend_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - cloud_ui_database_url | length > 0
+      - cloud_ui_rabbitmq_url | length > 0
+    fail_msg: "Cloud UI AIO live reconfigure requires test marker, rollback window, digest images and runtime DB/MQ inputs."
+  no_log: true
+
+- name: Ensure Cloud UI Docker network exists
+  community.docker.docker_network:
+    name: "{{ cloud_ui_aio_network_name }}"
+    state: present
+
+- name: Ensure Cloud UI log volume exists
+  community.docker.docker_volume:
+    name: "{{ cloud_ui_log_volume }}"
+    state: present
+
+- name: Ensure Cloud UI log directories exist inside Docker volume
+  ansible.builtin.file:
+    path: "{{ cloud_ui_aio_log_root }}/{{ item }}"
+    state: directory
+    owner: "42424"
+    group: "42424"
+    mode: "0755"
+  loop:
+    - cloud-ui
+    - cloud-ui-frontend
+
+- name: Run Cloud UI one-shot migration
+  community.docker.docker_container:
+    name: "{{ cloud_ui_migration_job.container_name }}"
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui db-upgrade"
+    state: started
+    detach: false
+    cleanup: true
+    read_only: "{{ cloud_ui_aio_read_only }}"
+    user: "{{ cloud_ui_aio_container_user }}"
+    cap_drop: "{{ cloud_ui_aio_cap_drop }}"
+    security_opts: "{{ cloud_ui_aio_security_opts }}"
+    tmpfs: "{{ cloud_ui_aio_tmpfs }}"
+    volumes:
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla"
+    networks:
+      - name: "{{ cloud_ui_aio_network_name }}"
+    env: "{{ cloud_ui_backend_environment }}"
+  no_log: true
+  when: cloud_ui_aio_run_migration | bool
+
+- name: Run Cloud UI API container
+  community.docker.docker_container:
+    name: "{{ cloud_ui_services.cloud_ui_api.container_name }}"
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "{{ cloud_ui_services.cloud_ui_api.command }}"
+    state: started
+    restart_policy: unless-stopped
+    read_only: "{{ cloud_ui_aio_read_only }}"
+    user: "{{ cloud_ui_aio_container_user }}"
+    cap_drop: "{{ cloud_ui_aio_cap_drop }}"
+    security_opts: "{{ cloud_ui_aio_security_opts }}"
+    tmpfs: "{{ cloud_ui_aio_tmpfs }}"
+    published_ports:
+      - "{{ cloud_ui_aio_api_host_port }}:{{ cloud_ui_backend_listen_port }}"
+    volumes:
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla"
+    networks:
+      - name: "{{ cloud_ui_aio_network_name }}"
+        aliases:
+          - "{{ cloud_ui_aio_api_network_alias }}"
+    env: "{{ cloud_ui_backend_environment }}"
+  no_log: true
+
+- name: Run Cloud UI worker container
+  community.docker.docker_container:
+    name: "{{ cloud_ui_services.cloud_ui_worker.container_name }}"
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "{{ cloud_ui_services.cloud_ui_worker.command }}"
+    state: started
+    restart_policy: unless-stopped
+    read_only: "{{ cloud_ui_aio_read_only }}"
+    user: "{{ cloud_ui_aio_container_user }}"
+    cap_drop: "{{ cloud_ui_aio_cap_drop }}"
+    security_opts: "{{ cloud_ui_aio_security_opts }}"
+    tmpfs: "{{ cloud_ui_aio_tmpfs }}"
+    volumes:
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla"
+    networks:
+      - name: "{{ cloud_ui_aio_network_name }}"
+    env: "{{ cloud_ui_backend_environment }}"
+  no_log: true
+
+- name: Run Cloud UI events container
+  community.docker.docker_container:
+    name: "{{ cloud_ui_services.cloud_ui_events.container_name }}"
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "{{ cloud_ui_services.cloud_ui_events.command }}"
+    state: started
+    restart_policy: unless-stopped
+    read_only: "{{ cloud_ui_aio_read_only }}"
+    user: "{{ cloud_ui_aio_container_user }}"
+    cap_drop: "{{ cloud_ui_aio_cap_drop }}"
+    security_opts: "{{ cloud_ui_aio_security_opts }}"
+    tmpfs: "{{ cloud_ui_aio_tmpfs }}"
+    volumes:
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla"
+    networks:
+      - name: "{{ cloud_ui_aio_network_name }}"
+    env: "{{ cloud_ui_backend_environment }}"
+  no_log: true
+
+- name: Run Cloud UI frontend container
+  community.docker.docker_container:
+    name: "{{ cloud_ui_services.cloud_ui_frontend.container_name }}"
+    image: "{{ cloud_ui_frontend_image_full }}"
+    command: "{{ cloud_ui_services.cloud_ui_frontend.command }}"
+    state: started
+    restart_policy: unless-stopped
+    read_only: "{{ cloud_ui_aio_read_only }}"
+    user: "{{ cloud_ui_aio_container_user }}"
+    cap_drop: "{{ cloud_ui_aio_cap_drop }}"
+    security_opts: "{{ cloud_ui_aio_security_opts }}"
+    tmpfs: "{{ cloud_ui_aio_tmpfs }}"
+    published_ports:
+      - "{{ cloud_ui_aio_frontend_host_port }}:{{ cloud_ui_frontend_listen_port }}"
+    volumes:
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla"
+    networks:
+      - name: "{{ cloud_ui_aio_network_name }}"

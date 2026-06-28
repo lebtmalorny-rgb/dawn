@@ -509,6 +509,30 @@ This narrows, but does not close, the affected requirements:
 - ДКБ-82: rollback snapshot and smoke evidence exist for the all-in-one lab. Full Kolla-Ansible
   reconfigure, rolling update and failed-update rollback acceptance remain open.
 
+Обновление live evidence 2026-06-28, AIO role path: текущий all-in-one UI переведен с bounded
+manual Docker script на Kolla-Ansible-side role path. `deploy/kolla/ansible` был синхронизирован на
+Ansible host в `/etc/kolla/cloud-ui-sync-bundle`, preflight playbook прошел с `ok=10 changed=0
+failed=0`, затем `playbooks/cloud-ui-aio-reconfigure.yml` был выполнен через Kolla inventory
+`/etc/kolla/all-in-one` и Kolla virtualenv с итогом `openstack-aio : ok=35 changed=6 failed=0
+skipped=1`. Повторный прогон с `cloud_ui_aio_run_migration=false` подтвердил idempotency:
+`openstack-aio : ok=34 changed=0 failed=0 skipped=2`. После роли API readiness вернул HTTP 200,
+frontend `/api/v1/session` через frontend вернул HTTP 401, а sanitized inspect снова подтвердил
+`cloudui`, read-only rootfs, `cap_drop=["ALL"]` и `no-new-privileges`.
+
+This further narrows, but still does not close, the affected requirements:
+
+- ДКБ-55/56: role tasks accept DB/MQ runtime URLs only from runtime vars and secret-referencing tasks
+  use `no_log: true`; full SecMan/Kolla rotation and revoke evidence remain open.
+- ДКБ-65: the all-in-one role path preserves non-root/read-only/cap-drop runtime evidence; SELinux
+  label and host policy evidence remain open.
+- ДКБ-69/70: the role converged digest-pinned test-registry images. Formal ДКБ-69 waiver,
+  corporate registry signing/scanner/provenance evidence remain open.
+- ДКБ-76/77/80: evidence is still direct-port AIO on Docker network `cloud-ui`; HAProxy/VIP/TLS,
+  management VLAN, firewall/ACL and unused-interface blocking remain open.
+- ДКБ-82: AIO role reconfigure and idempotency evidence now exist, but upstream Kolla
+  `site.yml`/tag integration, three-node rolling update and failed-update rollback acceptance remain
+  open.
+
 ## E09 live reconfigure preflight bundle
 
 Обновление требований 2026-06-26: E09 live reconfigure preflight bundle is preflight only. It

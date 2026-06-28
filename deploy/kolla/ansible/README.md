@@ -14,7 +14,7 @@ The role preserves the E09.1 two-image contract:
 - `cloud-ui-frontend` for `cloud_ui_frontend`
 - `cloud-ui-backend` for `cloud_ui_api`, `cloud_ui_worker` and `cloud_ui_events`
 
-## Scope
+## Default Scope
 
 E09.2 does not run a deployment. It provides defaults, validation, config templates, handler names and
 container definition data for later Kolla-Ansible integration.
@@ -22,6 +22,9 @@ container definition data for later Kolla-Ansible integration.
 Database provisioning, message broker provisioning, one-shot migration, HAProxy/TLS, live container
 inspection, SELinux proof, registry digest evidence, rollback and three-node smoke remain later E09
 slices.
+
+The role now also contains a default-off all-in-one live mode for the approved lab path. That mode is
+not enabled by the normal role defaults and does not change the three-node E09 target.
 
 ## Runtime Secret Inputs
 
@@ -65,6 +68,35 @@ configuration so the `cloud_ui` role resolves correctly.
 Evidence and remaining live follow-up are recorded in
 `docs/generated/e09-live-reconfigure-bundle.md`.
 
+## AIO live reconfigure role mode
+
+`playbooks/cloud-ui-aio-reconfigure.yml` is the bounded all-in-one role path used to move the current
+lab UI away from one-off Docker scripts. It targets only `openstack-aio`, enables
+`cloud_ui_aio_live_reconfigure_enabled=true`, and imports the `cloud_ui` role. The mode remains
+default-off in `roles/cloud_ui/defaults/main.yml`.
+
+The AIO mode uses `community.docker` modules through the Kolla-Ansible virtual environment and the
+approved `/etc/kolla/all-in-one` inventory. It creates the private Docker network `cloud-ui`, reuses
+the `kolla_logs` volume, runs the optional one-shot `cloud-ui db-upgrade` container first, and then
+converges the four permanent all-in-one containers:
+
+- `cloud_ui_frontend` on host port `13080`;
+- `cloud_ui_api` on host port `18081` with network alias `api`;
+- `cloud_ui_worker`;
+- `cloud_ui_events`.
+
+The permanent containers keep the hardening contract from the manual lab baseline: non-root
+`cloudui`, read-only root filesystem, `cap_drop: [ALL]`, `no-new-privileges:true`, bounded tmpfs and
+no container socket mount. Runtime DB/MQ URLs must be passed from a non-committed vars file or another
+approved secret mechanism; secret-referencing tasks use `no_log: true`.
+
+For repeat convergence after the schema is already at head, set `cloud_ui_aio_run_migration=false`.
+The 2026-06-28 lab idempotency run completed with no changes using that flag.
+
+This is Kolla-Ansible-side lab evidence, not full upstream Kolla integration. It does not prove
+`kolla-ansible reconfigure --tags cloud-ui`, HAProxy/VIP/TLS routing, SELinux labels, corporate
+registry policy, failed-update rollback, or twelve containers across three nodes.
+
 ## E09 Ansible sync bundle
 
 The E09 Ansible sync bundle is a local-only export for the approved test-stand preparation path. It
@@ -72,8 +104,10 @@ packages the `cloud_ui` role, preflight playbook, placeholder example vars and a
 checksums. It contains no runtime secret value, inventory, SSH material, DB/MQ URL, token, private key
 or host-specific credential.
 
-The bundle is not live deployment evidence and does not run live mutating Kolla actions. Remote sync,
-DB/MQ auth remediation, live reconfigure and rollback remain `pending_external_evidence`, and the
-copied bundle should use `ANSIBLE_ROLES_PATH=roles` or an equivalent Ansible roles path configuration.
+The bundle now includes the AIO reconfigure playbook and `tasks/live-aio.yml` so an operator can copy
+the same bounded lab role path that was validated on 2026-06-28. It is still a local-only export:
+remote sync, DB/MQ auth remediation, live reconfigure and rollback evidence must be collected from
+the approved stand as `pending_external_evidence`, and the copied bundle should use
+`ANSIBLE_ROLES_PATH=roles` or an equivalent Ansible roles path configuration.
 
 Evidence: `docs/generated/e09-ansible-sync-bundle.md`.

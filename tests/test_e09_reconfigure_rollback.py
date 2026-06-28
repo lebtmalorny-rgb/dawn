@@ -193,6 +193,7 @@ def test_lifecycle_task_is_included_and_publishes_dry_run_facts() -> None:
         "config.yml",
         "migration.yml",
         "containers.yml",
+        "live-aio.yml",
     ]
 
     lifecycle_tasks = load_yaml_list(

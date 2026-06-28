@@ -17,6 +17,16 @@ The preflight imports only the role validation task path. It does not run live m
 
 Role resolution note: when invoking the preflight playbook from this repository, provide the Cloud UI role path through `ANSIBLE_ROLES_PATH=deploy/kolla/ansible/roles` or an equivalent Ansible roles path configuration.
 
+## Subsequent AIO lab evidence
+
+On 2026-06-28 the preflight bundle was synchronized to the Ansible host and executed against the
+approved all-in-one inventory. The preflight completed with `localhost : ok=10 changed=0 failed=0`.
+A separate bounded AIO reconfigure playbook then converged the current lab UI; that evidence is
+recorded in `docs/generated/e09-deployment-smoke-evidence.md`.
+
+This document remains scoped to the preflight bundle. Full E09 acceptance still requires the
+three-node/twelve-container, HAProxy/VIP/TLS, SELinux and rollback evidence listed below.
+
 ## Required live follow-up
 
 Full E09 acceptance remains blocked until an explicitly approved test-stand run provides:

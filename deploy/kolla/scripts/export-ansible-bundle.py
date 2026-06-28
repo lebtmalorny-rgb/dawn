@@ -14,6 +14,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover - PyYAML is present with Ansible.
+    yaml = None  # type: ignore[assignment]
+
 ROOT = Path(__file__).resolve().parents[3]
 GENERATED_DOCS = (ROOT / "docs/generated").resolve()
 
@@ -21,6 +26,10 @@ BUNDLE_SCHEMA_VERSION = "e09-ansible-sync-bundle/v1"
 BUNDLE_SOURCES = (
     ("deploy/kolla/ansible/roles/cloud_ui", "roles/cloud_ui"),
     ("deploy/kolla/ansible/playbooks/cloud-ui-preflight.yml", "playbooks/cloud-ui-preflight.yml"),
+    (
+        "deploy/kolla/ansible/playbooks/cloud-ui-aio-reconfigure.yml",
+        "playbooks/cloud-ui-aio-reconfigure.yml",
+    ),
     ("deploy/kolla/ansible/examples/cloud-ui-vars.yml.example", "examples/cloud-ui-vars.yml.example"),
 )
 ROLE_PATH_NOTE = "Set ANSIBLE_ROLES_PATH=roles or configure an equivalent Ansible roles path."
@@ -42,8 +51,17 @@ MUTATING_KOLLA_RE = re.compile(
     r"(?is)\bkolla-ansible\b(?:(?!\n).)*\b(?:deploy|reconfigure|destroy|upgrade)\b"
 )
 TASK_SHELL_OR_COMMAND_RE = re.compile(
-    r"(?im)^\s*(?:-\s*)?(?:ansible\.builtin\.)?(?:shell|command)\s*:"
+    r"(?im)^\s*(?:-\s*)?ansible\.builtin\.(?:shell|command)\s*:|"
+    r"^\s*-\s*(?:shell|command)\s*:"
 )
+SHELL_OR_COMMAND_ACTIONS = {
+    "ansible.builtin.command",
+    "ansible.builtin.shell",
+    "command",
+    "shell",
+}
+PLAY_TASK_SECTIONS = ("tasks", "pre_tasks", "post_tasks", "handlers")
+TASK_BLOCK_SECTIONS = ("block", "rescue", "always")
 
 
 @dataclass(frozen=True)
@@ -120,6 +138,47 @@ def _is_task_or_playbook_source(relative_path: Path) -> bool:
     return "roles" in parts and "tasks" in parts
 
 
+def _iter_task_dicts(value: Any) -> list[dict[str, Any]]:
+    tasks: list[dict[str, Any]] = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                tasks.extend(_iter_task_dicts(item))
+        return tasks
+    if not isinstance(value, dict):
+        return tasks
+
+    is_play = any(section in value for section in PLAY_TASK_SECTIONS) or "hosts" in value
+    if is_play:
+        for section in PLAY_TASK_SECTIONS:
+            section_value = value.get(section)
+            if isinstance(section_value, list):
+                tasks.extend(_iter_task_dicts(section_value))
+        return tasks
+
+    tasks.append(value)
+    for section in TASK_BLOCK_SECTIONS:
+        section_value = value.get(section)
+        if isinstance(section_value, list):
+            tasks.extend(_iter_task_dicts(section_value))
+    return tasks
+
+
+def _has_shell_or_command_action(text: str) -> bool:
+    if yaml is None:
+        return TASK_SHELL_OR_COMMAND_RE.search(text) is not None
+    try:
+        documents = list(yaml.safe_load_all(text))
+    except yaml.YAMLError:
+        return TASK_SHELL_OR_COMMAND_RE.search(text) is not None
+
+    for document in documents:
+        for task in _iter_task_dicts(document):
+            if any(str(key) in SHELL_OR_COMMAND_ACTIONS for key in task):
+                return True
+    return False
+
+
 def _scan_text(relative_path: Path, text: str) -> tuple[str, ...]:
     errors: list[str] = []
     if (
@@ -132,7 +191,7 @@ def _scan_text(relative_path: Path, text: str) -> tuple[str, ...]:
         errors.append(f"{relative_path}: forbidden credential file reference found")
     if MUTATING_KOLLA_RE.search(text):
         errors.append(f"{relative_path}: live mutating Kolla command pattern found")
-    elif _is_task_or_playbook_source(relative_path) and TASK_SHELL_OR_COMMAND_RE.search(text):
+    elif _is_task_or_playbook_source(relative_path) and _has_shell_or_command_action(text):
         errors.append(f"{relative_path}: live mutating shell/command module pattern found")
     return tuple(errors)
 
@@ -338,15 +397,17 @@ def render_evidence(manifest: dict[str, object]) -> str:
             "",
             ROLE_PATH_NOTE,
             "",
-            "This local-only slice does not copy the bundle to a host, run live mutating Kolla",
-            "actions, remediate DB/MQ auth, inspect containers, validate HAProxy/TLS or execute",
-            "rollback.",
+            "This local-only export does not itself copy the bundle to a host, run live mutating",
+            "Kolla actions, remediate DB/MQ auth, inspect containers, validate HAProxy/TLS or",
+            "execute rollback. Separate 2026-06-28 AIO role evidence is recorded in",
+            "`docs/generated/e09-deployment-smoke-evidence.md`.",
             "",
             "## Remaining blockers",
             "",
-            "- remote sync remains separately approved;",
-            "- DB/MQ auth remediation remains `pending_external_evidence`;",
-            "- live reconfigure, 12-container inspection, HAProxy/TLS, SELinux and rollback remain pending.",
+            "- remote sync remains separately approved for each target stand;",
+            "- DB/MQ auth remediation remains `pending_external_evidence` for new stands;",
+            "- upstream Kolla `site.yml`/tag integration, 12-container inspection, HAProxy/TLS,",
+            "  SELinux and failed-update rollback remain pending.",
             "",
         ]
     )

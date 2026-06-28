@@ -154,6 +154,25 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   - 2026-06-28: endpoint smoke passed on the all-in-one node: API readiness HTTP 200, frontend index
     HTTP 200 with `index-CPtHnxYH.js`, and frontend `/api/v1/session` HTTP 401 `not_authenticated`.
     This is still partial all-in-one evidence, not three-node E09 acceptance.
+- [x] 2026-06-28: The current all-in-one UI was moved from the bounded manual lab deploy path to a
+  bounded Kolla-Ansible-side role path without claiming full E09 acceptance.
+  - A fresh rollback snapshot was created on the all-in-one test host:
+    `/root/cloud-ui-aio-rollback-20260628T081816Z`.
+  - The updated role/playbook content was synchronized to
+    `/etc/kolla/cloud-ui-sync-bundle` on the Ansible host.
+  - `playbooks/cloud-ui-preflight.yml` completed with `localhost : ok=10 changed=0 failed=0`.
+  - The first AIO role attempt failed before container mutation because the HAProxy route contract
+    referenced `kolla_external_vip_address` when full Kolla globals were not loaded. The fix gates
+    that render task on `cloud_ui_haproxy_enabled | bool`.
+  - `playbooks/cloud-ui-aio-reconfigure.yml` then completed against `/etc/kolla/all-in-one` with
+    `openstack-aio : ok=35 changed=6 failed=0 skipped=1`.
+  - A repeat convergence with `cloud_ui_aio_run_migration=false` completed with
+    `openstack-aio : ok=34 changed=0 failed=0 skipped=2`.
+  - Post-role smoke confirmed API readiness HTTP 200, frontend `/api/v1/session` HTTP 401 and
+    sanitized hardening fields `cloudui`, `readonly=true`, `cap_drop=["ALL"]` and
+    `no-new-privileges:true`.
+  - Remaining gates: upstream Kolla `site.yml`/tag integration, HAProxy/VIP/TLS, SELinux labels,
+    corporate registry policy, three-node/twelve-container rollout and failed-update rollback.
 
 ## Неожиданные открытия
 

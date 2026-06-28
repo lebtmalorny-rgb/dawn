@@ -85,7 +85,7 @@ def test_defaults_declare_four_permanent_services_and_two_images() -> None:
     }
 
 
-def test_tasks_are_skeleton_only_and_import_expected_steps() -> None:
+def test_tasks_import_contract_steps_and_default_off_aio_live_mode() -> None:
     main_tasks = load_yaml_list("deploy/kolla/ansible/roles/cloud_ui/tasks/main.yml")
     containers_tasks = load_yaml_list(
         "deploy/kolla/ansible/roles/cloud_ui/tasks/containers.yml"
@@ -118,7 +118,9 @@ def test_tasks_are_skeleton_only_and_import_expected_steps() -> None:
         "config.yml",
         "migration.yml",
         "containers.yml",
+        "live-aio.yml",
     ]
+    assert main_tasks[-1]["when"] == "cloud_ui_aio_live_reconfigure_enabled | bool"
 
     assert isinstance(containers_tasks, list)
     set_fact_value = None

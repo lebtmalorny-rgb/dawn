@@ -14,3 +14,7 @@
 
 - name: Define Cloud UI container data
   ansible.builtin.include_tasks: containers.yml
+
+- name: Apply Cloud UI live all-in-one containers
+  ansible.builtin.include_tasks: live-aio.yml
+  when: cloud_ui_aio_live_reconfigure_enabled | bool

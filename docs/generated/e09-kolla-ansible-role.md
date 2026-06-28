@@ -2,8 +2,8 @@
 
 - Stage: E09.2 Ansible role skeleton
 - Date: 2026-06-24
-- Scope: repository-side role skeleton for Cloud UI Kolla-Ansible integration
-- Live deployment: not executed in this slice
+- Scope: repository-side role skeleton for Cloud UI Kolla-Ansible integration, plus default-off AIO live mode
+- Live deployment: partial all-in-one role evidence collected on 2026-06-28
 - Production action: none
 
 ## Role Contract
@@ -38,8 +38,34 @@ This evidence covers repository-side role skeleton artifacts only:
 - `cloud_ui_container_definitions` fact data for later Kolla-Ansible container tasks.
 
 No Kolla-Ansible inventory, remote host, registry credential, runtime secret value, DB/MQ credential
-value, certificate or live deployment output was added. The role fails closed when `cloud_ui_enabled`
-is true and the DB/MQ runtime URLs are not supplied by the approved secret mechanism.
+value or certificate was added. The role fails closed when `cloud_ui_enabled` is true and the DB/MQ
+runtime URLs are not supplied by the approved secret mechanism.
+
+## AIO Live Role Mode
+
+`playbooks/cloud-ui-aio-reconfigure.yml` enables a bounded all-in-one lab path by setting
+`cloud_ui_aio_live_reconfigure_enabled=true` and applying the `cloud_ui` role only to
+`openstack-aio`. The normal role default remains `cloud_ui_aio_live_reconfigure_enabled=false`.
+
+The AIO path uses `tasks/live-aio.yml` and `community.docker` modules through the Kolla-Ansible
+virtual environment. It creates the `cloud-ui` Docker network, ensures the `kolla_logs` volume/log
+directories, optionally runs the one-shot `cloud-ui db-upgrade` container, and converges
+`cloud_ui_frontend`, `cloud_ui_api`, `cloud_ui_worker` and `cloud_ui_events`.
+
+Live AIO evidence collected on 2026-06-28:
+
+- preflight playbook recap: `localhost : ok=10 changed=0 failed=0`;
+- AIO role reconfigure recap: `openstack-aio : ok=35 changed=6 failed=0 skipped=1`;
+- AIO idempotency recap with `cloud_ui_aio_run_migration=false`: `openstack-aio : ok=34 changed=0
+  failed=0 skipped=2`;
+- post-role API readiness HTTP 200 with DB/RabbitMQ reachable;
+- post-role frontend `/api/v1/session` HTTP 401 through the frontend;
+- sanitized Docker inspect for all four containers confirmed `cloudui`, `readonly=true`,
+  `cap_drop=["ALL"]` and `security_opt=["no-new-privileges:true"]`.
+
+This is partial all-in-one lab evidence. It does not prove upstream Kolla `site.yml`/tag
+integration, HAProxy/VIP/TLS, SELinux labels, three-node/twelve-container rollout, corporate registry
+policy or failed-update rollback.
 
 ## External Evidence Status
 
@@ -49,15 +75,15 @@ is true and the DB/MQ runtime URLs are not supplied by the approved secret mecha
 | SBOM tied to deployed digests | pending_external_evidence | Requires approved SBOM tooling against the exact backend/frontend digests used by the stand. |
 | vulnerability scan | pending_external_evidence | Requires approved scanner output and policy threshold for the deployed images. |
 | image signature verification | pending_external_evidence | Requires approved signing keys and pull-time verification policy. |
-| Kolla-Ansible syntax/render against test inventory | pending_external_evidence | Requires an approved non-production test inventory and host group mapping. |
-| live Kolla-Ansible deploy/reconfigure | pending_external_evidence | Requires a test stand with approved registry digests and runtime secrets. |
+| Kolla-Ansible syntax/render against test inventory | partial_lab_evidence | AIO preflight and role playbook ran against `/etc/kolla/all-in-one`; full upstream `site.yml` integration remains pending. |
+| live Kolla-Ansible deploy/reconfigure | partial_lab_evidence | AIO role playbook converged four all-in-one containers. Three-node/twelve-container rollout and upstream tag path remain pending. |
 | MariaDB schema/user and RabbitMQ vhost/user provisioning | pending_external_evidence | Later E09 slices own database, broker and secret integration. |
-| one-shot `cloud-ui db-upgrade` migration ordering | completed_repository_evidence | E09.4 adds `cloud_ui_db_migrate` job metadata outside the permanent container set; live execution remains pending. |
+| one-shot `cloud-ui db-upgrade` migration ordering | partial_lab_evidence | E09.4 adds `cloud_ui_db_migrate` job metadata outside the permanent container set; the AIO role executed the migration and can skip it for repeat convergence with `cloud_ui_aio_run_migration=false`. |
 | HAProxy/TLS routing | pending_external_evidence | Requires Kolla TLS/HAProxy configuration and certificate evidence. |
 | SELinux labels and host enforcement proof | pending_external_evidence | Requires Rocky/Kolla host inspection. |
 | 12-container topology contract | completed_repository_evidence | E09.5 adds synthetic three-node process topology for 12 permanent containers. |
-| 12 live containers on three control/UI nodes | pending_external_evidence | Requires the deployment stand and container inspection. |
-| rollback/reconfigure execution | pending_external_evidence | Requires live deployment state. |
+| 12 live containers on three control/UI nodes | pending_external_evidence | AIO evidence covers four containers on one node only. |
+| rollback/reconfigure execution | partial_lab_evidence | AIO rollback snapshot, reconfigure and idempotency evidence exist; failed-update rollback remains pending. |
 
 ## DKB Impact
 
@@ -73,8 +99,15 @@ is true and the DB/MQ runtime URLs are not supplied by the approved secret mecha
   MariaDB/RabbitMQ credentials and rotation evidence remain later deployment work. The role now
   records `cloud_ui_secret_references` and renders `CLOUD_UI_DATABASE_URL`/`CLOUD_UI_RABBITMQ_URL`
   only from runtime variables with `no_log: true`; no runtime secret value is committed.
-- ДКБ-82: rollback is repository-only by Git revert in this slice. Live rollback proof remains later
-  E09 evidence.
+- ДКБ-82: AIO rollback snapshot and role idempotency evidence now exist for one test node. Failed
+  update rollback, rolling upgrade and three-node acceptance remain later E09 evidence.
+
+## AIO Role Evidence Update
+
+The 2026-06-28 all-in-one role run narrows ДКБ-65/69/70/76/77/80/82 by proving a default-off role
+path can converge the current lab UI without manual Docker replacement. Full E09 acceptance remains
+blocked until the approved stand proves the three-node layout, HAProxy/VIP/TLS, SELinux labels,
+corporate registry policy, formal ДКБ-69 waiver and failed-update rollback.
 
 ## E09.4 Update
 
