@@ -122,6 +122,172 @@ def test_preflight_uses_kolla_cli_custom_preflight_playbook(tmp_path: Path) -> N
     assert ["-t", "cloud-ui"] == [plan.argv[plan.argv.index("-t")], plan.argv[plan.argv.index("-t") + 1]]
 
 
+def test_wrapper_builds_registry_manifest_urls_for_digest_preflight(tmp_path: Path) -> None:
+    module = load_module()
+    inventory = create_inventory(tmp_path)
+    bundle = create_bundle(tmp_path)
+    runtime_vars = tmp_path / "runtime-vars.yml"
+    runtime_vars.write_text("---\n", encoding="utf-8")
+
+    config = module.InvocationConfig(
+        mode="preflight",
+        inventory=inventory,
+        bundle_dir=bundle,
+        runtime_vars=runtime_vars,
+        registry="192.168.10.15:5000/kolla/cloud-ui-test",
+        backend_digest="sha256:" + "a" * 64,
+        frontend_digest="sha256:" + "b" * 64,
+        kolla_ansible=Path("kolla-ansible"),
+        rollback_window_open=True,
+    )
+
+    checks = module.build_digest_manifest_checks(config)
+
+    assert [(check.service, check.image_name, check.digest) for check in checks] == [
+        ("backend", "cloud-ui-backend", "sha256:" + "a" * 64),
+        ("frontend", "cloud-ui-frontend", "sha256:" + "b" * 64),
+    ]
+    assert checks[0].manifest_url == (
+        "http://192.168.10.15:5000/v2/kolla/cloud-ui-test/"
+        "cloud-ui-backend/manifests/sha256:" + "a" * 64
+    )
+    assert checks[1].manifest_url == (
+        "http://192.168.10.15:5000/v2/kolla/cloud-ui-test/"
+        "cloud-ui-frontend/manifests/sha256:" + "b" * 64
+    )
+
+
+def test_wrapper_rejects_registry_url_with_credentials(tmp_path: Path) -> None:
+    module = load_module()
+    inventory = create_inventory(tmp_path)
+    bundle = create_bundle(tmp_path)
+    runtime_vars = tmp_path / "runtime-vars.yml"
+    runtime_vars.write_text("---\n", encoding="utf-8")
+
+    config = module.InvocationConfig(
+        mode="preflight",
+        inventory=inventory,
+        bundle_dir=bundle,
+        runtime_vars=runtime_vars,
+        registry="https://user:pass@registry.example/kolla/cloud-ui-test",
+        backend_digest="sha256:" + "a" * 64,
+        frontend_digest="sha256:" + "b" * 64,
+        kolla_ansible=Path("kolla-ansible"),
+        rollback_window_open=True,
+    )
+
+    result = module.validate_config(config)
+
+    assert result.ok is False
+    assert "registry credentials are not accepted" in result.errors
+
+
+def test_wrapper_checks_digest_availability_before_subprocess(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = load_module()
+    inventory = create_inventory(tmp_path)
+    bundle = create_bundle(tmp_path)
+    runtime_vars = tmp_path / "runtime-vars.yml"
+    runtime_vars.write_text("---\n", encoding="utf-8")
+    calls: list[str] = []
+
+    def fake_urlopen(request: Any, *, timeout: float) -> object:
+        calls.append(request.full_url)
+        if "cloud-ui-backend" in request.full_url:
+            raise module.urllib.error.HTTPError(
+                request.full_url,
+                404,
+                "Not Found",
+                hdrs=None,
+                fp=None,
+            )
+
+        class Response:
+            def __enter__(self) -> object:
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+        return Response()
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("kolla-ansible must not run"),
+    )
+
+    rc = module.main(
+        [
+            "reconfigure",
+            "--inventory",
+            str(inventory),
+            "--bundle-dir",
+            str(bundle),
+            "--runtime-vars",
+            str(runtime_vars),
+            "--registry",
+            "192.168.10.15:5000/kolla/cloud-ui-test",
+            "--backend-digest",
+            "sha256:" + "a" * 64,
+            "--frontend-digest",
+            "sha256:" + "b" * 64,
+            "--rollback-window-open",
+        ]
+    )
+
+    assert rc == 2
+    assert len(calls) == 2
+    stderr = capsys.readouterr().err
+    assert "backend digest is not available in registry" in stderr
+    assert "sha256:" + "a" * 64 in stderr
+    assert "mysql+pymysql://" not in stderr
+    assert "amqp://" not in stderr
+
+
+def test_wrapper_dry_run_skips_digest_network_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    inventory = create_inventory(tmp_path)
+    bundle = create_bundle(tmp_path)
+    runtime_vars = tmp_path / "runtime-vars.yml"
+    runtime_vars.write_text("---\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        module.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: pytest.fail("dry-run must not contact registry"),
+    )
+
+    rc = module.main(
+        [
+            "preflight",
+            "--inventory",
+            str(inventory),
+            "--bundle-dir",
+            str(bundle),
+            "--runtime-vars",
+            str(runtime_vars),
+            "--registry",
+            "192.168.10.15:5000/kolla/cloud-ui-test",
+            "--backend-digest",
+            "sha256:" + "a" * 64,
+            "--frontend-digest",
+            "sha256:" + "b" * 64,
+            "--rollback-window-open",
+            "--dry-run",
+        ]
+    )
+
+    assert rc == 0
+
+
 def test_wrapper_adds_kolla_venv_to_path_for_ansible_playbook_lookup(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

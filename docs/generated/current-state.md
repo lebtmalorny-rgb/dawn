@@ -16,8 +16,8 @@ Current branch and pushed state observed on 2026-06-28:
 | repository root | `/Users/dmitry/Desktop/dawn` |
 | branch | `main` |
 | remote | `https://github.com/lebtmalorny-rgb/dawn.git` |
-| local HEAD | feature worktree contains the AIO Kolla CLI migration reconfigure evidence refresh |
-| origin branch | `origin/main` already contains the previous AIO Kolla CLI path through `f14ea6d`; this migration-enabled evidence is pending merge |
+| local HEAD | feature worktree contains the AIO Kolla CLI digest availability preflight update |
+| origin branch | `origin/main` contains the AIO Kolla CLI migration reconfigure evidence through `e02cc4f`; this digest preflight update is pending merge |
 
 ## Current E09 handoff
 
@@ -72,6 +72,7 @@ Latest local verification for the handoff:
 | E09 AIO role reconfigure | passed: `playbooks/cloud-ui-aio-reconfigure.yml` recap `openstack-aio : ok=35 changed=6 failed=0 skipped=1` |
 | E09 AIO role idempotency | passed: same playbook with `cloud_ui_aio_run_migration=false` recap `openstack-aio : ok=34 changed=0 failed=0 skipped=2` |
 | E09 AIO Kolla CLI preflight | passed: `run-cloud-ui-aio-kolla.py preflight` via `kolla-ansible reconfigure -p` recap `localhost : ok=10 changed=0 failed=0` |
+| E09 AIO Kolla CLI stale digest gate | passed: stale backend/frontend digest inputs returned wrapper exit code `2` before Kolla-Ansible started |
 | E09 AIO Kolla CLI reconfigure with migration | passed: `run-cloud-ui-aio-kolla.py reconfigure` via `kolla-ansible reconfigure -p` recap `openstack-aio : ok=36 changed=2 failed=0 skipped=1` |
 | E09 AIO Kolla CLI idempotency | passed: `run-cloud-ui-aio-kolla.py reconfigure-no-migration` via `kolla-ansible reconfigure -p` recap `openstack-aio : ok=34 changed=0 failed=0 skipped=3` |
 | E09.8 sanitized Docker inspect via Ansible script | passed: four containers non-root, read-only rootfs, `cap_drop=["ALL"]`, `no-new-privileges`, expected ports/alias |

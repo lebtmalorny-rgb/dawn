@@ -106,8 +106,10 @@ kolla-ansible reconfigure -i /etc/kolla/all-in-one \
 
 The wrapper has three allowlisted modes: `preflight`, `reconfigure` and
 `reconfigure-no-migration`. It rejects production-looking inventories, non-digest image inputs and a
-closed rollback window. `examples/cloud-ui-aio-kolla-vars.yml.example` is non-secret only; runtime
-DB/MQ URL values must still come from an external non-committed vars file or approved secret source.
+closed rollback window. Before non-dry-run execution it checks the backend and frontend digest
+manifests through the Docker Registry HTTP API, so stale digest inputs fail before Kolla-Ansible
+starts a playbook. `examples/cloud-ui-aio-kolla-vars.yml.example` is non-secret only; runtime DB/MQ
+URL values must still come from an external non-committed vars file or approved secret source.
 
 This is Kolla CLI custom-playbook AIO evidence, not full upstream Kolla `site.yml` service
 integration. It does not prove HAProxy/VIP/TLS routing, SELinux labels, corporate registry policy,

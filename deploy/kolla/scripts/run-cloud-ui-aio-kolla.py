@@ -7,6 +7,9 @@ import re
 import shlex
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +23,12 @@ TEST_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 DIGEST_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
+REGISTRY_MANIFEST_ACCEPT = (
+    "application/vnd.docker.distribution.manifest.v2+json, "
+    "application/vnd.docker.distribution.manifest.list.v2+json, "
+    "application/vnd.oci.image.manifest.v1+json, "
+    "application/vnd.oci.image.index.v1+json"
+)
 
 
 @dataclass(frozen=True)
@@ -48,6 +57,14 @@ class InvocationPlan:
     redacted_command: str
 
 
+@dataclass(frozen=True)
+class RegistryManifestCheck:
+    service: str
+    image_name: str
+    digest: str
+    manifest_url: str
+
+
 def _path_text(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8", errors="replace")
@@ -55,9 +72,17 @@ def _path_text(path: Path) -> str:
         return ""
 
 
+def _parse_registry(registry: str) -> urllib.parse.SplitResult:
+    raw_registry = registry.rstrip("/")
+    if "://" not in raw_registry:
+        raw_registry = f"http://{raw_registry}"
+    return urllib.parse.urlsplit(raw_registry)
+
+
 def validate_config(config: InvocationConfig) -> ValidationResult:
     errors: list[str] = []
     inventory_text = _path_text(config.inventory)
+    registry_parts = _parse_registry(config.registry)
 
     if config.mode not in ALLOWED_MODES:
         errors.append("mode must be one of preflight, reconfigure or reconfigure-no-migration")
@@ -79,6 +104,12 @@ def validate_config(config: InvocationConfig) -> ValidationResult:
         errors.append("runtime vars path must be an existing file")
     if PRODUCTION_RE.search(config.registry):
         errors.append("registry looks like production")
+    if registry_parts.scheme not in {"http", "https"}:
+        errors.append("registry scheme must be http or https")
+    if not registry_parts.netloc:
+        errors.append("registry host must be present")
+    if registry_parts.username or registry_parts.password:
+        errors.append("registry credentials are not accepted")
     if not DIGEST_RE.fullmatch(config.backend_digest):
         errors.append("backend digest must be sha256:<64 lowercase hex chars>")
     if not DIGEST_RE.fullmatch(config.frontend_digest):
@@ -86,6 +117,86 @@ def validate_config(config: InvocationConfig) -> ValidationResult:
     if not config.rollback_window_open:
         errors.append("rollback window must be explicitly open")
 
+    return ValidationResult(ok=not errors, errors=tuple(errors))
+
+
+def _manifest_url(registry: str, image_name: str, digest: str) -> str:
+    registry_parts = _parse_registry(registry)
+    repository_prefix = registry_parts.path.strip("/")
+    repository = "/".join(part for part in (repository_prefix, image_name) if part)
+    quoted_repository = urllib.parse.quote(repository, safe="/")
+    return urllib.parse.urlunsplit(
+        (
+            registry_parts.scheme,
+            registry_parts.netloc,
+            f"/v2/{quoted_repository}/manifests/{digest}",
+            "",
+            "",
+        )
+    )
+
+
+def build_digest_manifest_checks(config: InvocationConfig) -> tuple[RegistryManifestCheck, ...]:
+    return (
+        RegistryManifestCheck(
+            service="backend",
+            image_name="cloud-ui-backend",
+            digest=config.backend_digest,
+            manifest_url=_manifest_url(
+                registry=config.registry,
+                image_name="cloud-ui-backend",
+                digest=config.backend_digest,
+            ),
+        ),
+        RegistryManifestCheck(
+            service="frontend",
+            image_name="cloud-ui-frontend",
+            digest=config.frontend_digest,
+            manifest_url=_manifest_url(
+                registry=config.registry,
+                image_name="cloud-ui-frontend",
+                digest=config.frontend_digest,
+            ),
+        ),
+    )
+
+
+def _registry_manifest_exists(check: RegistryManifestCheck, *, timeout_seconds: float) -> bool:
+    request = urllib.request.Request(
+        check.manifest_url,
+        method="HEAD",
+        headers={"Accept": REGISTRY_MANIFEST_ACCEPT},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds):
+            return True
+    except urllib.error.HTTPError as exc:
+        if exc.code != 405:
+            return False
+
+    fallback_request = urllib.request.Request(
+        check.manifest_url,
+        method="GET",
+        headers={"Accept": REGISTRY_MANIFEST_ACCEPT},
+    )
+    try:
+        with urllib.request.urlopen(fallback_request, timeout=timeout_seconds):
+            return True
+    except urllib.error.URLError:
+        return False
+
+
+def validate_digest_availability(
+    config: InvocationConfig,
+    *,
+    timeout_seconds: float = 5.0,
+) -> ValidationResult:
+    errors: list[str] = []
+    for check in build_digest_manifest_checks(config):
+        if not _registry_manifest_exists(check, timeout_seconds=timeout_seconds):
+            errors.append(
+                f"{check.service} digest is not available in registry: {check.digest}"
+            )
     return ValidationResult(ok=not errors, errors=tuple(errors))
 
 
@@ -180,10 +291,17 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     plan = build_invocation(config)
-    print(plan.redacted_command)
     if args.dry_run:
+        print(plan.redacted_command)
         return 0
 
+    digest_availability = validate_digest_availability(config)
+    if not digest_availability.ok:
+        for error in digest_availability.errors:
+            print(f"error: {error}", file=sys.stderr)
+        return 2
+
+    print(plan.redacted_command)
     env = os.environ.copy()
     env.update(plan.env)
     completed = subprocess.run(plan.argv, env=env, check=False)  # noqa: S603

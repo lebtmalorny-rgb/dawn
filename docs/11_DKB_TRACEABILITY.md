@@ -548,9 +548,13 @@ returned API readiness HTTP 200, frontend HTTP 200 and frontend `/api/v1/session
 inspect confirmed `cloudui`, read-only rootfs, `cap_drop=["ALL"]` and `no-new-privileges`. An initial
 stale-digest attempt stopped before permanent container changes with `changed=0`; diagnostics showed
 the schema was already `0006_audit_delivery (head)` and the failure was a registry 404 for the stale
-backend digest input. This narrows ДКБ-82 from direct `ansible-playbook` evidence to Kolla CLI
-custom-playbook evidence with migration, but still does not close upstream Kolla `site.yml` service
-integration, three-node rolling update or failed-update rollback acceptance.
+backend digest input. The wrapper now checks backend/frontend digest manifest availability before
+non-dry-run execution; the stale digest pair exits with code `2` before Kolla-Ansible starts, and the
+current digest pair still passes preflight with `localhost : ok=10 changed=0 failed=0`. This narrows
+ДКБ-70/82 from direct `ansible-playbook` evidence to Kolla CLI custom-playbook evidence with
+digest-availability preflight and migration, but still does not close upstream Kolla `site.yml`
+service integration, corporate registry signing/scanning, three-node rolling update or failed-update
+rollback acceptance.
 
 ## E09 live reconfigure preflight bundle
 
