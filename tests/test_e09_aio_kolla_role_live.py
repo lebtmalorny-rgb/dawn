@@ -92,7 +92,8 @@ def test_aio_live_playbook_targets_only_openstack_aio_and_imports_role() -> None
     assert play["gather_facts"] is False
     assert play["vars"]["cloud_ui_enabled"] is True
     assert play["vars"]["cloud_ui_aio_live_reconfigure_enabled"] is True
-    assert play["roles"] == ["cloud_ui"]
+    assert play["tags"] == ["cloud-ui"]
+    assert play["roles"] == [{"role": "cloud_ui", "tags": ["cloud-ui"]}]
 
 
 def test_aio_live_tasks_use_docker_modules_without_shell_or_secret_output() -> None:

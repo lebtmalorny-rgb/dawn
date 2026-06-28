@@ -2,8 +2,12 @@
 - name: Cloud UI all-in-one reconfigure
   hosts: openstack-aio
   gather_facts: false
+  tags:
+    - cloud-ui
   vars:
     cloud_ui_enabled: true
     cloud_ui_aio_live_reconfigure_enabled: true
   roles:
-    - cloud_ui
+    - role: cloud_ui
+      tags:
+        - cloud-ui

@@ -3,7 +3,7 @@
 - Date: 2026-06-28
 - Workspace: `/Users/dmitry/Desktop/dawn`
 - Stage: E09.8 deployment smoke/evidence handoff
-- Evidence status: all-in-one test UI is role-reconfigured and smoke-passed; full three-node E09 acceptance remains pending
+- Evidence status: all-in-one test UI is role-reconfigured, Kolla CLI custom-playbook path is smoke-passed, and full three-node E09 acceptance remains pending
 
 ## Repository state
 
@@ -52,7 +52,7 @@ Full E09 acceptance is not claimed. The live deployment evidence remains partial
 test stand provides:
 
 - 12 live Cloud UI permanent containers on three test nodes;
-- accepted upstream Kolla `site.yml`/tag integration or another approved full role path;
+- accepted upstream Kolla `site.yml` service integration or another approved full role path;
 - HAProxy/VIP/TLS health and negative TLS evidence;
 - SELinux label and host policy evidence;
 - corporate registry signing, scanner/provenance and ДКБ-69 waiver evidence;
@@ -68,6 +68,8 @@ Latest local verification for the handoff:
 | E09 AIO role preflight | passed: `playbooks/cloud-ui-preflight.yml` recap `localhost : ok=10 changed=0 failed=0` |
 | E09 AIO role reconfigure | passed: `playbooks/cloud-ui-aio-reconfigure.yml` recap `openstack-aio : ok=35 changed=6 failed=0 skipped=1` |
 | E09 AIO role idempotency | passed: same playbook with `cloud_ui_aio_run_migration=false` recap `openstack-aio : ok=34 changed=0 failed=0 skipped=2` |
+| E09 AIO Kolla CLI preflight | passed: `run-cloud-ui-aio-kolla.py preflight` via `kolla-ansible reconfigure -p` recap `localhost : ok=10 changed=0 failed=0` |
+| E09 AIO Kolla CLI reconfigure | passed: `run-cloud-ui-aio-kolla.py reconfigure-no-migration` via `kolla-ansible reconfigure -p` recap `openstack-aio : ok=34 changed=0 failed=0 skipped=2` |
 | E09.8 sanitized Docker inspect via Ansible script | passed: four containers non-root, read-only rootfs, `cap_drop=["ALL"]`, `no-new-privileges`, expected ports/alias |
 | E09.8 live endpoint checks via Ansible `uri` | passed: API ready HTTP 200, frontend index HTTP 200, frontend `/api/v1/session` HTTP 401 |
 | `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-backend-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_deployment_smoke_evidence.py tests/test_e09_reconfigure_rollback.py tests/test_e09_kolla_ansible_role.py tests/test_e09_haproxy_tls_network.py tests/test_e09_process_containers.py tests/test_e09_migration_job.py tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_image_build.py backend/tests/test_cli.py -q` | passed: 81 tests |

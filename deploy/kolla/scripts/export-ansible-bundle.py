@@ -31,6 +31,10 @@ BUNDLE_SOURCES = (
         "playbooks/cloud-ui-aio-reconfigure.yml",
     ),
     ("deploy/kolla/ansible/examples/cloud-ui-vars.yml.example", "examples/cloud-ui-vars.yml.example"),
+    (
+        "deploy/kolla/ansible/examples/cloud-ui-aio-kolla-vars.yml.example",
+        "examples/cloud-ui-aio-kolla-vars.yml.example",
+    ),
 )
 ROLE_PATH_NOTE = "Set ANSIBLE_ROLES_PATH=roles or configure an equivalent Ansible roles path."
 

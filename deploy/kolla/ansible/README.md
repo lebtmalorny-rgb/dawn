@@ -93,9 +93,23 @@ approved secret mechanism; secret-referencing tasks use `no_log: true`.
 For repeat convergence after the schema is already at head, set `cloud_ui_aio_run_migration=false`.
 The 2026-06-28 lab idempotency run completed with no changes using that flag.
 
-This is Kolla-Ansible-side lab evidence, not full upstream Kolla integration. It does not prove
-`kolla-ansible reconfigure --tags cloud-ui`, HAProxy/VIP/TLS routing, SELinux labels, corporate
-registry policy, failed-update rollback, or twelve containers across three nodes.
+`deploy/kolla/scripts/run-cloud-ui-aio-kolla.py` is the bounded Kolla CLI entry point for this AIO
+path. It builds:
+
+```text
+kolla-ansible reconfigure -i /etc/kolla/all-in-one \
+  -p /etc/kolla/cloud-ui-sync-bundle/playbooks/cloud-ui-aio-reconfigure.yml \
+  -t cloud-ui ...
+```
+
+The wrapper has three allowlisted modes: `preflight`, `reconfigure` and
+`reconfigure-no-migration`. It rejects production-looking inventories, non-digest image inputs and a
+closed rollback window. `examples/cloud-ui-aio-kolla-vars.yml.example` is non-secret only; runtime
+DB/MQ URL values must still come from an external non-committed vars file or approved secret source.
+
+This is Kolla CLI custom-playbook AIO evidence, not full upstream Kolla `site.yml` service
+integration. It does not prove HAProxy/VIP/TLS routing, SELinux labels, corporate registry policy,
+failed-update rollback, or twelve containers across three nodes.
 
 ## E09 Ansible sync bundle
 
@@ -104,10 +118,11 @@ packages the `cloud_ui` role, preflight playbook, placeholder example vars and a
 checksums. It contains no runtime secret value, inventory, SSH material, DB/MQ URL, token, private key
 or host-specific credential.
 
-The bundle now includes the AIO reconfigure playbook and `tasks/live-aio.yml` so an operator can copy
-the same bounded lab role path that was validated on 2026-06-28. It is still a local-only export:
-remote sync, DB/MQ auth remediation, live reconfigure and rollback evidence must be collected from
-the approved stand as `pending_external_evidence`, and the copied bundle should use
-`ANSIBLE_ROLES_PATH=roles` or an equivalent Ansible roles path configuration.
+The bundle now includes the AIO reconfigure playbook, `tasks/live-aio.yml` and the non-secret AIO
+Kolla vars example so an operator can copy the same bounded lab role path that was validated on
+2026-06-28. It is still a local-only export: remote sync, DB/MQ auth remediation, live reconfigure
+and rollback evidence must be collected from the approved stand as `pending_external_evidence`, and
+the copied bundle should use `ANSIBLE_ROLES_PATH=roles` or an equivalent Ansible roles path
+configuration.
 
 Evidence: `docs/generated/e09-ansible-sync-bundle.md`.

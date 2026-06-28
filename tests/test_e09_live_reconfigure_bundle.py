@@ -171,7 +171,15 @@ def test_e09_live_reconfigure_bundle_files_exist() -> None:
 
 def test_preflight_playbook_is_local_and_imports_only_validation() -> None:
     play = load_play()
-    allowed_play_keys = {"name", "hosts", "connection", "gather_facts", "vars", "tasks"}
+    allowed_play_keys = {
+        "name",
+        "hosts",
+        "connection",
+        "gather_facts",
+        "tags",
+        "vars",
+        "tasks",
+    }
     unsafe_play_keys = {
         "become",
         "collections",
@@ -190,6 +198,7 @@ def test_preflight_playbook_is_local_and_imports_only_validation() -> None:
     assert play["hosts"] == "localhost"
     assert play["connection"] == "local"
     assert play["gather_facts"] is False
+    assert play["tags"] == ["cloud-ui"]
     assert play["vars"] == {"cloud_ui_enabled": True}
 
     tasks = load_tasks()

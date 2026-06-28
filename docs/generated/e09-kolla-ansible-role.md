@@ -63,7 +63,11 @@ Live AIO evidence collected on 2026-06-28:
 - sanitized Docker inspect for all four containers confirmed `cloudui`, `readonly=true`,
   `cap_drop=["ALL"]` and `security_opt=["no-new-privileges:true"]`.
 
-This is partial all-in-one lab evidence. It does not prove upstream Kolla `site.yml`/tag
+The follow-up AIO Kolla CLI path uses `deploy/kolla/scripts/run-cloud-ui-aio-kolla.py` to invoke the
+same custom playbook through `kolla-ansible reconfigure -p ... -t cloud-ui`. On 2026-06-28 the Kolla
+CLI preflight completed with `localhost : ok=10 changed=0 failed=0`, and the Kolla CLI
+`reconfigure-no-migration` run completed with `openstack-aio : ok=34 changed=0 failed=0 skipped=2`.
+This is still partial all-in-one lab evidence. It does not prove upstream Kolla `site.yml` service
 integration, HAProxy/VIP/TLS, SELinux labels, three-node/twelve-container rollout, corporate registry
 policy or failed-update rollback.
 
@@ -75,8 +79,8 @@ policy or failed-update rollback.
 | SBOM tied to deployed digests | pending_external_evidence | Requires approved SBOM tooling against the exact backend/frontend digests used by the stand. |
 | vulnerability scan | pending_external_evidence | Requires approved scanner output and policy threshold for the deployed images. |
 | image signature verification | pending_external_evidence | Requires approved signing keys and pull-time verification policy. |
-| Kolla-Ansible syntax/render against test inventory | partial_lab_evidence | AIO preflight and role playbook ran against `/etc/kolla/all-in-one`; full upstream `site.yml` integration remains pending. |
-| live Kolla-Ansible deploy/reconfigure | partial_lab_evidence | AIO role playbook converged four all-in-one containers. Three-node/twelve-container rollout and upstream tag path remain pending. |
+| Kolla-Ansible syntax/render against test inventory | partial_lab_evidence | AIO preflight and Kolla CLI custom playbook path run against `/etc/kolla/all-in-one`; full upstream `site.yml` integration remains pending. |
+| live Kolla-Ansible deploy/reconfigure | partial_lab_evidence | AIO Kolla CLI custom playbook path converges four all-in-one containers. Three-node/twelve-container rollout and upstream `site.yml` path remain pending. |
 | MariaDB schema/user and RabbitMQ vhost/user provisioning | pending_external_evidence | Later E09 slices own database, broker and secret integration. |
 | one-shot `cloud-ui db-upgrade` migration ordering | partial_lab_evidence | E09.4 adds `cloud_ui_db_migrate` job metadata outside the permanent container set; the AIO role executed the migration and can skip it for repeat convergence with `cloud_ui_aio_run_migration=false`. |
 | HAProxy/TLS routing | pending_external_evidence | Requires Kolla TLS/HAProxy configuration and certificate evidence. |
@@ -105,8 +109,10 @@ policy or failed-update rollback.
 ## AIO Role Evidence Update
 
 The 2026-06-28 all-in-one role run narrows ДКБ-65/69/70/76/77/80/82 by proving a default-off role
-path can converge the current lab UI without manual Docker replacement. Full E09 acceptance remains
-blocked until the approved stand proves the three-node layout, HAProxy/VIP/TLS, SELinux labels,
+path can converge the current lab UI without manual Docker replacement. The follow-up Kolla CLI path
+uses `kolla-ansible reconfigure -p` for the same bounded AIO playbook and has live preflight,
+idempotency, endpoint and hardening evidence. Full E09 acceptance remains blocked until the approved
+stand proves upstream `site.yml` integration, the three-node layout, HAProxy/VIP/TLS, SELinux labels,
 corporate registry policy, formal ДКБ-69 waiver and failed-update rollback.
 
 ## E09.4 Update

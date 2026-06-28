@@ -3,6 +3,8 @@
   hosts: localhost
   connection: local
   gather_facts: false
+  tags:
+    - cloud-ui
   vars:
     cloud_ui_enabled: true
   tasks:

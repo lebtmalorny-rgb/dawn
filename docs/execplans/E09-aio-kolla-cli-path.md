@@ -67,16 +67,32 @@ reconfigure -p <custom-playbook>`, а не прямой `ansible-playbook`. По
 
 - [x] 2026-06-28: Исследование фактического состояния. Evidence: E09 task/docs read, current role
   inspected, Kolla host CLI help confirms `reconfigure -p`, baseline E09 pytest `108 passed`.
-- [ ] Контракт и тестовый double.
-- [ ] Минимальная реализация.
-- [ ] Отрицательные сценарии и безопасность.
-- [ ] Интеграционные и пользовательские проверки.
-- [ ] Документация, evidence и review.
+- [x] 2026-06-28: Контракт и тестовый double. Evidence:
+  `tests/test_e09_aio_kolla_cli_path.py` failed in RED with missing wrapper/example/tags, then passed
+  after implementation.
+- [x] 2026-06-28: Минимальная реализация. Evidence:
+  `deploy/kolla/scripts/run-cloud-ui-aio-kolla.py`, tagged playbooks/tasks and non-secret AIO vars
+  example were added; targeted suite passed `52 passed`.
+- [x] 2026-06-28: Отрицательные сценарии и безопасность. Evidence: tests reject unsafe modes,
+  production-looking inventories, tag-only image inputs and closed rollback windows. A regression test
+  covers Kolla venv `PATH` propagation after live preflight initially failed to find
+  `ansible-playbook`.
+- [x] 2026-06-28: Интеграционные и пользовательские проверки. Evidence: Kolla CLI preflight recap
+  `localhost : ok=10 changed=0 failed=0`; Kolla CLI reconfigure-no-migration recap
+  `openstack-aio : ok=34 changed=0 failed=0 skipped=2`; endpoint smoke returned API ready 200,
+  frontend 200 and frontend session 401; sanitized inspect confirmed non-root/read-only/cap-drop.
+- [x] 2026-06-28: Документация, evidence и review. Evidence: E09 smoke evidence, Kolla role
+  evidence, current-state, DKB traceability and risk register were updated; local verification passed
+  with E09 pytest `118 passed`, ruff `All checks passed!`, secret scan exit `0` and
+  `git diff --check` exit `0`.
 
 ## Неожиданные открытия
 
 - Kolla-Ansible custom playbooks are supported by CLI option `-p PLAYBOOKS`; this allows an AIO path
   without mutating venv-owned upstream `site.yml`.
+- Running the wrapper with `/usr/bin/python3` initially failed because Kolla-Ansible could not find
+  `ansible-playbook` on PATH. The root cause was missing Kolla venv bin propagation; the wrapper now
+  prepends the `--kolla-ansible` parent directory to PATH.
 
 ## Журнал решений
 
@@ -143,4 +159,22 @@ copy snapshot env/inspect contents into Git.
 
 ## Итог и остаточные риски
 
-Pending until implementation and live evidence are complete.
+Implemented and live-verified the bounded AIO Kolla CLI custom-playbook path. The wrapper
+`deploy/kolla/scripts/run-cloud-ui-aio-kolla.py` builds `kolla-ansible reconfigure -p ... -t
+cloud-ui`, rejects unsafe modes and unsafe inputs, and prepends the Kolla virtualenv bin directory to
+PATH so `ansible-playbook` is resolved correctly.
+
+Live result on 2026-06-28:
+
+- rollback snapshot: `/root/cloud-ui-aio-rollback-20260628T112402Z`;
+- Kolla CLI preflight: `localhost : ok=10 changed=0 failed=0`;
+- Kolla CLI `reconfigure-no-migration`: `openstack-aio : ok=34 changed=0 failed=0 skipped=2`;
+- API readiness HTTP 200 with DB/RabbitMQ reachable;
+- frontend HTTP 200;
+- frontend `/api/v1/session` HTTP 401;
+- sanitized inspect confirmed `cloudui`, `readonly=true`, `cap_drop=["ALL"]` and
+  `security_opt=["no-new-privileges:true"]`.
+
+Remaining risks: this is still a custom-playbook AIO Kolla CLI path, not upstream Kolla `site.yml`
+service integration, not HAProxy/VIP/TLS, not SELinux label proof, not three-node/twelve-container
+acceptance and not failed-update rollback acceptance.

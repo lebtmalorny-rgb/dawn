@@ -533,6 +533,18 @@ This further narrows, but still does not close, the affected requirements:
   `site.yml`/tag integration, three-node rolling update and failed-update rollback acceptance remain
   open.
 
+Обновление live evidence 2026-06-28, AIO Kolla CLI path: добавлен и выполнен bounded wrapper
+`deploy/kolla/scripts/run-cloud-ui-aio-kolla.py`, который строит allowlisted запуск
+`kolla-ansible reconfigure -p <cloud-ui-aio-playbook> -t cloud-ui` для текущего all-in-one пути.
+Wrapper rejects production-looking inventories, non-digest image inputs and a closed rollback window,
+and it does not read or print DB/MQ runtime URL values. Kolla CLI preflight completed with
+`localhost : ok=10 changed=0 failed=0`; Kolla CLI `reconfigure-no-migration` completed with
+`openstack-aio : ok=34 changed=0 failed=0 skipped=2`. Post-run smoke returned API readiness HTTP 200,
+frontend HTTP 200 and frontend `/api/v1/session` HTTP 401; sanitized inspect confirmed `cloudui`,
+read-only rootfs, `cap_drop=["ALL"]` and `no-new-privileges`. This narrows ДКБ-82 from direct
+`ansible-playbook` evidence to Kolla CLI custom-playbook evidence, but still does not close upstream
+Kolla `site.yml` service integration, three-node rolling update or failed-update rollback acceptance.
+
 ## E09 live reconfigure preflight bundle
 
 Обновление требований 2026-06-26: E09 live reconfigure preflight bundle is preflight only. It

@@ -18,6 +18,7 @@ RISK_REGISTER = ROOT / "docs/generated/risk-register.md"
 
 EXPECTED_BUNDLE_FILES = {
     "examples/cloud-ui-vars.yml.example",
+    "examples/cloud-ui-aio-kolla-vars.yml.example",
     "manifest.json",
     "playbooks/cloud-ui-aio-reconfigure.yml",
     "playbooks/cloud-ui-preflight.yml",

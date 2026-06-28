@@ -1,0 +1,13 @@
+---
+# Non-secret AIO Kolla CLI variables for:
+#   run-cloud-ui-aio-kolla.py reconfigure-no-migration ...
+#
+# Runtime DB/MQ URL variables must be supplied from a separate non-committed
+# file or an approved deployment secret source.
+
+cloud_ui_test_stand: true
+cloud_ui_rollback_window_open: true
+cloud_ui_registry: "192.168.10.15:5000/kolla/cloud-ui-test"
+cloud_ui_backend_image_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+cloud_ui_frontend_image_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+cloud_ui_aio_run_migration: false
