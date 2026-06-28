@@ -152,5 +152,39 @@ def test_aio_live_migration_can_be_disabled_for_idempotent_reconfigure() -> None
         == "{{ cloud_ui_migration_job.container_name }}"
     ]
 
-    assert len(migration_tasks) == 1
-    assert migration_tasks[0]["when"] == "cloud_ui_aio_run_migration | bool"
+    assert len(migration_tasks) == 2
+    assert all(
+        task["when"] == "cloud_ui_aio_run_migration | bool"
+        for task in migration_tasks
+    )
+
+
+def test_aio_live_migration_runs_precheck_before_upgrade() -> None:
+    tasks = load_tasks(LIVE_TASKS)
+    migration_tasks = [
+        task
+        for task in tasks
+        if task.get("community.docker.docker_container", {}).get("name")
+        == "{{ cloud_ui_migration_job.container_name }}"
+    ]
+    commands = [
+        task["community.docker.docker_container"]["command"]
+        for task in migration_tasks
+    ]
+
+    assert commands == ["cloud-ui db-upgrade --check", "cloud-ui db-upgrade"]
+    for task in migration_tasks:
+        assert task["when"] == "cloud_ui_aio_run_migration | bool"
+        assert task["no_log"] is True
+        container = task["community.docker.docker_container"]
+        assert container["detach"] is False
+        assert container["cleanup"] is True
+        assert container["read_only"] == "{{ cloud_ui_aio_read_only }}"
+        assert container["user"] == "{{ cloud_ui_aio_container_user }}"
+        assert container["cap_drop"] == "{{ cloud_ui_aio_cap_drop }}"
+        assert container["security_opts"] == "{{ cloud_ui_aio_security_opts }}"
+        assert (
+            container["env_file"]
+            == "{{ cloud_ui_config_root }}/cloud-ui-backend/cloud-ui-backend.env"
+        )
+        assert "env" not in container

@@ -3,7 +3,7 @@
 - Stage: E09 Ansible sync bundle
 - Scope: local-only export; remote sync remains separately approved
 - Live execution status: `pending_external_evidence`
-- Source commit: `e09-aio-kolla-cli-path-local`
+- Source commit: `e09-aio-kolla-migration-reconfigure-local`
 - Bundle schema: `e09-ansible-sync-bundle/v1`
 - runtime secret value: absent; DB/MQ URLs remain external runtime secret inputs
 
@@ -20,7 +20,7 @@
 | `roles/cloud_ui/tasks/config.yml` | 994 | `732d109d520ba585775c6a6232a34d9052d068d4060dbd2afb1456a4cd3f2e83` |
 | `roles/cloud_ui/tasks/containers.yml` | 701 | `e6a8329ff57dfaf64644a75073c225c1ae46dc7943ef1dab0009f7924eb66b6f` |
 | `roles/cloud_ui/tasks/lifecycle.yml` | 1346 | `cf0b352e7b059bcb76b42b1785f32ef2d0dcedf25a31860ed10af914671f7ddc` |
-| `roles/cloud_ui/tasks/live-aio.yml` | 5160 | `c4114cc425c532ff38621f4384945418e03a4cf6dfcd7c8e0eeffcf036a4e8e8` |
+| `roles/cloud_ui/tasks/live-aio.yml` | 5989 | `195568135be9ec88af7de67ec7a3811e5997c44bade4bc3d91a6852a4d1cadef` |
 | `roles/cloud_ui/tasks/main.yml` | 637 | `bc163e652927b8994d0d0d3d064994d9ca3933d94782f1b24953b9356e6154b3` |
 | `roles/cloud_ui/tasks/migration.yml` | 375 | `2c8d50320a9584b09509cdbb7981e9fea2c2ef61548e1ee54d3f9e98af35f2fc` |
 | `roles/cloud_ui/tasks/validate.yml` | 3539 | `13db400fc8828a49b8b25ac8606a1cfa69512056bc754bc21bb04309f2549614` |

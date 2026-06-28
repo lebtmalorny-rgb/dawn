@@ -91,7 +91,9 @@ no container socket mount. Runtime DB/MQ URLs must be passed from a non-committe
 approved secret mechanism; secret-referencing tasks use `no_log: true`.
 
 For repeat convergence after the schema is already at head, set `cloud_ui_aio_run_migration=false`.
-The 2026-06-28 lab idempotency run completed with no changes using that flag.
+The AIO migration path runs `cloud-ui db-upgrade --check` before `cloud-ui db-upgrade` and reads the
+already rendered backend env-file instead of passing DB/MQ secret values through the migration task
+argument dict. The 2026-06-28 lab idempotency run completed with no changes using the skip flag.
 
 `deploy/kolla/scripts/run-cloud-ui-aio-kolla.py` is the bounded Kolla CLI entry point for this AIO
 path. It builds:

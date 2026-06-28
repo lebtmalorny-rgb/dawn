@@ -538,12 +538,19 @@ This further narrows, but still does not close, the affected requirements:
 `kolla-ansible reconfigure -p <cloud-ui-aio-playbook> -t cloud-ui` для текущего all-in-one пути.
 Wrapper rejects production-looking inventories, non-digest image inputs and a closed rollback window,
 and it does not read or print DB/MQ runtime URL values. Kolla CLI preflight completed with
-`localhost : ok=10 changed=0 failed=0`; Kolla CLI `reconfigure-no-migration` completed with
-`openstack-aio : ok=34 changed=0 failed=0 skipped=2`. Post-run smoke returned API readiness HTTP 200,
-frontend HTTP 200 and frontend `/api/v1/session` HTTP 401; sanitized inspect confirmed `cloudui`,
-read-only rootfs, `cap_drop=["ALL"]` and `no-new-privileges`. This narrows ДКБ-82 from direct
-`ansible-playbook` evidence to Kolla CLI custom-playbook evidence, but still does not close upstream
-Kolla `site.yml` service integration, three-node rolling update or failed-update rollback acceptance.
+`localhost : ok=10 changed=0 failed=0`. A later migration-enabled Kolla CLI run executed
+`cloud-ui db-upgrade --check` before `cloud-ui db-upgrade` through disposable backend containers and
+completed with `openstack-aio : ok=36 changed=2 failed=0 skipped=1`; the repeat
+`reconfigure-no-migration` run completed with `openstack-aio : ok=34 changed=0 failed=0 skipped=3`.
+The migration tasks use the rendered backend env-file, whose template render is `no_log: true`,
+instead of passing DB/MQ secret values through the migration task argument dict. Post-run smoke
+returned API readiness HTTP 200, frontend HTTP 200 and frontend `/api/v1/session` HTTP 401; sanitized
+inspect confirmed `cloudui`, read-only rootfs, `cap_drop=["ALL"]` and `no-new-privileges`. An initial
+stale-digest attempt stopped before permanent container changes with `changed=0`; diagnostics showed
+the schema was already `0006_audit_delivery (head)` and the failure was a registry 404 for the stale
+backend digest input. This narrows ДКБ-82 from direct `ansible-playbook` evidence to Kolla CLI
+custom-playbook evidence with migration, but still does not close upstream Kolla `site.yml` service
+integration, three-node rolling update or failed-update rollback acceptance.
 
 ## E09 live reconfigure preflight bundle
 

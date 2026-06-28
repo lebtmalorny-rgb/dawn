@@ -41,6 +41,29 @@
   tags:
     - cloud-ui
 
+- name: Run Cloud UI migration precheck
+  community.docker.docker_container:
+    name: "{{ cloud_ui_migration_job.container_name }}"
+    image: "{{ cloud_ui_backend_image_full }}"
+    command: "cloud-ui db-upgrade --check"
+    state: started
+    detach: false
+    cleanup: true
+    read_only: "{{ cloud_ui_aio_read_only }}"
+    user: "{{ cloud_ui_aio_container_user }}"
+    cap_drop: "{{ cloud_ui_aio_cap_drop }}"
+    security_opts: "{{ cloud_ui_aio_security_opts }}"
+    tmpfs: "{{ cloud_ui_aio_tmpfs }}"
+    volumes:
+      - "{{ cloud_ui_log_volume }}:/var/log/kolla"
+    networks:
+      - name: "{{ cloud_ui_aio_network_name }}"
+    env_file: "{{ cloud_ui_config_root }}/cloud-ui-backend/cloud-ui-backend.env"
+  no_log: true
+  when: cloud_ui_aio_run_migration | bool
+  tags:
+    - cloud-ui
+
 - name: Run Cloud UI one-shot migration
   community.docker.docker_container:
     name: "{{ cloud_ui_migration_job.container_name }}"
@@ -58,7 +81,7 @@
       - "{{ cloud_ui_log_volume }}:/var/log/kolla"
     networks:
       - name: "{{ cloud_ui_aio_network_name }}"
-    env: "{{ cloud_ui_backend_environment }}"
+    env_file: "{{ cloud_ui_config_root }}/cloud-ui-backend/cloud-ui-backend.env"
   no_log: true
   when: cloud_ui_aio_run_migration | bool
   tags:
