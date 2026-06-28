@@ -3,7 +3,7 @@
 - Date: 2026-06-28
 - Workspace: `/Users/dmitry/Desktop/dawn`
 - Stage: E09.8 deployment smoke/evidence handoff
-- Evidence status: all-in-one test UI is role-reconfigured, Kolla CLI custom-playbook path is migration- and smoke-passed, and full three-node E09 acceptance remains pending
+- Evidence status: all-in-one test UI is role-reconfigured, Kolla CLI custom-playbook path is migration- and smoke-passed, AIO operator runbook is recorded, and full three-node E09 acceptance remains pending
 
 ## Repository state
 
@@ -16,8 +16,8 @@ Current branch and pushed state observed on 2026-06-28:
 | repository root | `/Users/dmitry/Desktop/dawn` |
 | branch | `main` |
 | remote | `https://github.com/lebtmalorny-rgb/dawn.git` |
-| local HEAD | feature worktree contains the AIO Kolla CLI digest availability preflight update |
-| origin branch | `origin/main` contains the AIO Kolla CLI migration reconfigure evidence through `e02cc4f`; this digest preflight update is pending merge |
+| local HEAD | feature worktree contains the AIO operator baseline runbook update |
+| origin branch | `origin/main` contains the AIO digest availability preflight through `1e0782e`; this runbook update is pending merge |
 
 ## Current E09 handoff
 
@@ -50,6 +50,8 @@ All-in-one test UI status on 2026-06-28:
   skipped=1`; the changes were the disposable migration precheck and upgrade containers.
 - follow-up AIO idempotency with `cloud_ui_aio_run_migration=false` completed with no changes:
   `openstack-aio : ok=34 changed=0 failed=0 skipped=3`.
+- operator runbook for the current AIO baseline is recorded in
+  `docs/generated/e09-aio-operator-runbook.md`.
 
 Full E09 acceptance is not claimed. The live deployment evidence remains partial until the approved
 test stand provides:
@@ -84,6 +86,7 @@ Latest local verification for the handoff:
 Primary handoff documents:
 
 - `docs/execplans/E09-deployment-smoke-evidence.md`;
+- `docs/generated/e09-aio-operator-runbook.md`;
 - `docs/generated/e09-deployment-smoke-evidence.md`;
 - `deploy/kolla/scripts/collect-e09-evidence.py`;
 - `tests/test_e09_deployment_smoke_evidence.py`;

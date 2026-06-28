@@ -556,6 +556,14 @@ digest-availability preflight and migration, but still does not close upstream K
 service integration, corporate registry signing/scanning, three-node rolling update or failed-update
 rollback acceptance.
 
+Обновление 2026-06-28, AIO operator baseline: `docs/generated/e09-aio-operator-runbook.md` фиксирует
+поддерживаемую all-in-one процедуру для текущего test UI baseline: digest source, preflight,
+migration-enabled reconfigure, repeat convergence without migration, direct-port smoke, sanitized
+container inspection and rollback reference. This improves ДКБ-70/82 operator reproducibility and
+keeps ДКБ-55/56 secret handling explicit because the runbook does not store runtime secret values.
+The runbook is labelled as all-in-one only; it does not close three-node rollout, HAProxy/VIP/TLS,
+SELinux, corporate registry policy, ДКБ-69 waiver or failed-update rollback acceptance.
+
 ## E09 live reconfigure preflight bundle
 
 Обновление требований 2026-06-26: E09 live reconfigure preflight bundle is preflight only. It
