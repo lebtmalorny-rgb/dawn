@@ -1,23 +1,23 @@
 # Current state baseline
 
-- Date: 2026-06-26
+- Date: 2026-06-28
 - Workspace: `/Users/dmitry/Desktop/dawn`
 - Stage: E09.8 deployment smoke/evidence handoff
-- Evidence status: repository evidence implemented; live test-stand gates are pending external sanitized evidence
+- Evidence status: all-in-one test UI is deployed and smoke-passed; full three-node E09 acceptance remains pending
 
 ## Repository state
 
 Fact: current workspace is a Git repository.
 
-Current branch and pushed state observed on 2026-06-26:
+Current branch and pushed state observed on 2026-06-28:
 
 | Item | Observed value |
 |---|---|
 | repository root | `/Users/dmitry/Desktop/dawn` |
 | branch | `main` |
 | remote | `https://github.com/lebtmalorny-rgb/dawn.git` |
-| local HEAD | `cb57783 docs: record E09 authorization redaction review fix` |
-| origin branch | `main...origin/main`; no local drift before this documentation refresh |
+| local HEAD | local `main` contains E09.8 image/runtime fixes and this evidence refresh |
+| origin branch | local branch is ahead of `origin/main`; not pushed in this evidence run |
 
 ## Current E09 handoff
 
@@ -32,26 +32,39 @@ E09 is the active stage. Repository-side evidence exists for E09.1-E09.8:
 - E09.7 reconfigure, rolling update and rollback lifecycle contract;
 - E09.8 fail-closed deployment evidence runner and redaction tests.
 
-Full E09 acceptance is not claimed. The live deployment rows in
-`docs/generated/e09-deployment-smoke-evidence.md` remain `pending_external_evidence` until the
-approved test stand provides:
+All-in-one test UI status on 2026-06-28:
 
-- confirmed SSH host identity and approved inventory path with `cloud_ui_test_stand`;
-- `cloud-ui-backend` and `cloud-ui-frontend` image refs pinned by `@sha256`;
-- an open rollback window;
+- approved test inventory `/etc/kolla/all-in-one` was used through Ansible host `192.168.10.15`;
+- backend image `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-backend@sha256:7e8a4bae48bbc2b3539b33babe39d290b22ae2d61e21d0f886434af1ac2bc438` is live;
+- frontend image `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-frontend@sha256:750ac3131e9ea9868d0893ff6df4eb603641b31c413c204c6a1470c20d17e790` is live;
+- four Cloud UI containers are running on `openstack-aio`: frontend, api, worker and events;
+- API readiness on `127.0.0.1:18081` returns HTTP 200 with DB/RabbitMQ reachable;
+- frontend on `127.0.0.1:13080` returns HTTP 200 and references bundle `index-CPtHnxYH.js`;
+- frontend proxy to `/api/v1/session` returns HTTP 401 `not_authenticated`;
+- sanitized inspect shows all four containers run as `cloudui` with read-only root filesystem,
+  dropped capabilities and `no-new-privileges`.
+
+Full E09 acceptance is not claimed. The live deployment evidence remains partial until the approved
+test stand provides:
+
 - 12 live Cloud UI permanent containers on three test nodes;
-- one-shot migration execution and failure/retry evidence;
-- HAProxy/TLS health and API/UI smoke;
-- DB/RabbitMQ least-privilege checks without secret output;
-- non-root/caps/mounts/SELinux container inspection;
+- live `kolla-ansible reconfigure --tags cloud-ui` or equivalent accepted role path;
+- HAProxy/VIP/TLS health and negative TLS evidence;
+- SELinux label and host policy evidence;
+- corporate registry signing, scanner/provenance and ДКБ-69 waiver evidence;
 - executed failed-update rollback evidence.
 
 Latest local verification for the handoff:
 
 | Command | Result |
 |---|---|
-| `backend/.venv/bin/python -m pytest tests/test_e09_deployment_smoke_evidence.py tests/test_e09_reconfigure_rollback.py tests/test_e09_kolla_ansible_role.py tests/test_e09_haproxy_tls_network.py tests/test_e09_process_containers.py tests/test_e09_migration_job.py tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_image_build.py -q` | passed: 68 tests |
+| E09.8 all-in-one debug smoke via Ansible script | passed: new API/frontend debug containers started, API readiness `ok`, frontend `/api/v1/session` returned HTTP 401 |
+| E09.8 all-in-one live deploy via Ansible script | passed: rollback snapshot created, `cloud-ui db-upgrade` returned success, four live containers replaced by digest images |
+| E09.8 sanitized Docker inspect via Ansible script | passed: four containers non-root, read-only rootfs, `cap_drop=["ALL"]`, `no-new-privileges`, expected ports/alias |
+| E09.8 live endpoint checks via Ansible `uri` | passed: API ready HTTP 200, frontend index HTTP 200, frontend `/api/v1/session` HTTP 401 |
+| `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-backend-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_deployment_smoke_evidence.py tests/test_e09_reconfigure_rollback.py tests/test_e09_kolla_ansible_role.py tests/test_e09_haproxy_tls_network.py tests/test_e09_process_containers.py tests/test_e09_migration_job.py tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_image_build.py backend/tests/test_cli.py -q` | passed: 81 tests |
 | `./scripts/secret-scan.sh` | passed |
+| `git diff --check` | passed |
 
 Primary handoff documents:
 

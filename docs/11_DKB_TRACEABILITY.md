@@ -487,6 +487,28 @@ Evidence: `tests/test_e09_deployment_smoke_evidence.py`,
 `docs/generated/risk-register.md` and ExecPlan
 `docs/execplans/E09-deployment-smoke-evidence.md`.
 
+Обновление live evidence 2026-06-28: на утвержденном all-in-one test stand Cloud UI развернут
+из digest-pinned backend/frontend образов через ограниченный Ansible/Docker lab script. Зафиксированы
+четыре live контейнера (`frontend`, `api`, `worker`, `events`), успешный `cloud-ui db-upgrade`,
+API readiness HTTP 200 с DB/RabbitMQ `reachable`, frontend HTTP 200 и frontend BFF route
+`/api/v1/session` HTTP 401 без раскрытия сессии. Sanitized Docker inspect подтвердил non-root
+`cloudui`, read-only root filesystem, `cap_drop=["ALL"]` и `no-new-privileges` для всех четырех
+контейнеров. Runtime env, credentials and full inspect files are not committed.
+
+This narrows, but does not close, the affected requirements:
+
+- ДКБ-55/56: lab DB/MQ runtime access now works without committing secret values. Full SecMan/Kolla
+  rotation, revoke, owner approval and production secret lifecycle evidence remain open.
+- ДКБ-65: container user/cap/read-only-rootfs evidence is now available for one all-in-one test node.
+  SELinux label and host policy evidence remain open.
+- ДКБ-69/70: digest pull/deploy evidence exists for the test registry. ДКБ-69 remains a formal
+  Python interpreter/shell waiver gap; corporate registry signing, scanner/SBOM and provenance remain
+  open.
+- ДКБ-76/77/80: live evidence is limited to one Docker `cloud-ui` network and direct test ports.
+  Three-node topology, management VLAN, firewall/ACL and unused-interface blocking remain open.
+- ДКБ-82: rollback snapshot and smoke evidence exist for the all-in-one lab. Full Kolla-Ansible
+  reconfigure, rolling update and failed-update rollback acceptance remain open.
+
 ## E09 live reconfigure preflight bundle
 
 Обновление требований 2026-06-26: E09 live reconfigure preflight bundle is preflight only. It

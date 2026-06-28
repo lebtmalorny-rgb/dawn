@@ -107,8 +107,9 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   found in 83 source files` and frontend `tsc -b`; `make security` exited `0` via
   `./scripts/secret-scan.sh`; `make test` exited `0` with backend `327 passed, 1 skipped in 3.28s`
   and frontend vitest `35 passed (35)`; `git diff --check` exited `0` before the ExecPlan update.
-- [ ] Optional live test-stand execution and sanitized evidence refresh remain pending. Read-only
-  discovery against the provided test address on 2026-06-25 did not produce attachable live evidence:
+- [x] 2026-06-28: Optional live all-in-one test-stand execution and sanitized evidence refresh were
+  completed for the bounded lab scope. Earlier read-only discovery against the provided test address
+  on 2026-06-25 did not produce attachable live evidence:
   OpenSSH reported a host-key mismatch, `podman` was present but Cloud UI/Kolla containers/images were
   not found by name, `kolla-ansible`/`kolla-build` were not on PATH, and no approved inventory path or
   backend/frontend image digests were available.
@@ -138,6 +139,21 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
     `1045 Access denied` for `cloud_ui`, and RabbitMQ returns `403 ACCESS_REFUSED` on `/cloud-ui`.
     This is recorded as runtime DB/MQ secret injection or principal drift, not as a Keystone RBAC
     failure.
+  - 2026-06-28: no-log lab remediation reset the existing Cloud UI MariaDB/RabbitMQ principals from
+    approved test-host secret material without printing values. API readiness then returned HTTP 200
+    with DB/RabbitMQ reachable.
+  - 2026-06-28: new backend/frontend digest images were debug-smoked on temporary ports. API status
+    was `running`, frontend status was `running`, readiness was `ok`, and frontend
+    `/api/v1/session` returned HTTP 401.
+  - 2026-06-28: live all-in-one deploy completed with `rc=0`, created rollback snapshot
+    `/root/cloud-ui-aio-rollback-20260628T051453Z`, ran `cloud-ui db-upgrade`, and replaced
+    `cloud_ui_frontend`, `cloud_ui_api`, `cloud_ui_worker` and `cloud_ui_events` with digest-pinned
+    images.
+  - 2026-06-28: sanitized Docker inspect confirmed `user=cloudui`, `readonly=true`,
+    `cap_drop=["ALL"]` and `security_opt=["no-new-privileges:true"]` for all four live containers.
+  - 2026-06-28: endpoint smoke passed on the all-in-one node: API readiness HTTP 200, frontend index
+    HTTP 200 with `index-CPtHnxYH.js`, and frontend `/api/v1/session` HTTP 401 `not_authenticated`.
+    This is still partial all-in-one evidence, not three-node E09 acceptance.
 
 ## Неожиданные открытия
 
@@ -177,6 +193,17 @@ count, image digests, hardening inspection, DB/RabbitMQ access, HAProxy/TLS heal
   `Authorization:` headers were redacted only for Bearer values. Commit
   `8cac2a4 deploy: redact all E09 authorization headers` now redacts any `Authorization:` or
   `Proxy-Authorization:` header value and adds Basic/Token/custom scheme regression tests.
+- 2026-06-28: Rocky/Kolla backend image needed Python 3.11 installation and `cloud-ui` console-script
+  packaging outside OpenStack upper constraints; otherwise the backend image built but runtime/migration
+  command was not compatible with project Python bounds.
+- 2026-06-28: Kolla profile/build-arg syntax had to match Kolla oslo config parsing: profile
+  `cloudui` and build args in `key:value` form. The earlier hyphenated profile and `key=value`
+  argument shape did not work reliably in the Kolla 2025.1 build environment.
+- 2026-06-28: Alembic migrations had to be packaged under `cloud_ui.migrations` and loaded through a
+  programmatic Alembic config. The previous repository-relative `alembic.ini` path failed inside the
+  installed Kolla backend image.
+- 2026-06-28: Frontend nginx required writable temp paths and a pre-created `kolla_logs` subdirectory
+  owned by `cloudui`; the named log volume hides image-created directories at runtime.
 
 ## Журнал решений
 
@@ -204,11 +231,16 @@ Repository paths to create or modify:
 
 ## Миграции и совместимость
 
-No database, OpenAPI, backend runtime command or frontend behavior changes are planned. The runner is
-additive and can be reverted by Git. Live stand rollback, if a mutating test run is executed, follows
-E09.7 failed-update phases before contract migration: stop rollout, restore previous config commit,
-restore previous image digests, rerun test reconfigure, smoke previous version and preserve
-operations/audit/read model/queued messages.
+The original runner is additive and can be reverted by Git. During live all-in-one execution, backend
+migration packaging and frontend nginx runtime changes were required so the already-defined
+`cloud-ui db-upgrade` and frontend process could run inside Kolla images with read-only rootfs. These
+changes preserve the existing public API and two-image contract.
+
+Live stand rollback follows E09.7 failed-update phases before any incompatible contract migration:
+stop rollout, restore previous config commit, restore previous image digests, rerun test reconfigure,
+smoke previous version and preserve operations/audit/read model/queued messages. The 2026-06-28
+deployment created a test-host rollback snapshot, but full E09 failed-update rollback acceptance still
+requires a separate approved run.
 
 ## Проверка
 
