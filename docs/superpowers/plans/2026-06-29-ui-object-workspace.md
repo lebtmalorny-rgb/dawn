@@ -33,7 +33,7 @@
 - Create: `frontend/src/workspace/ActionState.tsx`
 - Create: `frontend/src/workspace/ActionState.test.tsx`
 
-- [ ] **Step 1: Write the failing action-state tests**
+- [x] **Step 1: Write the failing action-state tests**
 
 Create `frontend/src/workspace/ActionState.test.tsx`:
 
@@ -94,7 +94,7 @@ describe("ActionStateList", () => {
 });
 ```
 
-- [ ] **Step 2: Run the failing action-state tests**
+- [x] **Step 2: Run the failing action-state tests**
 
 Run:
 
@@ -104,7 +104,7 @@ cd frontend && npm test -- --run src/workspace/ActionState.test.tsx
 
 Expected result: fail because `frontend/src/workspace/ActionState.tsx` does not exist.
 
-- [ ] **Step 3: Add shared types**
+- [x] **Step 3: Add shared types**
 
 Create `frontend/src/workspace/types.ts`:
 
@@ -155,7 +155,7 @@ export function actionStateLabel(state: WorkspaceActionState): string {
 }
 ```
 
-- [ ] **Step 4: Implement action-state component**
+- [x] **Step 4: Implement action-state component**
 
 Create `frontend/src/workspace/ActionState.tsx`:
 
@@ -190,7 +190,7 @@ export function ActionStateList({ actions, title }: ActionStateListProps) {
 }
 ```
 
-- [ ] **Step 5: Run action-state tests**
+- [x] **Step 5: Run action-state tests**
 
 Run:
 
@@ -200,7 +200,7 @@ cd frontend && npm test -- --run src/workspace/ActionState.test.tsx
 
 Expected result: tests pass.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 Run:
 
@@ -220,7 +220,7 @@ git commit -m "feat: add ui workspace action states"
 - Create: `frontend/src/workspace/SelectionSummary.test.tsx`
 - Modify: `frontend/src/workspace/types.ts`
 
-- [ ] **Step 1: Write failing panel tests**
+- [x] **Step 1: Write failing panel tests**
 
 Create `frontend/src/workspace/MetricsPanel.test.tsx`:
 
@@ -308,7 +308,7 @@ describe("SelectionSummaryPanel", () => {
 });
 ```
 
-- [ ] **Step 2: Run failing panel tests**
+- [x] **Step 2: Run failing panel tests**
 
 Run:
 
@@ -318,7 +318,7 @@ cd frontend && npm test -- --run src/workspace/MetricsPanel.test.tsx src/workspa
 
 Expected result: fail because the panel components do not exist.
 
-- [ ] **Step 3: Implement panels**
+- [x] **Step 3: Implement panels**
 
 Create `frontend/src/workspace/MetricsPanel.tsx`:
 
@@ -410,7 +410,7 @@ export function SelectionSummaryPanel({ summary, title }: SelectionSummaryPanelP
 }
 ```
 
-- [ ] **Step 4: Run panel tests**
+- [x] **Step 4: Run panel tests**
 
 Run:
 
@@ -420,7 +420,7 @@ cd frontend && npm test -- --run src/workspace/MetricsPanel.test.tsx src/workspa
 
 Expected result: tests pass.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 Run:
 
