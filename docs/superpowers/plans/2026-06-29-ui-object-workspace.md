@@ -438,7 +438,7 @@ git commit -m "feat: add ui workspace status panels"
 - Create: `frontend/src/workspace/hypervisor/HypervisorWorkspace.tsx`
 - Create: `frontend/src/workspace/hypervisor/HypervisorWorkspace.test.tsx`
 
-- [ ] **Step 1: Write failing VM workspace test**
+- [x] **Step 1: Write failing VM workspace test**
 
 Create `frontend/src/workspace/vm/VirtualMachineWorkspace.test.tsx`:
 
@@ -494,7 +494,7 @@ describe("VirtualMachineWorkspace", () => {
 });
 ```
 
-- [ ] **Step 2: Write failing hypervisor workspace test**
+- [x] **Step 2: Write failing hypervisor workspace test**
 
 Create `frontend/src/workspace/hypervisor/HypervisorWorkspace.test.tsx`:
 
@@ -547,7 +547,7 @@ describe("HypervisorWorkspace", () => {
 });
 ```
 
-- [ ] **Step 3: Run failing workspace tests**
+- [x] **Step 3: Run failing workspace tests**
 
 Run:
 
@@ -557,7 +557,7 @@ cd frontend && npm test -- --run src/workspace/vm/VirtualMachineWorkspace.test.t
 
 Expected result: fail because workspace components do not exist.
 
-- [ ] **Step 4: Implement tasks/events panel**
+- [x] **Step 4: Implement tasks/events panel**
 
 Create `frontend/src/workspace/TasksEventsPanel.tsx`:
 
@@ -579,7 +579,7 @@ export function TasksEventsPanel({ objectId }: TasksEventsPanelProps) {
 }
 ```
 
-- [ ] **Step 5: Implement VM workspace**
+- [x] **Step 5: Implement VM workspace**
 
 Create `frontend/src/workspace/vm/VirtualMachineWorkspace.tsx`:
 
@@ -645,7 +645,7 @@ export function VirtualMachineWorkspace({ capabilities, instance }: VirtualMachi
 }
 ```
 
-- [ ] **Step 6: Implement hypervisor workspace**
+- [x] **Step 6: Implement hypervisor workspace**
 
 Create `frontend/src/workspace/hypervisor/HypervisorWorkspace.tsx`:
 
@@ -707,7 +707,7 @@ export function HypervisorWorkspace({ capabilities, hypervisor }: HypervisorWork
 }
 ```
 
-- [ ] **Step 7: Run workspace tests**
+- [x] **Step 7: Run workspace tests**
 
 Run:
 
@@ -717,7 +717,7 @@ cd frontend && npm test -- --run src/workspace/vm/VirtualMachineWorkspace.test.t
 
 Expected result: tests pass.
 
-- [ ] **Step 8: Commit Task 3**
+- [x] **Step 8: Commit Task 3**
 
 Run:
 
