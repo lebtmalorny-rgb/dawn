@@ -112,7 +112,7 @@ export function HypervisorWorkspace({ capabilities, hypervisor }: HypervisorWork
         <dl className="cloud-ui-detail-list">
           <div>
             <dt>Host</dt>
-            <dd>{hypervisor.host_name}</dd>
+            <dd>Host: {hypervisor.host_name}</dd>
           </div>
           <div>
             <dt>Service</dt>

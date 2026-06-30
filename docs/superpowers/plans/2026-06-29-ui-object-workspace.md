@@ -733,7 +733,7 @@ git commit -m "feat: add vm and hypervisor workspaces"
 - Modify: `frontend/src/App.test.tsx`
 - Modify: `frontend/src/styles.css`
 
-- [ ] **Step 1: Write failing App integration tests**
+- [x] **Step 1: Write failing App integration tests**
 
 Append these tests to `frontend/src/App.test.tsx`:
 
@@ -817,7 +817,7 @@ test("renders hypervisor object workspace from the current paginated inventory p
 });
 ```
 
-- [ ] **Step 2: Run failing App integration tests**
+- [x] **Step 2: Run failing App integration tests**
 
 Run:
 
@@ -827,7 +827,7 @@ cd frontend && npm test -- --run src/App.test.tsx
 
 Expected result: new tests fail because `InventoryWorkArea` does not render workspace components.
 
-- [ ] **Step 3: Import workspace components in App**
+- [x] **Step 3: Import workspace components in App**
 
 Modify `frontend/src/App.tsx` imports:
 
@@ -836,7 +836,7 @@ import { HypervisorWorkspace } from "./workspace/hypervisor/HypervisorWorkspace"
 import { VirtualMachineWorkspace } from "./workspace/vm/VirtualMachineWorkspace";
 ```
 
-- [ ] **Step 4: Render workspace after current inventory tables**
+- [x] **Step 4: Render workspace after current inventory tables**
 
 In `InventoryWorkArea`, after the existing `renderInstancesPage(...)` block, add:
 
@@ -869,7 +869,7 @@ After the existing `renderHypervisorsPage(...)` block, add:
 This intentionally uses the first item on the current server-paginated page. It does not fetch a full
 inventory and does not create a new backend route.
 
-- [ ] **Step 5: Add dense workspace styles**
+- [x] **Step 5: Add dense workspace styles**
 
 Append to `frontend/src/styles.css`:
 
@@ -977,7 +977,7 @@ Append to `frontend/src/styles.css`:
 }
 ```
 
-- [ ] **Step 6: Run App integration tests**
+- [x] **Step 6: Run App integration tests**
 
 Run:
 
@@ -987,7 +987,7 @@ cd frontend && npm test -- --run src/App.test.tsx
 
 Expected result: App tests pass.
 
-- [ ] **Step 7: Commit Task 4**
+- [x] **Step 7: Commit Task 4**
 
 Run:
 

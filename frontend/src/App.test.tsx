@@ -2233,3 +2233,93 @@ test("renders allowed instance refresh affordance disabled until refresh contrac
     expect.anything(),
   );
 });
+
+test("renders VM object workspace from the current paginated inventory page", async () => {
+  window.history.replaceState({}, "", "/?view=instances");
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(
+        capabilitiesPayload(["instance.read", "hypervisor.read"]),
+      );
+    }
+    if (url === "/api/v1/session/csrf") {
+      return jsonResponse({
+        subject: operatorSessionPayload.subject,
+        csrf: "restored-csrf-value",
+        expires_at: "2026-06-21T15:00:00Z",
+      });
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/instances?limit=50&sort=name.asc") {
+      return jsonResponse(inventoryPage([instanceItem({ name: "vm-workspace" })]));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(
+    await screen.findByRole("region", { name: "VM object workspace" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Power on/off/reboot")).toBeInTheDocument();
+  expect(screen.getByText("VM console")).toBeInTheDocument();
+  expect(screen.getByText("Selected VM targets")).toBeInTheDocument();
+  expect(screen.queryByText(/prometheus/i)).not.toBeInTheDocument();
+});
+
+test("renders hypervisor object workspace from the current paginated inventory page", async () => {
+  window.history.replaceState({}, "", "/?view=hypervisors");
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/v1/session") {
+      return jsonResponse(operatorSessionPayload);
+    }
+    if (url === "/api/v1/health/ready") {
+      return jsonResponse(readyPayload);
+    }
+    if (url === "/api/v1/capabilities") {
+      return jsonResponse(
+        capabilitiesPayload(["instance.read", "hypervisor.read"]),
+      );
+    }
+    if (url === "/api/v1/session/csrf") {
+      return jsonResponse({
+        subject: operatorSessionPayload.subject,
+        csrf: "restored-csrf-value",
+        expires_at: "2026-06-21T15:00:00Z",
+      });
+    }
+    if (url === "/api/v1/inventory/modules") {
+      return jsonResponse(inventoryModulesPayload());
+    }
+    if (url === "/api/v1/hypervisors?limit=50&sort=host_name.asc") {
+      return jsonResponse(
+        inventoryPage([hypervisorItem({ host_name: "compute-workspace" })]),
+      );
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+
+  expect(
+    await screen.findByRole("region", { name: "Hypervisor object workspace" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Enter maintenance with evacuation")).toBeInTheDocument();
+  expect(screen.getByText("Host users and rights")).toBeInTheDocument();
+  expect(screen.getByText("Selected hypervisor targets")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("textbox", { name: /shell|command|path|script/i }),
+  ).not.toBeInTheDocument();
+});

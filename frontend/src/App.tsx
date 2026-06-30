@@ -50,6 +50,8 @@ import {
 } from "./api";
 import type { ShellContext } from "./navigation/types";
 import { CloudShell } from "./shell/CloudShell";
+import { HypervisorWorkspace } from "./workspace/hypervisor/HypervisorWorkspace";
+import { VirtualMachineWorkspace } from "./workspace/vm/VirtualMachineWorkspace";
 import "./styles.css";
 
 const READINESS_UNAVAILABLE_MESSAGE = "Готовность API недоступна";
@@ -1825,6 +1827,16 @@ function InventoryWorkArea({
         )}
 
       {state.type === "ready" &&
+        state.view === "instances" &&
+        activeView === "instances" &&
+        state.page.items.length > 0 && (
+          <VirtualMachineWorkspace
+            capabilities={capabilities.capabilities}
+            instance={state.page.items[0]}
+          />
+        )}
+
+      {state.type === "ready" &&
         state.view === "hypervisors" &&
         activeView === "hypervisors" &&
         renderHypervisorsPage(
@@ -1833,6 +1845,16 @@ function InventoryWorkArea({
           capabilities,
           onInventoryLinkSelect,
           onInventoryNextPage,
+        )}
+
+      {state.type === "ready" &&
+        state.view === "hypervisors" &&
+        activeView === "hypervisors" &&
+        state.page.items.length > 0 && (
+          <HypervisorWorkspace
+            capabilities={capabilities.capabilities}
+            hypervisor={state.page.items[0]}
+          />
         )}
     </section>
   );

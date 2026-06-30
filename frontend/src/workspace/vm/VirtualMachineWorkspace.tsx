@@ -139,7 +139,7 @@ export function VirtualMachineWorkspace({
         <dl className="cloud-ui-detail-list">
           <div>
             <dt>Name</dt>
-            <dd>{instance.name}</dd>
+            <dd>VM name: {instance.name}</dd>
           </div>
           <div>
             <dt>Status</dt>
@@ -149,7 +149,7 @@ export function VirtualMachineWorkspace({
           </div>
           <div>
             <dt>Host</dt>
-            <dd>{instance.host_name ?? "-"}</dd>
+            <dd>Host: {instance.host_name ?? "-"}</dd>
           </div>
           <div>
             <dt>Flavor</dt>
