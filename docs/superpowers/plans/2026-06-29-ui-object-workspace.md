@@ -1003,7 +1003,7 @@ git commit -m "feat: surface object workspaces in inventory"
 - Modify: `docs/generated/risk-register.md`
 - Modify: `docs/superpowers/plans/2026-06-29-ui-object-workspace.md`
 
-- [ ] **Step 1: Update generated UI evidence**
+- [x] **Step 1: Update generated UI evidence**
 
 Add to `docs/generated/ui-shell-horizon-parity.md` under `## Evidence`:
 
@@ -1020,7 +1020,7 @@ Add under `## Verification`:
 - `cd frontend && npm test -- --run src/workspace/ActionState.test.tsx src/workspace/MetricsPanel.test.tsx src/workspace/DiagnosticsPanel.test.tsx src/workspace/SelectionSummary.test.tsx src/workspace/vm/VirtualMachineWorkspace.test.tsx src/workspace/hypervisor/HypervisorWorkspace.test.tsx src/App.test.tsx src/shell/CloudShell.test.tsx`
 ```
 
-- [ ] **Step 2: Update risk register**
+- [x] **Step 2: Update risk register**
 
 Add one row after `R-072` in `docs/generated/risk-register.md`:
 
@@ -1028,7 +1028,7 @@ Add one row after `R-072` in `docs/generated/risk-register.md`:
 | R-075 | UI object workspace mistaken for implemented hypervisor/VM operations | The offline VM/hypervisor object workspace exposes vSphere-like administration surfaces and pending/blocked actions, but it does not implement backend contracts, live metrics, diagnostics, console proxy, snapshots, ISO mount, migration, host user management or OpenStack mutations. | Keep action states explicit, require backend OpenAPI contracts, negative authorization tests, audit mapping, operation evidence and live stand evidence before enabling any mutating control. | UI/E04/E06/E08 |
 ```
 
-- [ ] **Step 3: Run focused frontend verification**
+- [x] **Step 3: Run focused frontend verification**
 
 Run:
 
@@ -1038,7 +1038,7 @@ cd frontend && npm test -- --run src/workspace/ActionState.test.tsx src/workspac
 
 Expected result: all listed frontend tests pass.
 
-- [ ] **Step 4: Run frontend typecheck and lint**
+- [x] **Step 4: Run frontend typecheck and lint**
 
 Run:
 
@@ -1050,7 +1050,7 @@ cd frontend && npm run lint
 Expected result: both commands pass. The local Node engine warning from install is acceptable if tests,
 typecheck and lint pass.
 
-- [ ] **Step 5: Run repository hygiene checks**
+- [x] **Step 5: Run repository hygiene checks**
 
 Run:
 
@@ -1063,22 +1063,17 @@ git status --short
 Expected result: secret scan and diff check pass. `git status --short` shows only intentional files
 before the final commit.
 
-- [ ] **Step 6: Update this plan progress**
+- [x] **Step 6: Update this plan progress**
 
-In this file, append a short progress note under this task with the actual command results. Use this
-format:
-
-```markdown
 Verification results:
 
-- frontend focused tests: passed, record the exact Vitest count from the command output.
+- frontend focused tests: passed, 8 test files and 55 tests.
 - frontend typecheck: passed.
 - frontend lint: passed.
 - secret scan: passed.
 - `git diff --check`: passed.
-```
 
-- [ ] **Step 7: Commit Task 5**
+- [x] **Step 7: Commit Task 5**
 
 Run:
 
@@ -1089,10 +1084,10 @@ git commit -m "docs: record ui object workspace evidence"
 
 ## Final Review Checklist
 
-- [ ] The UI shows VM and hypervisor object workspaces on current paginated inventory data.
-- [ ] VM and hypervisor required actions are visible but not executable unless explicitly `enabled`.
-- [ ] Metrics and diagnostics states are explicit and do not create direct datasource or host calls.
-- [ ] Multi-target summaries do not imply permission for resources outside the current page.
-- [ ] Frontend tests cover no direct OpenStack/telemetry/host browser calls and no browser secret storage through existing App tests plus new workspace tests.
-- [ ] `App.tsx` changes are integration-only; new UI logic lives under `frontend/src/workspace`.
-- [ ] Generated evidence and risk register do not claim full Horizon replacement, live operations, live telemetry, diagnostics, console proxy or DKB compliance.
+- [x] The UI shows VM and hypervisor object workspaces on current paginated inventory data.
+- [x] VM and hypervisor required actions are visible but not executable unless explicitly `enabled`.
+- [x] Metrics and diagnostics states are explicit and do not create direct datasource or host calls.
+- [x] Multi-target summaries do not imply permission for resources outside the current page.
+- [x] Frontend tests cover no direct OpenStack/telemetry/host browser calls and no browser secret storage through existing App tests plus new workspace tests.
+- [x] `App.tsx` changes are integration-only; new UI logic lives under `frontend/src/workspace`.
+- [x] Generated evidence and risk register do not claim full Horizon replacement, live operations, live telemetry, diagnostics, console proxy or DKB compliance.

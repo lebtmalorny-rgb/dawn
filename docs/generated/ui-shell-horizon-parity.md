@@ -23,10 +23,15 @@
 - `frontend/src/App.test.tsx` verifies shell integration, no direct OpenStack browser calls, no
   full inventory browser load, no shell for users without accessible sections and no token/secret
   browser storage on the rendered shell path.
+- `frontend/src/workspace/vm/VirtualMachineWorkspace.tsx` and
+  `frontend/src/workspace/hypervisor/HypervisorWorkspace.tsx` expose the offline VM/hypervisor object
+  workspaces with required pending/blocked actions, metrics datasource states, diagnostics placeholder
+  and current-page multi-target summaries.
 
 ## Verification
 
 - `cd frontend && npm test -- --run src/App.test.tsx src/shell/CloudShell.test.tsx`
+- `cd frontend && npm test -- --run src/workspace/ActionState.test.tsx src/workspace/MetricsPanel.test.tsx src/workspace/DiagnosticsPanel.test.tsx src/workspace/SelectionSummary.test.tsx src/workspace/vm/VirtualMachineWorkspace.test.tsx src/workspace/hypervisor/HypervisorWorkspace.test.tsx src/App.test.tsx src/shell/CloudShell.test.tsx`
 - `cd frontend && npm run typecheck`
 - `cd frontend && npm run lint`
 - `cd frontend && npm test`
