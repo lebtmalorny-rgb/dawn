@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 
 import type { HypervisorItem } from "../../api";
@@ -31,21 +31,32 @@ const hypervisor: HypervisorItem = {
 };
 
 describe("HypervisorWorkspace", () => {
-  test("renders required hypervisor administration tabs and blocked/pending actions", () => {
+  test("renders required hypervisor workspace tabs, monitor navigation and blocked/pending actions", () => {
     render(<HypervisorWorkspace capabilities={["hypervisor.read"]} hypervisor={hypervisor} />);
 
-    for (const label of [
-      "Summary",
-      "VMs",
-      "Performance",
-      "Network",
-      "Services/NTP",
-      "Diagnostics",
-      "Users/Roles",
-      "Tasks/Events",
-    ]) {
-      expect(screen.getByText(label)).toBeInTheDocument();
+    const tabs = screen.getByRole("navigation", { name: "Hypervisor workspace tabs" });
+    for (const label of ["Summary", "Monitor", "Configure", "Permissions", "VMs", "Resource Pools", "Datastores", "Networks", "Updates"]) {
+      expect(within(tabs).getByText(label)).toBeInTheDocument();
     }
+
+    const monitorNav = screen.getByRole("navigation", { name: "Hypervisor Monitor navigation" });
+    for (const label of [
+      "Issues and Alarms",
+      "Performance Overview",
+      "Advanced Performance",
+      "Tasks",
+      "Events",
+      "Resource Allocation",
+      "Utilization",
+      "Hardware Health",
+      "Service Health",
+    ]) {
+      expect(within(monitorNav).getByText(label)).toBeInTheDocument();
+    }
+
+    expect(screen.getByRole("heading", { name: "Performance Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Utilization" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Events table" })).toBeInTheDocument();
     expect(screen.getByText("Enter maintenance with evacuation")).toBeInTheDocument();
     expect(screen.getByText("Reboot or shutdown")).toBeInTheDocument();
     expect(screen.getByText("Network adapter configuration")).toBeInTheDocument();

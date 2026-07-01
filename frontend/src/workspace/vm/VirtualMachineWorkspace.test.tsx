@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 
 import type { InstanceItem } from "../../api";
@@ -33,21 +33,29 @@ const vm: InstanceItem = {
 };
 
 describe("VirtualMachineWorkspace", () => {
-  test("renders required VM administration tabs and blocked/pending actions", () => {
+  test("renders required VM workspace tabs, monitor navigation and blocked/pending actions", () => {
     render(<VirtualMachineWorkspace capabilities={["instance.read"]} instance={vm} />);
 
-    for (const label of [
-      "Summary",
-      "Hardware",
-      "Network",
-      "Performance",
-      "Snapshots",
-      "Console",
-      "ISO/Media",
-      "Tasks/Events",
-    ]) {
-      expect(screen.getByText(label)).toBeInTheDocument();
+    const tabs = screen.getByRole("navigation", { name: "VM workspace tabs" });
+    for (const label of ["Summary", "Monitor", "Configure", "Permissions", "Hardware", "Network", "Snapshots", "Console", "ISO/Media"]) {
+      expect(within(tabs).getByText(label)).toBeInTheDocument();
     }
+
+    const monitorNav = screen.getByRole("navigation", { name: "VM Monitor navigation" });
+    for (const label of [
+      "Issues and Alarms",
+      "Performance Overview",
+      "Advanced Performance",
+      "Utilization",
+      "Tasks",
+      "Events",
+    ]) {
+      expect(within(monitorNav).getByText(label)).toBeInTheDocument();
+    }
+
+    expect(screen.getByRole("heading", { name: "Performance Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Utilization" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Events table" })).toBeInTheDocument();
     expect(screen.getByText("Create VM without OS")).toBeInTheDocument();
     expect(screen.getByText("Power on/off/reboot")).toBeInTheDocument();
     expect(screen.getByText("VM console")).toBeInTheDocument();
