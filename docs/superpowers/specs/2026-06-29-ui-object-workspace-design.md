@@ -14,8 +14,8 @@ pretending that unavailable backend contracts, telemetry, diagnostics or mutatin
 
 The observable result of the later implementation should be:
 
-- VM and hypervisor workspaces with `Summary`, `Performance`, `Diagnostics`, configuration and
-  `Tasks/Events` surfaces;
+- VM and hypervisor workspaces with top-level `Summary`, `Monitor`, `Configure`, `Permissions` and
+  related-resource tabs, plus type-specific secondary navigation inside `Monitor`;
 - action menus that show required host/VM functions as `enabled`, `disabled`, `pending` or
   `blocked`;
 - multi-object action context for several VMs or hypervisors, including allowed, denied, stale and
@@ -44,6 +44,16 @@ The current frontend already has:
 The current limitation is that the shell is still mostly list/view oriented. VM and hypervisor detail
 surfaces do not yet expose the full administration model described by the requirements.
 
+Additional vSphere screenshot review on 2026-07-01 refined the object workspace requirements:
+
+- the primary object tabs should stay coarse-grained, while detailed monitor pages live in a local
+  secondary side navigation;
+- performance time-series and current utilization/capacity bars are different surfaces, not the same
+  chart with different data;
+- event and task views are dense operator tables with per-column filtering, expandable rows, managed
+  columns and bounded page-size controls;
+- global warnings and object issue strips are first-class status regions, not incidental card content.
+
 ## Scope
 
 This design covers the next offline UI slice only:
@@ -68,21 +78,55 @@ introduced by this slice.
 
 ## Product Model
 
+### Workspace navigation model
+
+The object workspace should keep two levels of navigation:
+
+- top-level object tabs for stable work areas: `Summary`, `Monitor`, `Configure`, `Permissions` and
+  resource-specific relationship tabs such as `VMs`, `Networks`, `Volumes`, `Snapshots` or
+  `Updates`;
+- secondary navigation inside a selected top-level tab for dense object-local pages such as
+  `Performance Overview`, `Utilization`, `Tasks`, `Events` and health/status pages.
+
+This keeps the object header and action model stable while avoiding a long, flat tab row. The
+secondary navigation is resource-type-specific: VM and hypervisor monitor pages do not have to expose
+identical entries.
+
+The object header should show the resource type icon, object name, warning/health marker, compact
+quick actions and a single `Actions` menu. Object-level warnings should also appear as issue strips
+near the top of `Summary` or the relevant monitor page, with issue-scoped actions rendered as
+pending/disabled/blocked unless backend contracts exist.
+
 ### Hypervisor workspace
 
-The hypervisor object workspace should expose these tabs:
+The hypervisor object workspace should expose these top-level tabs:
 
 - `Summary`: host identity, service status/state, hypervisor type/version, AZ, aggregates,
-  running VM count, capacity summary, maintenance/disabled reason and freshness.
+  running VM count, issue strip, capacity summary, related objects, maintenance/disabled reason and
+  freshness.
+- `Monitor`: secondary navigation for host health, time-series, utilization, allocation, tasks and
+  events.
+- `Configure`: pending host configuration surfaces, including network, service/NTP, updates and
+  performance parameters when backend contracts are absent.
+- `Permissions`: explicit pending/blocked state for host-local users/rights until a PAM/RBAC contract
+  is approved.
 - `VMs`: server-paginated related VM list, not a full browser-side inventory copy.
-- `Performance`: CPU, memory, disk and network chart placeholders with datasource/freshness state.
-- `Network`: network adapter inventory placeholder and pending actions for enable/disable, VLAN, MTU,
-  DNS, gateway and related configuration.
-- `Services/NTP`: NTP/service status placeholders and pending actions.
-- `Diagnostics`: diagnostic collection status, pending bundle request and safe artifact placeholder.
-- `Users/Roles`: local host users/rights surface marked pending or blocked until an approved PAM/RBAC
-  contract exists.
-- `Tasks/Events`: operation timeline and audit/event links by correlation ID.
+- relationship tabs such as `Resource Pools`, `Datastores`, `Networks` and `Updates` only when a
+  backend contract or explicit disabled-state placeholder exists.
+
+The hypervisor `Monitor` secondary navigation should include:
+
+- `Issues and Alarms`: all issues, triggered alarms and issue-scoped pending actions.
+- `Performance Overview`: CPU, memory, disk and network time-series placeholders with
+  datasource/freshness state.
+- `Advanced Performance`: planned metric selection and drill-down placeholder.
+- `Tasks`: operation timeline and audit/event links by correlation ID.
+- `Events`: dense server-paginated event table.
+- `Resource Allocation`: CPU, memory and storage allocation pages.
+- `Utilization`: current host CPU, memory and storage capacity bars with absolute used/free/capacity
+  values and freshness.
+- `Hardware Health` and `Service Health`: explicit disabled/pending placeholders until corresponding
+  adapters exist.
 
 Required hypervisor actions are visible, but most are not executable in this slice:
 
@@ -96,18 +140,31 @@ Required hypervisor actions are visible, but most are not executable in this sli
 
 ### VM workspace
 
-The VM object workspace should expose these tabs:
+The VM object workspace should expose these top-level tabs:
 
 - `Summary`: VM identity, project, host, hypervisor, AZ, power/status/task state, flavor, image or boot
-  volume, addresses and freshness.
-- `Hardware`: CPU, RAM, disk and NIC summary plus pending modification actions.
+  volume, addresses, issue strip, compact capacity/status summary and freshness.
+- `Monitor`: secondary navigation for VM issues, performance, utilization, tasks and events.
+- `Configure`: hardware, network, media and advanced configuration surfaces, with mutating controls
+  pending/blocked until backend operation contracts exist.
+- `Permissions`: capability and ownership context where exposed by backend policy.
+- `Hardware`: CPU, RAM, disk and NIC summary plus pending modification actions when kept as a
+  first-level relationship tab by route design.
 - `Network`: NIC list placeholder, IP/gateway/DNS/MTU/VLAN labels where available, enable/disable
   actions pending.
-- `Performance`: CPU, memory, disk and network chart placeholders with datasource/freshness state.
 - `Snapshots`: one-time snapshot action pending until backend operation contract exists.
 - `Console`: explicit placeholder for console proxy design; no token or console URL exposed.
 - `ISO/Media`: ISO 9660 media mount action pending until backend workflow/API contract exists.
-- `Tasks/Events`: operation timeline and audit/event links by correlation ID.
+
+The VM `Monitor` secondary navigation should include:
+
+- `Issues and Alarms`: all issues, triggered alarms and issue-scoped pending actions.
+- `Performance Overview`: CPU, memory, disk and network time-series placeholders with
+  datasource/freshness state.
+- `Advanced Performance`: planned metric selection and drill-down placeholder.
+- `Utilization`: current CPU, memory, disk and network utilization summary where backend data exists.
+- `Tasks`: operation timeline and audit/event links by correlation ID.
+- `Events`: dense server-paginated event table.
 
 Required VM actions are visible, but most are not executable in this slice:
 
@@ -172,9 +229,34 @@ Metrics charts are part of the visible design from this slice, but data source s
 Frontend tests may use synthetic chart fixtures. Runtime UI must not call Prometheus, Gnocchi,
 Ceilometer, Aetos, OpenStack metrics APIs or host exporters directly.
 
+`Performance Overview` and `Utilization` are separate surfaces:
+
+- `Performance Overview` shows historical or real-time time-series for CPU, memory, disk and network.
+- `Utilization` shows current allocation/capacity bars and absolute used/free/capacity values.
+
+Both surfaces must display source, freshness and datasource state. Neither surface may imply that live
+telemetry is configured when the backend contract is absent.
+
 Diagnostics are modeled as asynchronous backend jobs in later slices. In this slice the UI shows
 planned collection status and safe artifact placeholders only. It must not accept arbitrary shell
 commands, paths, scripts, Python, Jinja or host credentials.
+
+## Event and Table UX
+
+Object `Tasks` and `Events` pages should use a dense operator table model:
+
+- server-side pagination, stable sort and typed filters;
+- visible page-size control bounded by backend maximum;
+- per-column filter affordances and a global filter only when translated to backend query state;
+- expandable rows for safe detail fields and correlation IDs;
+- managed columns and density state stored as view preference, not result rows;
+- target cells linking back to the relevant object workspace;
+- `Open in new tab` for large journal views where route state is shareable;
+- export shown only as a pending/disabled/backend-bounded action until an audited export contract
+  exists.
+
+The UI must not export or copy a full inventory/event dataset from browser memory. Any future export
+must be a backend operation with capability checks, scope limits, audit and redaction.
 
 ## Data Flow
 
@@ -205,7 +287,10 @@ the new UI into focused frontend modules, for example:
 - `frontend/src/workspace/ObjectWorkspace.tsx`;
 - `frontend/src/workspace/ActionState.tsx`;
 - `frontend/src/workspace/MetricsPanel.tsx`;
+- `frontend/src/workspace/UtilizationPanel.tsx`;
+- `frontend/src/workspace/ObjectEventTable.tsx`;
 - `frontend/src/workspace/DiagnosticsPanel.tsx`;
+- `frontend/src/workspace/SecondaryNavigation.tsx`;
 - `frontend/src/workspace/SelectionSummary.tsx`;
 - `frontend/src/workspace/vm/VirtualMachineWorkspace.tsx`;
 - `frontend/src/workspace/hypervisor/HypervisorWorkspace.tsx`;
@@ -224,6 +309,7 @@ The workspace must distinguish:
 - stale/partial read model;
 - telemetry not configured;
 - telemetry unavailable;
+- utilization data unavailable or stale;
 - diagnostics contract not implemented;
 - action blocked by missing backend contract;
 - action denied by current capability;
@@ -238,8 +324,11 @@ The implementation plan should add tests before code for:
 
 - VM workspace renders all required tabs and pending/blocked actions.
 - Hypervisor workspace renders all required tabs and pending/blocked actions.
+- VM and hypervisor `Monitor` tabs render resource-specific secondary navigation.
 - Multi-target summary shows allowed, denied, stale and blocked counts.
 - Metrics panels show `not_configured`, `unavailable`, `stale` and `ready` states from fixtures.
+- Utilization panels distinguish current capacity bars from performance time-series.
+- Event tables use server-side page/filter/sort state and do not export from browser memory.
 - Diagnostics panel is pending and does not render a shell/path/script input.
 - Console and ISO surfaces are visible but blocked/pending.
 - No direct browser call is made to OpenStack, telemetry or host endpoints.
@@ -275,6 +364,8 @@ authorization and not live OpenStack evidence.
 - The design is committed as a standalone spec.
 - The scope is implementable without test stand access.
 - Multi-hypervisor and multi-VM action context is explicit.
+- Top-level tabs and resource-specific secondary monitor navigation are explicit.
 - Mutating requirements are visible but not enabled without backend contracts.
 - Metrics and diagnostics are represented as explicit datasource/contract states.
+- Utilization and event-table behavior are represented without browser-side full data export.
 - Security boundaries remain backend/BFF-only and browser-secret-free.

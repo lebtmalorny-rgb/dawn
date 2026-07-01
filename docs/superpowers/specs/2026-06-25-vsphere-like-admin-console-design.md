@@ -4,9 +4,10 @@
 
 Cloud UI should present a dense administrative console for hypervisors and virtual machines, using
 VMware vSphere as the visual and workflow reference: inventory tree on the left, selected object
-workspace in the center, and tasks/events on the right. The first UI slice must show the full
-administrative surface, while actions without approved backend workflow/API contracts are visible as
-disabled or pending rather than hidden as if they did not exist.
+workspace in the center, and a bottom or side work panel for tasks, alarms and audit context. The
+first UI slice must show the full administrative surface, while actions without approved backend
+workflow/API contracts are visible as disabled or pending rather than hidden as if they did not
+exist.
 
 This document captures UI requirements and scope only. It does not implement UI code, backend
 workflow contracts, live host operations or production compliance evidence.
@@ -17,11 +18,23 @@ The approved layout is the classic vSphere shell:
 
 - left inventory tree for region, administration group, hypervisors, VMs, networks and resource groups;
 - center object workspace for list/detail pages, tabs, metrics and object actions;
-- right tasks/events rail for operation timeline, prechecks, audit-visible status and pending actions;
+- bottom or side work panel for operation timeline, prechecks, alarms, audit-visible status and
+  pending actions;
 - top navigation for inventory, operations, audit and administration modules.
 
 The console should feel like an operational tool: compact, table-first, low decoration, stable
 dimensions, strong status visibility and no marketing-style landing page.
+
+The object workspace uses two navigation levels:
+
+- top-level tabs for coarse work areas such as `Summary`, `Monitor`, `Configure`, `Permissions` and
+  related resource lists;
+- resource-specific secondary navigation inside `Monitor` for issues, performance overview,
+  utilization, tasks, events, allocation and health pages.
+
+Global warning banners, object issue strips and inventory-tree warning markers are explicit status
+regions. They may suggest issue-scoped actions, but those actions still follow the enabled,
+disabled, pending and blocked action model below.
 
 ## Primary Workspaces
 
@@ -42,16 +55,26 @@ The hypervisor workspace must support these screens and action states:
 | Performance metrics: CPU, RAM, disk, NICs | Enabled as charts when telemetry endpoint exists; placeholder until then | Backend-only metrics API; no raw browser PromQL |
 | Host users and rights management | Pending/disabled | Separate RBAC/workflow design; must not bypass Keystone/PAM policy |
 
-Tabs for a hypervisor detail page:
+Top-level tabs for a hypervisor detail page:
 
 - Summary;
+- Monitor;
+- Configure;
+- Permissions;
 - VMs;
-- Performance;
-- Network;
-- Services/NTP;
-- Diagnostics;
-- Users/Roles;
-- Tasks/Events.
+- Resource Pools or Aggregates/Placement where contracted;
+- Datastores/Storage where contracted;
+- Networks;
+- Updates.
+
+Hypervisor `Monitor` secondary pages:
+
+- Issues and Alarms;
+- Performance Overview and Advanced Performance;
+- Resource Allocation: CPU, Memory and Storage;
+- Utilization;
+- Tasks and Events;
+- Hardware Health and Service Health placeholders until adapters exist.
 
 ### Virtual Machines
 
@@ -71,16 +94,24 @@ The VM workspace must support these screens and action states:
 | Mount ISO 9660 media | Pending/disabled | Backend workflow/API contract required |
 | VM migration within administration group without guest OS downtime | Pending/disabled | Backend workflow with group preconditions and live migration evidence |
 
-Tabs for a VM detail page:
+Top-level tabs for a VM detail page:
 
 - Summary;
+- Monitor;
+- Configure;
+- Permissions;
 - Hardware;
 - Network;
-- Performance;
 - Snapshots;
 - Console;
-- ISO/Media;
-- Tasks/Events.
+- ISO/Media.
+
+VM `Monitor` secondary pages:
+
+- Issues and Alarms;
+- Performance Overview and Advanced Performance;
+- Utilization;
+- Tasks and Events.
 
 ## Navigation and Object Model
 
@@ -113,7 +144,7 @@ Enabled mutating actions must:
 - include CSRF and idempotency key where required;
 - return `operation_id`;
 - create sanitized audit events;
-- show progress in the tasks/events rail;
+- show progress in the object timeline and bottom/side work panel;
 - keep OpenStack/host credentials, Vault secrets and tokens out of the browser.
 
 No arbitrary shell command, user-provided workflow name, user-provided Jinja/Python or direct host
@@ -129,8 +160,25 @@ availability must be explicit:
 - freshness timestamp and source label when data is present;
 - no direct browser access to Prometheus or OpenStack metrics APIs.
 
+Performance and utilization are separate surfaces. Performance uses time-series charts. Utilization
+uses current allocation/capacity bars with absolute used/free/capacity values. Both surfaces must
+show source, freshness and datasource state.
+
 Diagnostics should be modeled as asynchronous operations. The UI should display bundle metadata,
 safe status and download/view actions only after backend redaction and authorization checks.
+
+## Tasks, Events and Tables
+
+Object tasks and events use dense server-driven tables:
+
+- quick and typed filters must translate to backend query state;
+- sort, pagination and page-size controls remain server-side and bounded;
+- rows may expand for safe detail fields and correlation IDs;
+- target cells link to object workspaces;
+- manage-column and density preferences store view state only, not result rows;
+- export is disabled or pending until a backend-bounded, audited and redacted export contract exists.
+
+The browser must not copy or export a full inventory/event dataset from local memory.
 
 ## Visual Style
 
@@ -140,7 +188,8 @@ Use PatternFly as the existing implementation base and keep a vSphere-like infor
 - fixed action toolbar;
 - status badges and health summary;
 - tabs for object details;
-- right-side tasks/events rail;
+- secondary side navigation inside dense object tabs;
+- bottom or side tasks/events/audit work panel;
 - restrained neutral palette with status colors;
 - no hero page, card-heavy marketing layout or decorative backgrounds.
 
@@ -166,9 +215,10 @@ with backend tests, OpenAPI/contracts, traceability updates and live evidence wh
 
 Recommended first UI implementation slice after deployment gates:
 
-1. Shell/navigation: vSphere-like layout, inventory tree, object workspace and tasks/events rail.
+1. Shell/navigation: vSphere-like layout, inventory tree, object workspace and bottom/side work panel.
 2. Read-only hypervisor/VM detail pages using existing inventory APIs and disabled/pending actions.
-3. Metrics and diagnostics placeholders with explicit unavailable/degraded states.
+3. Monitor secondary navigation with metrics, utilization, event-table and diagnostics placeholders
+   with explicit unavailable/degraded states.
 4. First safe operations: host maintenance mode and VM power actions, only after backend workflow
    contracts and negative authorization tests exist.
 5. Expanded VM/host administration actions in separate slices, each with precheck, workflow, audit,
