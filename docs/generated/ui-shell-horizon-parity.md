@@ -27,10 +27,17 @@
   `frontend/src/workspace/hypervisor/HypervisorWorkspace.tsx` expose the offline VM/hypervisor object
   workspaces with required pending/blocked actions, metrics datasource states, diagnostics placeholder
   and current-page multi-target summaries.
+- `frontend/src/workspace/SecondaryNavigation.tsx` keeps `Monitor` resource-specific instead of a
+  long flat tab row, with VM and hypervisor tests covering different monitor pages.
+- `frontend/src/workspace/UtilizationPanel.tsx` separates current capacity/allocation bars from
+  time-series `Performance Overview` metrics.
+- `frontend/src/workspace/ObjectEventTable.tsx` renders dense server-driven event table state with
+  bounded page size, typed-filter wording, object target links and disabled/pending export.
 
 ## Verification
 
 - `cd frontend && npm test -- --run src/App.test.tsx src/shell/CloudShell.test.tsx`
+- `cd frontend && npm test -- --run src/workspace/SecondaryNavigation.test.tsx src/workspace/UtilizationPanel.test.tsx src/workspace/ObjectEventTable.test.tsx src/workspace/vm/VirtualMachineWorkspace.test.tsx src/workspace/hypervisor/HypervisorWorkspace.test.tsx`
 - `cd frontend && npm test -- --run src/workspace/ActionState.test.tsx src/workspace/MetricsPanel.test.tsx src/workspace/DiagnosticsPanel.test.tsx src/workspace/SelectionSummary.test.tsx src/workspace/vm/VirtualMachineWorkspace.test.tsx src/workspace/hypervisor/HypervisorWorkspace.test.tsx src/App.test.tsx src/shell/CloudShell.test.tsx`
 - `cd frontend && npm run typecheck`
 - `cd frontend && npm run lint`

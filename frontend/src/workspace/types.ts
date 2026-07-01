@@ -30,6 +30,48 @@ export type MetricSeries = {
   points: number[];
 };
 
+export type WorkspaceTab = {
+  key: string;
+  label: string;
+};
+
+export type SecondaryNavigationSection = {
+  key: string;
+  title: string;
+  items: string[];
+};
+
+export type UtilizationMetric = {
+  key: string;
+  title: string;
+  usedLabel: string;
+  freeLabel: string;
+  capacityLabel: string;
+  usedPercent: number;
+  state: MetricDatasourceState;
+  freshnessLabel: string;
+};
+
+export type ObjectEventRow = {
+  id: string;
+  description: string;
+  type: string;
+  dateTime: string;
+  task: string;
+  targetLabel: string;
+  userLabel: string;
+  correlationId: string;
+};
+
+export type ObjectEventTableState = {
+  pageSize: number;
+  totalItems: number;
+  sortLabel: string;
+  filterLabel: string;
+  exportState: "disabled" | "pending" | "blocked";
+  exportReason: string;
+};
+
 export type DiagnosticState = {
   state: "pending" | "blocked";
   title: string;

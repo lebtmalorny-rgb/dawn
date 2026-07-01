@@ -48,7 +48,8 @@ Reference UI observation:
 
 - A test vSphere Client was inspected in a temporary browser profile through read-only DevTools/CDP
   snapshots.
-- Captured screenshots and DOM snapshots were kept in `/tmp` only and are not committed.
+- Additional local screenshot review on 2026-07-01 refined the object workspace recommendations.
+- Captured screenshots, local screenshots and DOM snapshots are not committed.
 - Credentials, cookies, tokens and session data were not written to the repository or this spec.
 
 ## Key decisions
@@ -81,6 +82,9 @@ The target shell has these stable regions:
 - Object tabs:
   `Summary`, `Monitor`, `Configure`, `Permissions`, related resource tabs, `Operations`,
   `Audit`.
+- Secondary object navigation:
+  resource-specific pages inside dense tabs, especially `Monitor` pages for issues, performance,
+  utilization, tasks, events, allocation and health.
 - Bottom work panel:
   `Recent Tasks`, `Alarms`, `Audit Tail`, `Approvals`.
 
@@ -90,12 +94,17 @@ The vSphere reference specifically validated:
 - global search in the top chrome;
 - object title plus `Actions`;
 - object-level tabs;
+- resource-specific secondary navigation inside `Monitor`;
+- global warning banners, object issue strips and inventory-tree warning markers;
+- separate performance time-series and current utilization/capacity views;
 - dense datagrid with quick filter, advanced filter, resizable columns, manage columns, export and
   page-size control;
+- expandable tasks/events rows and target links back to object workspaces;
 - persistent bottom tasks/alarms panel.
 
 Cloud UI keeps those interaction patterns but adapts them to OpenStack read-model constraints,
-capabilities, DKB evidence and partial/stale states.
+capabilities, DKB evidence and partial/stale states. In particular, export, copy, filtering and
+pagination remain backend-bounded when they operate on inventory, audit, task or event datasets.
 
 ### 3. Horizon parity model
 

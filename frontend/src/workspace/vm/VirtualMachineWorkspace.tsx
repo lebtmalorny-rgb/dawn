@@ -2,9 +2,20 @@ import type { InstanceItem } from "../../api";
 import { ActionStateList } from "../ActionState";
 import { DiagnosticsPanel } from "../DiagnosticsPanel";
 import { MetricsPanel } from "../MetricsPanel";
+import { ObjectEventTable } from "../ObjectEventTable";
+import { SecondaryNavigation } from "../SecondaryNavigation";
 import { SelectionSummaryPanel } from "../SelectionSummary";
 import { TasksEventsPanel } from "../TasksEventsPanel";
-import type { MetricSeries, WorkspaceAction } from "../types";
+import { UtilizationPanel } from "../UtilizationPanel";
+import type {
+  MetricSeries,
+  ObjectEventRow,
+  ObjectEventTableState,
+  SecondaryNavigationSection,
+  UtilizationMetric,
+  WorkspaceAction,
+  WorkspaceTab,
+} from "../types";
 
 type VirtualMachineWorkspaceProps = {
   instance: InstanceItem;
@@ -46,16 +57,109 @@ const VM_METRICS: MetricSeries[] = [
   },
 ];
 
-const VM_TABS = [
-  "Summary",
-  "Hardware",
-  "Network",
-  "Performance",
-  "Snapshots",
-  "Console",
-  "ISO/Media",
-  "Tasks/Events",
+const VM_TABS: WorkspaceTab[] = [
+  { key: "summary", label: "Summary" },
+  { key: "monitor", label: "Monitor" },
+  { key: "configure", label: "Configure" },
+  { key: "permissions", label: "Permissions" },
+  { key: "hardware", label: "Hardware" },
+  { key: "network", label: "Network" },
+  { key: "snapshots", label: "Snapshots" },
+  { key: "console", label: "Console" },
+  { key: "iso-media", label: "ISO/Media" },
 ];
+
+const VM_MONITOR_NAVIGATION: SecondaryNavigationSection[] = [
+  {
+    key: "issues",
+    title: "Issues and Alarms",
+    items: ["All Issues", "Triggered Alarms"],
+  },
+  {
+    key: "performance",
+    title: "Performance",
+    items: ["Performance Overview", "Advanced Performance"],
+  },
+  {
+    key: "utilization",
+    title: "Usage",
+    items: ["Utilization"],
+  },
+  {
+    key: "tasks-events",
+    title: "Tasks and Events",
+    items: ["Tasks", "Events"],
+  },
+];
+
+const VM_EVENT_TABLE_STATE: ObjectEventTableState = {
+  pageSize: 100,
+  totalItems: 1,
+  sortLabel: "Date Time descending",
+  filterLabel: "Typed filters are server-side",
+  exportState: "pending",
+  exportReason: "Backend-bounded audited export contract is not enabled",
+};
+
+function buildVmUtilization(instance: InstanceItem): UtilizationMetric[] {
+  return [
+    {
+      key: "cpu",
+      title: "VM CPU",
+      usedLabel: `${instance.vcpus} vCPU allocated`,
+      freeLabel: "Guest usage unavailable",
+      capacityLabel: "Flavor allocation",
+      usedPercent: 0,
+      state: "not_configured",
+      freshnessLabel: "Backend utilization endpoint absent",
+    },
+    {
+      key: "memory",
+      title: "VM Memory",
+      usedLabel: `${instance.ram_mb} MB allocated`,
+      freeLabel: "Guest usage unavailable",
+      capacityLabel: "Flavor allocation",
+      usedPercent: 0,
+      state: "not_configured",
+      freshnessLabel: "Backend utilization endpoint absent",
+    },
+    {
+      key: "disk",
+      title: "VM Disk",
+      usedLabel: `${instance.disk_gb} GB allocated`,
+      freeLabel: "Guest usage unavailable",
+      capacityLabel: "Flavor allocation",
+      usedPercent: 0,
+      state: "not_configured",
+      freshnessLabel: "Backend utilization endpoint absent",
+    },
+    {
+      key: "network",
+      title: "VM Network",
+      usedLabel: "No interface utilization",
+      freeLabel: "Datasource absent",
+      capacityLabel: "Backend contract required",
+      usedPercent: 0,
+      state: "not_configured",
+      freshnessLabel: "Backend utilization endpoint absent",
+    },
+  ];
+}
+
+function buildVmEvents(instance: InstanceItem): ObjectEventRow[] {
+  return [
+    {
+      id: `vm-event-${instance.instance_id}`,
+      description: `Read-model observation for ${instance.name}`,
+      type: "Information",
+      dateTime: instance.observed_at,
+      task: "Inventory observation",
+      targetLabel: "Current VM",
+      userLabel: "portal-system",
+      correlationId: instance.instance_id,
+    },
+  ];
+}
 
 export function VirtualMachineWorkspace({
   capabilities,
@@ -130,9 +234,14 @@ export function VirtualMachineWorkspace({
     <section className="cloud-ui-object-workspace" aria-label="VM object workspace">
       <nav className="cloud-ui-workspace-tabs" aria-label="VM workspace tabs">
         {VM_TABS.map((tab) => (
-          <span key={tab}>{tab}</span>
+          <span key={tab.key}>{tab.label}</span>
         ))}
       </nav>
+      <SecondaryNavigation
+        activeItem="Performance Overview"
+        ariaLabel="VM Monitor navigation"
+        sections={VM_MONITOR_NAVIGATION}
+      />
 
       <section className="cloud-ui-workspace-panel" aria-label="VM summary">
         <h3>VM summary</h3>
@@ -171,7 +280,8 @@ export function VirtualMachineWorkspace({
         title="Selected VM targets"
       />
       <ActionStateList actions={actions} title="VM actions" />
-      <MetricsPanel metrics={VM_METRICS} title="VM performance metrics" />
+      <MetricsPanel metrics={VM_METRICS} title="Performance Overview" />
+      <UtilizationPanel metrics={buildVmUtilization(instance)} title="Utilization" />
       <DiagnosticsPanel
         state={{
           state: "pending",
@@ -180,6 +290,7 @@ export function VirtualMachineWorkspace({
         }}
       />
       <TasksEventsPanel objectId={instance.instance_id} />
+      <ObjectEventTable rows={buildVmEvents(instance)} state={VM_EVENT_TABLE_STATE} title="Events" />
     </section>
   );
 }

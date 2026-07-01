@@ -1,7 +1,7 @@
 # Актуальный реестр рисков
 
 - Stage: UI shell and Horizon parity first slice
-- Last updated: 2026-06-26
+- Last updated: 2026-07-01
 - Rule: запись в этом файле не является принятием риска. Риск считается сниженным только после теста, evidence и ссылки из ExecPlan/ДКБ.
 
 ## Снятые или суженные решениями риски
@@ -120,6 +120,7 @@
 |---|---|---|---|---|
 | R-072 | UI shell and Horizon parity registry mistaken for implemented Horizon replacement | The first UI slice creates a vSphere-informed shell and static Horizon parity registry, but it does not implement every Horizon workflow, production federation, real Watcher/Masakari workflows, export approvals or DKB compliance evidence. | Keep parity rows, disabled-state reasons, backend/API tests and DKB evidence gates explicit before claiming Horizon replacement or production compliance. | UI/E04/E08 |
 | R-075 | UI object workspace mistaken for implemented hypervisor/VM operations | The offline VM/hypervisor object workspace exposes vSphere-like administration surfaces and pending/blocked actions, but it does not implement backend contracts, live metrics, diagnostics, console proxy, snapshots, ISO mount, migration, host user management or OpenStack mutations. | Keep action states explicit, require backend OpenAPI contracts, negative authorization tests, audit mapping, operation evidence and live stand evidence before enabling any mutating control. | UI/E04/E06/E08 |
+| R-076 | Monitor utilization/events surfaces mistaken for live telemetry or audited export | The UI now separates `Performance Overview`, `Utilization`, `Tasks` and `Events` and renders dense event-table state, but all data remains static/read-model-derived placeholder state. Export is disabled/pending and no backend telemetry/export contract is implemented. | Keep datasource state visible, keep export disabled until a backend-bounded audited contract exists, and require OpenAPI, authorization, redaction and load evidence before enabling live telemetry or event export. | UI/E04/E07/E10 |
 
 ## Immediate priority order
 

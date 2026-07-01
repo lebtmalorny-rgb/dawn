@@ -1,9 +1,9 @@
 # Current state baseline
 
-- Date: 2026-06-28
+- Date: 2026-07-01
 - Workspace: `/Users/dmitry/Desktop/dawn`
 - Stage: E09.8 deployment smoke/evidence handoff
-- Evidence status: all-in-one test UI is role-reconfigured, Kolla CLI custom-playbook path is migration- and smoke-passed, AIO operator runbook is recorded, and full three-node E09 acceptance remains pending
+- Evidence status: all-in-one test UI is role-reconfigured, the 2026-07-01 vSphere-like UI image refresh is smoke-passed through the Kolla CLI custom-playbook path, AIO operator runbook is recorded, and full three-node E09 acceptance remains pending
 
 ## Repository state
 
@@ -32,17 +32,18 @@ E09 is the active stage. Repository-side evidence exists for E09.1-E09.8:
 - E09.7 reconfigure, rolling update and rollback lifecycle contract;
 - E09.8 fail-closed deployment evidence runner and redaction tests.
 
-All-in-one test UI status on 2026-06-28:
+All-in-one test UI status on 2026-07-01:
 
 - approved test inventory `/etc/kolla/all-in-one` was used through Ansible host `192.168.10.15`;
 - `deploy/kolla/ansible` was synced to `/etc/kolla/cloud-ui-sync-bundle` on the Ansible host;
 - `playbooks/cloud-ui-aio-reconfigure.yml` was executed through the Kolla-Ansible environment against
   host group `openstack-aio`;
-- backend image `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-backend@sha256:7e8a4bae48bbc2b3539b33babe39d290b22ae2d61e21d0f886434af1ac2bc438` is live;
-- frontend image `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-frontend@sha256:750ac3131e9ea9868d0893ff6df4eb603641b31c413c204c6a1470c20d17e790` is live;
+- backend image `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-backend@sha256:488fe10ca83838a17283e363d4bcc3efe1e5314b2a1a54103ee78d9a11777f63` is live;
+- frontend image `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-frontend@sha256:087aca8065069ab760308f9ce299603789f4a63fb728494e556b699fc531fd05` is live;
 - four Cloud UI containers are running on `openstack-aio`: frontend, api, worker and events;
 - API readiness on `127.0.0.1:18081` returns HTTP 200 with DB/RabbitMQ reachable;
-- frontend on `127.0.0.1:13080` returns HTTP 200 and references bundle `index-CPtHnxYH.js`;
+- frontend on `127.0.0.1:13080` returns HTTP 200 and references bundle `index-D8pWmsuw.js`
+  plus stylesheet `index-OB7EfGmx.css`;
 - frontend proxy to `/api/v1/session` returns HTTP 401 `not_authenticated`;
 - sanitized inspect shows all four containers run as `cloudui` with read-only root filesystem,
   dropped capabilities and `no-new-privileges`.
@@ -50,6 +51,9 @@ All-in-one test UI status on 2026-06-28:
   skipped=1`; the changes were the disposable migration precheck and upgrade containers.
 - follow-up AIO idempotency with `cloud_ui_aio_run_migration=false` completed with no changes:
   `openstack-aio : ok=34 changed=0 failed=0 skipped=3`.
+- 2026-07-01 UI refresh with `cloud_ui_aio_run_migration=false` completed with
+  `openstack-aio : ok=34 changed=4 failed=0 skipped=3`; the four permanent Cloud UI containers were
+  replaced with the new digest-pinned images.
 - operator runbook for the current AIO baseline is recorded in
   `docs/generated/e09-aio-operator-runbook.md`.
 
@@ -77,6 +81,10 @@ Latest local verification for the handoff:
 | E09 AIO Kolla CLI stale digest gate | passed: stale backend/frontend digest inputs returned wrapper exit code `2` before Kolla-Ansible started |
 | E09 AIO Kolla CLI reconfigure with migration | passed: `run-cloud-ui-aio-kolla.py reconfigure` via `kolla-ansible reconfigure -p` recap `openstack-aio : ok=36 changed=2 failed=0 skipped=1` |
 | E09 AIO Kolla CLI idempotency | passed: `run-cloud-ui-aio-kolla.py reconfigure-no-migration` via `kolla-ansible reconfigure -p` recap `openstack-aio : ok=34 changed=0 failed=0 skipped=3` |
+| E04/E09 AIO Kolla UI image build | passed: temporary source pin `506facab4f9f115cc063b8e52cf90d565a10aea6`, tag `2025.1-rocky-9-ui-vsphere-20260701T2230`, backend digest `sha256:488fe10ca83838a17283e363d4bcc3efe1e5314b2a1a54103ee78d9a11777f63`, frontend digest `sha256:087aca8065069ab760308f9ce299603789f4a63fb728494e556b699fc531fd05` |
+| E04/E09 AIO Kolla CLI UI preflight | passed: new digest pair completed with `localhost : ok=10 changed=0 failed=0` |
+| E04/E09 AIO Kolla CLI UI reconfigure | passed: `run-cloud-ui-aio-kolla.py reconfigure-no-migration` completed with `openstack-aio : ok=34 changed=4 failed=0 skipped=3`; migration skipped |
+| E04/E09 AIO UI smoke | passed: API ready HTTP 200 with DB/RabbitMQ reachable, frontend index HTTP 200 references `index-D8pWmsuw.js` and `index-OB7EfGmx.css`, frontend `/api/v1/session` HTTP 401 `not_authenticated`, sanitized inspect shows new digests with `user=cloudui`, read-only rootfs, `cap_drop=[ALL]` and `no-new-privileges` |
 | E09.8 sanitized Docker inspect via Ansible script | passed: four containers non-root, read-only rootfs, `cap_drop=["ALL"]`, `no-new-privileges`, expected ports/alias |
 | E09.8 live endpoint checks via Ansible `uri` | passed: API ready HTTP 200, frontend index HTTP 200, frontend `/api/v1/session` HTTP 401 |
 | `UV_CACHE_DIR=/tmp/dawn-uv-cache UV_PYTHON_INSTALL_DIR=/tmp/dawn-uv-python UV_PROJECT_ENVIRONMENT=/tmp/dawn-backend-venv uv run --python 3.11 --project backend --extra dev pytest tests/test_e09_deployment_smoke_evidence.py tests/test_e09_reconfigure_rollback.py tests/test_e09_kolla_ansible_role.py tests/test_e09_haproxy_tls_network.py tests/test_e09_process_containers.py tests/test_e09_migration_job.py tests/test_e09_db_rabbitmq_provisioning.py tests/test_e09_kolla_image_build.py backend/tests/test_cli.py -q` | passed: 81 tests |

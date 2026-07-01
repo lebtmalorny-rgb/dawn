@@ -1,12 +1,12 @@
 # E09.8 Deployment smoke/evidence
 
 - Stage: E09.8 Deployment smoke/evidence
-- Live execution status: `partial_lab_kolla_cli_reconfigured_all_in_one`
+- Live execution status: `partial_lab_kolla_cli_reconfigured_all_in_one_ui_refreshed_20260701`
 - Scope: `partial` `test-stand` `all-in-one`
 - Inventory: `/etc/kolla/all-in-one` on `192.168.10.15`; validated from a temporary copy outside the repository
 - Target node: `openstack-aio` reached through the approved Ansible host
-- Backend image: `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-backend@sha256:7e8a4bae48bbc2b3539b33babe39d290b22ae2d61e21d0f886434af1ac2bc438`
-- Frontend image: `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-frontend@sha256:750ac3131e9ea9868d0893ff6df4eb603641b31c413c204c6a1470c20d17e790`
+- Backend image: `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-backend@sha256:488fe10ca83838a17283e363d4bcc3efe1e5314b2a1a54103ee78d9a11777f63`
+- Frontend image: `192.168.10.15:5000/kolla/cloud-ui-test/cloud-ui-frontend@sha256:087aca8065069ab760308f9ce299603789f4a63fb728494e556b699fc531fd05`
 - Rollback snapshot: `/root/cloud-ui-aio-rollback-20260628T122556Z` on the test host; contents are not committed because runtime env/inspect files can contain secrets
 
 ## Evidence rows
@@ -21,9 +21,29 @@
 | DB/RabbitMQ | passed_lab | After no-log lab remediation of the existing Cloud UI MariaDB and RabbitMQ principals, API readiness reports database and RabbitMQ `reachable`. The earlier failure was MariaDB `1045 Access denied` and RabbitMQ `403 ACCESS_REFUSED`, i.e. runtime DB/MQ principal or secret drift, not Keystone RBAC. Secret values were not printed or committed. Full rotation/revoke evidence remains pending. |
 | HAProxy/TLS | pending_external_evidence | Smoke was collected through direct all-in-one test ports `13080` and `18081`. Same-origin HAProxy/VIP/TLS and negative certificate evidence were not collected in this run. |
 | container hardening | partial_lab_evidence | Sanitized Docker inspect shows all four containers run as `cloudui` with `readonly=true`, `cap_drop=["ALL"]`, `security_opt=["no-new-privileges:true"]` and `kolla_logs:/var/log/kolla`. SELinux label evidence was not collected. |
-| API/UI smoke | passed_lab | API readiness returned HTTP 200 with DB/RabbitMQ reachable. Frontend returned HTTP 200 and referenced `/assets/index-CPtHnxYH.js`. Frontend proxy to `/api/v1/session` returned HTTP 401 `not_authenticated`, proving BFF routing without exposing a session. |
+| API/UI smoke | passed_lab | API readiness returned HTTP 200 with DB/RabbitMQ reachable. Frontend returned HTTP 200 and referenced `/assets/index-D8pWmsuw.js` plus `/assets/index-OB7EfGmx.css`. Frontend proxy to `/api/v1/session` returned HTTP 401 `not_authenticated`, proving BFF routing without exposing a session. |
 | rollback | partial_lab_evidence | Rollback pending for full E09 acceptance. The migration-enabled Kolla CLI path run created rollback snapshot `/root/cloud-ui-aio-rollback-20260628T122556Z`; snapshot files are retained only on the test host because inspect/env backups can contain secrets. |
-| live reconfigure | passed_aio_kolla_cli_path_with_migration | `playbooks/cloud-ui-aio-reconfigure.yml` was synced to the Ansible host and executed through `kolla-ansible reconfigure -p ... -t cloud-ui`. Preflight completed with `ok=10 changed=0 failed=0`; migration-enabled reconfigure completed with `ok=36 changed=2 failed=0 skipped=1`; the idempotent reconfigure with migration disabled completed with `ok=34 changed=0 failed=0 skipped=3`. This is a bounded AIO Kolla CLI custom-playbook path, not full upstream `site.yml` service integration or three-node acceptance. |
+| live reconfigure | passed_aio_kolla_cli_path_with_migration | `playbooks/cloud-ui-aio-reconfigure.yml` was synced to the Ansible host and executed through `kolla-ansible reconfigure -p ... -t cloud-ui`. Preflight completed with `ok=10 changed=0 failed=0`; migration-enabled reconfigure completed with `ok=36 changed=2 failed=0 skipped=1`; the idempotent reconfigure with migration disabled completed with `ok=34 changed=0 failed=0 skipped=3`. On 2026-07-01 the UI image refresh used the same Kolla CLI path with `cloud_ui_aio_run_migration=false` and completed with `openstack-aio : ok=34 changed=4 failed=0 skipped=3`. This is a bounded AIO Kolla CLI custom-playbook path, not full upstream `site.yml` service integration or three-node acceptance. |
+
+## Live UI refresh on 2026-07-01
+
+The following checks were run only against the approved all-in-one test stand. No production host,
+inventory, runtime vars file, credential, private key, cookie, token or full runtime env is stored in
+this evidence.
+
+| Item | Result |
+|---|---|
+| Temporary source snapshot | The local worktree was copied to `/tmp/dawn-ui-vsphere-monitor-workspace.rQdpHY` on the Ansible host, then committed only inside that temporary repository as source pin `506facab4f9f115cc063b8e52cf90d565a10aea6`. Local repository history was not changed. |
+| Frontend dist | `npm run build` produced `/assets/index-D8pWmsuw.js` and `/assets/index-OB7EfGmx.css`; the Kolla wrapper dist hash was `70d2da07c0b26e4a27f38a861317e793d237098debf9132161ba8252d9a48aa0`. |
+| Kolla image build/push | `deploy/kolla/scripts/build-images.sh list` passed with profile images `base`, `openstack-base`, `cloud-ui-backend`, `cloud-ui-frontend`. `build-images.sh push` built and pushed tag `2025.1-rocky-9-ui-vsphere-20260701T2230`. The initial Kolla registry namespace included a duplicate `cloud-ui-test`; the built backend/frontend images were retagged and pushed to the expected `192.168.10.15:5000/kolla/cloud-ui-test` path without rebuilding. |
+| Registry digests | Backend manifest digest `sha256:488fe10ca83838a17283e363d4bcc3efe1e5314b2a1a54103ee78d9a11777f63`; frontend manifest digest `sha256:087aca8065069ab760308f9ce299603789f4a63fb728494e556b699fc531fd05`. |
+| Kolla CLI AIO preflight | `run-cloud-ui-aio-kolla.py preflight` with the new digest pair completed with `localhost : ok=10 changed=0 failed=0`. |
+| Kolla CLI AIO no-migration reconfigure | `run-cloud-ui-aio-kolla.py reconfigure-no-migration` completed with `openstack-aio : ok=34 changed=4 failed=0 skipped=3`. Migration precheck and one-shot migration were skipped. Kolla emitted a Docker warning that IPv4 forwarding is disabled; direct API/frontend smoke below still passed. |
+| Running containers | `cloud_ui_frontend`, `cloud_ui_api`, `cloud_ui_worker` and `cloud_ui_events` were up from the new digest-pinned backend/frontend images. |
+| API readiness after UI refresh | `http://127.0.0.1:18081/api/v1/health/ready` returned HTTP 200 with `database.reachable` and `rabbitmq.reachable` at `Wed, 01 Jul 2026 20:07:09 GMT`. |
+| Frontend index after UI refresh | `http://127.0.0.1:13080/` returned HTTP 200 and referenced `/assets/index-D8pWmsuw.js` plus `/assets/index-OB7EfGmx.css` at `Wed, 01 Jul 2026 20:07:09 GMT`. |
+| Frontend BFF route after UI refresh | `http://127.0.0.1:13080/api/v1/session` returned HTTP 401 with machine-readable `not_authenticated` and Russian user message `Требуется вход`. |
+| Container hardening after UI refresh | Sanitized inspect confirmed frontend image digest `sha256:087aca8065069ab760308f9ce299603789f4a63fb728494e556b699fc531fd05`, API image digest `sha256:488fe10ca83838a17283e363d4bcc3efe1e5314b2a1a54103ee78d9a11777f63`, `user=cloudui`, `readonly=true`, `cap_drop=[ALL]` and `security_opt=[no-new-privileges:true]`. |
 
 ## Live execution on 2026-06-28
 
